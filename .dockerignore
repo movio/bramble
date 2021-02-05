@@ -1,0 +1,5 @@
+.git
+docs
+contrib
+Dockerfile
+Makefile

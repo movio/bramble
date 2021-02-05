@@ -1,0 +1,8 @@
+/go.sum
+.gitignore
+.dockerignore
+CODEOWNERS
+*.graphql
+*.json
+python/.env
+python/Pipfile*
