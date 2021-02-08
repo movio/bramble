@@ -5,6 +5,5 @@ go.mod      internal_tools/graphql_gateway/server/build_config
 .drone.yml  internal_tools/graphql_gateway/server/ci_config
 *.jsonnet   internal_tools/graphql_gateway/server/ci_config
 docs        internal_tools/graphql_gateway/server/documentation
-python      internal_tools/graphql_gateway/client/python_library
+examples    internal_tools/graphql_gateway/server/documentation
 plugins     internal_tools/graphql_gateway/server/plugins
-contrib     internal_tools/graphql_gateway/server/contrib

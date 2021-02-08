@@ -1,8 +1,8 @@
-/go.sum
-.gitignore
 .dockerignore
-CODEOWNERS
+.gitignore
 *.graphql
 *.json
-python/.env
-python/Pipfile*
+*.png
+go.sum
+CODEOWNERS
+LICENSE
