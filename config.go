@@ -237,6 +237,8 @@ func (c *Config) Init() error {
 		return err
 	}
 
+	c.executableSchema = es
+
 	var pluginsNames []string
 	for _, plugin := range c.plugins {
 		plugin.Init(c.executableSchema)
