@@ -1,6 +1,8 @@
 .dockerignore
+.github
 .gitignore
 *.graphql
+*.nojekyll
 *.json
 *.png
 go.sum
