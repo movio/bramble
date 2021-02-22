@@ -163,7 +163,7 @@ The schema merge operation is a binary, associative, and commutative operation. 
 
 ### Scalars
 
-Since Bramble currently doesn't support custom scalars in federated services, the merged schema's scalars are just the standard `Int`, `Float`, `String`, `ID`, and `Boolean`.
+The merged schema contains the standard scalars (`Int`, `Float`, `String`, `ID`, and `Boolean`) as well as custom scalars defined in federated services.
 
 ### Directives
 
