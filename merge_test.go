@@ -9,6 +9,12 @@ import (
 func TestMergeSingleSchema(t *testing.T) {
 	fixture := MergeTestFixture{
 		Input1: `
+			type Service {
+				name: String!
+				version: String!
+				schema: String!
+			}
+
 			interface Named {
 				name: String!
 			}
@@ -20,6 +26,7 @@ func TestMergeSingleSchema(t *testing.T) {
 
 			type Query {
 				gizmo(id: ID!): Gizmo!
+				service: Service!
 			}
 		`,
 		Expected: `
