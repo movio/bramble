@@ -11,8 +11,22 @@ func MergeSchemas(schemas ...*ast.Schema) (*ast.Schema, error) {
 		return nil, fmt.Errorf("no source schemas")
 	}
 	if len(schemas) == 1 {
-		return schemas[0], nil
+		// if we have only one schema we append a minimal schema so that we can
+		// still go through the merging logic and prune special types (e.g.
+		// Service)
+		schemas = append(schemas, gqlparser.MustLoadSchema(&ast.Source{Name: "empty schema", Input: `
+		type Service {
+			name: String!
+			version: String!
+			schema: String!
 	}
+
+		type Query {
+			service: Service!
+		}
+		`}))
+	}
+
 	merged := ast.Schema{
 		Types:         make(map[string]*ast.Definition),
 		Directives:    make(map[string]*ast.DirectiveDefinition),
