@@ -3,6 +3,7 @@ package bramble
 import (
 	"fmt"
 
+	"github.com/vektah/gqlparser/v2"
 	"github.com/vektah/gqlparser/v2/ast"
 )
 
@@ -19,7 +20,7 @@ func MergeSchemas(schemas ...*ast.Schema) (*ast.Schema, error) {
 			name: String!
 			version: String!
 			schema: String!
-	}
+		}
 
 		type Query {
 			service: Service!
@@ -43,7 +44,7 @@ func MergeSchemas(schemas ...*ast.Schema) (*ast.Schema, error) {
 	}
 
 	merged.Implements = mergeImplements(schemas)
-	merged.PossibleTypes = mergePossibleTypes(schemas)
+	merged.PossibleTypes = mergePossibleTypes(schemas, merged.Types)
 	merged.Directives = mergeDirectives(schemas)
 
 	merged.Query = merged.Types[queryObjectName]
@@ -148,11 +149,15 @@ func mergeTypes(a, b map[string]*ast.Definition) (map[string]*ast.Definition, er
 		}
 
 		if isNamespaceObject(vb) || k == queryObjectName || k == mutationObjectName || k == subscriptionObjectName {
-			var err error
-			result[k], err = mergeNamespaceObjects(a, b, vb, va)
+			mergedObject, err := mergeNamespaceObjects(a, b, vb, va)
 			if err != nil {
 				return nil, err
 			}
+			if len(mergedObject.Fields) == 0 {
+				delete(result, k)
+				continue
+			}
+			result[k] = mergedObject
 			continue
 		}
 
@@ -202,11 +207,14 @@ func mergeDirectives(sources []*ast.Schema) map[string]*ast.DirectiveDefinition 
 	return result
 }
 
-func mergePossibleTypes(sources []*ast.Schema) map[string][]*ast.Definition {
+func mergePossibleTypes(sources []*ast.Schema, mergedTypes map[string]*ast.Definition) map[string][]*ast.Definition {
 	result := map[string][]*ast.Definition{}
 	for _, schema := range sources {
 		for typeName, interfaces := range schema.PossibleTypes {
 			if typeName != serviceObjectName && typeName != nodeInterfaceName {
+				if _, ok := mergedTypes[typeName]; !ok {
+					continue
+				}
 				for _, i := range interfaces {
 					if i.Name != nodeInterfaceName {
 						if ast.DefinitionList(result[typeName]).ForName(i.Name) == nil {
@@ -223,7 +231,7 @@ func mergePossibleTypes(sources []*ast.Schema) map[string][]*ast.Definition {
 func mergeNamespaceObjects(aTypes, bTypes map[string]*ast.Definition, a, b *ast.Definition) (*ast.Definition, error) {
 	var fields ast.FieldList
 	for _, f := range a.Fields {
-		if isQueryType(a) && (isNodeField(f) || isServiceField(f)) {
+		if isQueryType(a) && (isNodeField(f) || isServiceField(f) || isGraphQLBuiltinName(f.Name)) {
 			continue
 		}
 		fields = append(fields, f)

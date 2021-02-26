@@ -774,3 +774,43 @@ func TestMergeCustomnScalars(t *testing.T) {
 	}
 	fixture.CheckSuccess(t)
 }
+
+func TestMergeEmptyQuery(t *testing.T) {
+	fixture := MergeTestFixture{
+		Input1: `
+			type Service {
+				name: String!
+				version: String!
+				schema: String!
+			}
+
+            type Query {
+				service: Service!
+            }
+
+			type Mutation {
+				addGizmo(name: String!): ID!
+			}
+		`,
+		Input2: `
+			type Service {
+				name: String!
+				version: String!
+				schema: String!
+			}
+
+            type Query {
+				service: Service!
+            }
+
+			type Mutation {
+				updateGizmo(name: String!): ID!
+			}
+		`,
+		Expected: `type Mutation {
+			updateGizmo(name: String!): ID!
+			addGizmo(name: String!): ID!
+		}`,
+	}
+	fixture.CheckSuccess(t)
+}
