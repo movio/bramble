@@ -13,6 +13,7 @@ import (
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/vektah/gqlparser/v2/ast"
+	"github.com/vektah/gqlparser/v2/formatter"
 )
 
 func indentPrefix(sb *strings.Builder, level int, suffix ...string) (int, error) {
@@ -352,4 +353,11 @@ func getInnerTypeName(t *ast.Type) string {
 	}
 
 	return t.Name()
+}
+
+func formatSchema(schema *ast.Schema) string {
+	buf := bytes.NewBufferString("")
+	f := formatter.NewFormatter(buf)
+	f.FormatSchema(schema)
+	return buf.String()
 }

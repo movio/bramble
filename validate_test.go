@@ -705,3 +705,39 @@ func TestRootObjectNaming(t *testing.T) {
 		}`).assertInvalid("the schema Subscription type can not be renamed to SubObj", validateRootObjectNames)
 	})
 }
+
+func TestSchemaValidAfterMerge(t *testing.T) {
+	t.Run("invalid use of Servive type", func(t *testing.T) {
+		withSchema(t, `
+		type Service {
+			name: String!
+			version: String!
+			schema: String!
+		}
+
+		type Query {
+			service: Service!
+		}
+
+		type Mutation {
+			service: Service!
+		}`).assertInvalid("schema will become invalid after merge operation: merged schema:3: Undefined type Service.", validateSchemaValidAfterMerge)
+	})
+
+	t.Run("valid schema with empty Query type", func(t *testing.T) {
+		withSchema(t, `
+		type Service {
+			name: String!
+			version: String!
+			schema: String!
+		}
+
+		type Query {
+			service: Service!
+		}
+
+		type Mutation {
+			a: String!
+		}`).assertValid(validateSchemaValidAfterMerge)
+	})
+}

@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/vektah/gqlparser/v2"
 	"github.com/vektah/gqlparser/v2/ast"
 )
 
@@ -25,6 +26,9 @@ func ValidateSchema(schema *ast.Schema) error {
 		return err
 	}
 	if err := validateNamingConventions(schema); err != nil {
+		return err
+	}
+	if err := validateSchemaValidAfterMerge(schema); err != nil {
 		return err
 	}
 	return nil
@@ -349,6 +353,25 @@ func validateRootObjectNames(schema *ast.Schema) error {
 	if s := schema.Subscription; s != nil && s.Name != subscriptionObjectName {
 		return fmt.Errorf("the schema Subscription type can not be renamed to %s", s.Name)
 	}
+	return nil
+}
+
+// validateSchemaValidAfterMerge validates that the schema is still going to be
+// valid once it gets merged with another schema and special types are removed.
+// For example the Service type should not be used outside of the Query type.
+func validateSchemaValidAfterMerge(schema *ast.Schema) error {
+	mergedSchema, err := MergeSchemas(schema)
+	if err != nil {
+		return fmt.Errorf("merge schema error: %w", err)
+	}
+
+	// format and reload the schema to ensure it is valid
+	res := formatSchema(mergedSchema)
+	_, gqlErr := gqlparser.LoadSchema(&ast.Source{Name: "merged schema", Input: res})
+	if gqlErr != nil {
+		return fmt.Errorf("schema will become invalid after merge operation: %w", gqlErr)
+	}
+
 	return nil
 }
 

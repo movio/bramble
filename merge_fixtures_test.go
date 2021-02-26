@@ -1,13 +1,11 @@
 package bramble
 
 import (
-	"bytes"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/vektah/gqlparser/v2"
 	"github.com/vektah/gqlparser/v2/ast"
-	"github.com/vektah/gqlparser/v2/formatter"
 )
 
 type MergeTestFixture struct {
@@ -74,13 +72,6 @@ func (f BuildFieldURLMapFixture) Check(t *testing.T) {
 
 func loadSchema(input string) *ast.Schema {
 	return gqlparser.MustLoadSchema(&ast.Source{Name: "schema", Input: input})
-}
-
-func formatSchema(schema *ast.Schema) string {
-	buf := bytes.NewBufferString("")
-	f := formatter.NewFormatter(buf)
-	f.FormatSchema(schema)
-	return buf.String()
 }
 
 func loadAndFormatSchema(input string) string {
