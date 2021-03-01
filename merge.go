@@ -100,6 +100,7 @@ func mergeTypes(a, b map[string]*ast.Definition) (map[string]*ast.Definition, er
 		}
 		v.Interfaces = cleanInterfaces(v.Interfaces)
 		v.Directives = cleanDirectives(v.Directives)
+		v.Fields = cleanFields(v.Fields)
 		result[k] = v
 	}
 
@@ -111,11 +112,12 @@ func mergeTypes(a, b map[string]*ast.Definition) (map[string]*ast.Definition, er
 		if isGraphQLBuiltinName(k) || k == nodeInterfaceName || k == serviceObjectName {
 			continue
 		}
+		vb.Interfaces = cleanInterfaces(vb.Interfaces)
+		vb.Directives = cleanDirectives(vb.Directives)
+		vb.Fields = cleanFields(vb.Fields)
 
 		va, found := result[k]
 		if !found {
-			vb.Interfaces = cleanInterfaces(vb.Interfaces)
-			vb.Directives = cleanDirectives(vb.Directives)
 			result[k] = vb
 			continue
 		}
@@ -345,6 +347,14 @@ func cleanDirectives(directives ast.DirectiveList) ast.DirectiveList {
 	}
 
 	return res
+}
+
+func cleanFields(fields ast.FieldList) ast.FieldList {
+	for _, f := range fields {
+		f.Directives = cleanDirectives(f.Directives)
+	}
+
+	return fields
 }
 
 func allowedDirective(name string) bool {
