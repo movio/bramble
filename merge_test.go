@@ -814,3 +814,66 @@ func TestMergeEmptyQuery(t *testing.T) {
 	}
 	fixture.CheckSuccess(t)
 }
+
+func TestMergeRemovesCustomDirectives(t *testing.T) {
+	fixture := MergeTestFixture{
+		Input1: `
+			interface Node { id: ID! }
+			directive @boundary on OBJECT
+
+			directive @myObjectDirective on OBJECT
+			directive @myFieldDirective on FIELD
+
+            type Query @myObjectDirective {
+				name: String! @myFieldDirective @deprecated
+            }
+
+			type MyBoundaryType implements Node @boundary @myObjectDirective {
+				id: ID! @myFieldDirective
+				firstName: String @myFieldDirective
+			}
+
+			type ServiceAType {
+				field: String @myFieldDirective
+			}
+		`,
+		Input2: `
+			interface Node { id: ID! }
+			directive @boundary on OBJECT
+
+			directive @myObjectDirective on OBJECT
+			directive @myFieldDirective on FIELD
+
+			type MyBoundaryType implements Node @boundary @myObjectDirective {
+				id: ID! @myFieldDirective
+				lastName: String @myFieldDirective
+			}
+
+			type ServiceBType {
+				field: String @myFieldDirective
+			}
+		`,
+		Expected: `
+			directive @boundary on OBJECT
+
+            type Query {
+				name: String! @deprecated
+            }
+
+			type MyBoundaryType @boundary {
+				id: ID!
+				lastName: String
+				firstName: String
+			}
+
+			type ServiceAType {
+				field: String
+			}
+
+			type ServiceBType {
+				field: String
+			}
+		`,
+	}
+	fixture.CheckSuccess(t)
+}
