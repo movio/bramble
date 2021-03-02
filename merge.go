@@ -155,10 +155,6 @@ func mergeTypes(a, b map[string]*ast.Definition) (map[string]*ast.Definition, er
 			if err != nil {
 				return nil, err
 			}
-			if len(mergedObject.Fields) == 0 {
-				delete(result, k)
-				continue
-			}
 			result[k] = mergedObject
 			continue
 		}
@@ -233,7 +229,7 @@ func mergePossibleTypes(sources []*ast.Schema, mergedTypes map[string]*ast.Defin
 func mergeNamespaceObjects(aTypes, bTypes map[string]*ast.Definition, a, b *ast.Definition) (*ast.Definition, error) {
 	var fields ast.FieldList
 	for _, f := range a.Fields {
-		if isQueryType(a) && (isNodeField(f) || isServiceField(f) || isGraphQLBuiltinName(f.Name)) {
+		if isQueryType(a) && (isNodeField(f) || isServiceField(f)) {
 			continue
 		}
 		fields = append(fields, f)
@@ -410,4 +406,15 @@ func isNamespaceObject(a *ast.Definition) bool {
 
 func hasFederationDirectives(o *ast.Definition) bool {
 	return isBoundaryObject(o) || isNamespaceObject(o)
+}
+
+func filterBuiltinFields(fields ast.FieldList) ast.FieldList {
+	var res ast.FieldList
+	for _, f := range fields {
+		if isGraphQLBuiltinName(f.Name) {
+			continue
+		}
+		res = append(res, f)
+	}
+	return res
 }

@@ -365,6 +365,12 @@ func validateSchemaValidAfterMerge(schema *ast.Schema) error {
 		return fmt.Errorf("merge schema error: %w", err)
 	}
 
+	// If resulting Query type is empty, remove it from schema to avoid
+	// generating an invalid schema when formatting (empty Query type: `type Query {}`)
+	if len(filterBuiltinFields(mergedSchema.Query.Fields)) == 0 {
+		delete(mergedSchema.Types, "Query")
+	}
+
 	// format and reload the schema to ensure it is valid
 	res := formatSchema(mergedSchema)
 	_, gqlErr := gqlparser.LoadSchema(&ast.Source{Name: "merged schema", Input: res})

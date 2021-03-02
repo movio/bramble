@@ -33,6 +33,14 @@ func (f MergeTestFixture) CheckSuccess(t *testing.T) {
 		schemas = append(schemas, loadSchema(f.Input2))
 	}
 	actual := mustMergeSchemas(t, schemas...)
+
+	// If resulting Query type is empty, remove it from schema to avoid
+	// generating an invalid schema when formatting (empty Query type: `type Query {}`)
+	if actual.Query != nil && len(filterBuiltinFields(actual.Query.Fields)) == 0 {
+		delete(actual.Types, "Query")
+		delete(actual.PossibleTypes, "Query")
+	}
+
 	assertSchemaConsistency(t, actual)
 	assert.Equal(t, loadAndFormatSchema(f.Expected), formatSchema(actual))
 }

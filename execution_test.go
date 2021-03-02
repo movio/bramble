@@ -54,8 +54,12 @@ func TestIntrospectionQuery(t *testing.T) {
 		somethingRandom: MovieOrCinema
 	}`
 
+	// Make sure schema merging doesn't break introspection
+	mergedSchema, err := MergeSchemas(gqlparser.MustLoadSchema(&ast.Source{Name: "fixture", Input: schema}))
+	require.NoError(t, err)
+
 	es := ExecutableSchema{
-		MergedSchema: gqlparser.MustLoadSchema(&ast.Source{Name: "fixture", Input: schema}),
+		MergedSchema: mergedSchema,
 	}
 
 	t.Run("basic type fields", func(t *testing.T) {
