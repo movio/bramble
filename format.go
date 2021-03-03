@@ -144,6 +144,10 @@ func formatArgument(schema *ast.Schema, v *ast.Value, vars map[string]interface{
 }
 
 func expandAndFormatVariable(schema *ast.Schema, objectType *ast.Definition, v interface{}) string {
+	if v == nil {
+		return "null"
+	}
+
 	switch objectType.Kind {
 	case ast.Scalar:
 		b, _ := json.Marshal(v)
