@@ -223,6 +223,33 @@ func TestFormatSelectionSetWithEnumVariable(t *testing.T) {
 	assert.Equal(t, `{ search(input: {genre:ACTION}) { genre } }`, res)
 }
 
+func TestFormatSelectionSetWithNullEnumVariable(t *testing.T) {
+	schema := loadSchema(`
+	enum Genre {
+		ACTION
+		COMEDY
+	}
+
+	type Movie {
+		genre: Genre
+	}
+
+	input SearchInput {
+		genre: Genre
+	}
+	type Query {
+		search(input: SearchInput!): [Movie!]
+	}
+	`)
+
+	query := gqlparser.MustLoadQuery(schema, `query($genre: Genre!) {
+		search(input: { genre: $genre}) { genre }
+	}`)
+
+	res := formatSelectionSetSingleLine(testContextWithVariables(map[string]interface{}{"genre": nil}, nil), schema, query.Operations[0].SelectionSet)
+	assert.Equal(t, `{ search(input: {genre:null}) { genre } }`, res)
+}
+
 func TestFormatSelectionSetInlineFragment(t *testing.T) {
 	schema := loadSchema(`
 			interface Named {
