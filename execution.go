@@ -157,13 +157,6 @@ func (s *ExecutableSchema) ExecuteQuery(ctx context.Context) *graphql.Response {
 			result[f.Alias] = s.resolveType(ctx, perms.FilterSchema(s.MergedSchema), &ast.Type{NamedType: name}, f.SelectionSet)
 		case "__schema":
 			result[f.Alias] = s.resolveSchema(ctx, perms.FilterSchema(s.MergedSchema), f.SelectionSet)
-		case "__typename":
-			if op.Operation == ast.Query {
-				result[f.Alias] = queryObjectName
-			}
-			if op.Operation == ast.Mutation {
-				result[f.Alias] = mutationObjectName
-			}
 		}
 	}
 
@@ -566,6 +559,10 @@ func newQueryExecution(client *GraphQLClient, schema *ast.Schema, tracer opentra
 func (e *QueryExecution) execute(ctx context.Context, plan *queryPlan, resData map[string]interface{}) []*gqlerror.Error {
 	e.wg.Add(len(plan.RootSteps))
 	for _, step := range plan.RootSteps {
+		if step.ServiceURL == internalServiceName {
+			e.executeBrambleStep(ctx, step, resData)
+			continue
+		}
 		go e.executeRootStep(ctx, step, resData)
 	}
 
@@ -762,6 +759,30 @@ func (e *QueryExecution) executeChildStep(ctx context.Context, step *queryPlanSt
 		e.wg.Add(1)
 		go e.executeChildStep(ctx, subStep, result)
 	}
+}
+
+// executeBrambleStep executes the Bramble-specific operations
+func (e *QueryExecution) executeBrambleStep(ctx context.Context, step *queryPlanStep, result map[string]interface{}) {
+	m := buildTypenameResponseMap(step.SelectionSet, step.ParentType)
+	mergeMaps(result, m)
+	e.wg.Done()
+}
+
+// buildTypenameResponseMap recursively builds the response map for `__typename`
+// fields. This is used for namespaces as they do not belong to any service.
+func buildTypenameResponseMap(ss ast.SelectionSet, currentType string) map[string]interface{} {
+	res := make(map[string]interface{})
+	for _, f := range selectionSetToFields(ss) {
+		if len(f.SelectionSet) > 0 {
+			res[f.Alias] = buildTypenameResponseMap(f.SelectionSet, f.Definition.Type.Name())
+			continue
+		}
+
+		if f.Name == "__typename" {
+			res[f.Alias] = currentType
+		}
+	}
+	return res
 }
 
 func nodeAlias(i int) string {
