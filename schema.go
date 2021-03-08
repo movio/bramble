@@ -18,6 +18,8 @@ const (
 	queryObjectName        = "Query"
 	mutationObjectName     = "Mutation"
 	subscriptionObjectName = "Subscription"
+
+	internalServiceName = "__bramble"
 )
 
 func isGraphQLBuiltinName(s string) bool {

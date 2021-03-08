@@ -230,6 +230,10 @@ func routeSelectionSet(ctx *PlanningContext, parentType, parentLocation string, 
 				result[loc] = ss
 			}
 		}
+		// filter fields living only on the gateway
+		if ss := filterSelectionSetByLoc(ctx, input, internalServiceName, parentType); len(ss) > 0 {
+			result[internalServiceName] = ss
+		}
 
 		return result, nil
 	}
@@ -271,7 +275,7 @@ func routeSelectionSet(ctx *PlanningContext, parentType, parentLocation string, 
 func filterSelectionSetByLoc(ctx *PlanningContext, ss ast.SelectionSet, loc, parentType string) ast.SelectionSet {
 	var res ast.SelectionSet
 	for _, selection := range selectionSetToFields(ss) {
-		floc, err := ctx.Locations.UrlFor(parentType, "", selection.Name)
+		fieldLocation, err := ctx.Locations.UrlFor(parentType, "", selection.Name)
 		if err != nil {
 			// Namespace
 			subSS := filterSelectionSetByLoc(ctx, selection.SelectionSet, loc, selection.Definition.Type.Name())
@@ -281,7 +285,10 @@ func filterSelectionSetByLoc(ctx *PlanningContext, ss ast.SelectionSet, loc, par
 			s := *selection
 			s.SelectionSet = subSS
 			res = append(res, &s)
-		} else if floc == loc {
+		} else if fieldLocation == loc {
+			res = append(res, selection)
+		} else if loc == internalServiceName && selection.Name == "__typename" {
+			// __typename fields on namespaces
 			res = append(res, selection)
 		}
 	}

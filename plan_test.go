@@ -203,6 +203,13 @@ func TestQueryPlanWithTypename(t *testing.T) {
 				"SelectionSet": "{ transactions { id gross __typename } }",
 				"InsertionPoint": null,
 				"Then": null
+			  },
+			  {
+				"ServiceURL": "__bramble",
+				"ParentType": "Query",
+				"SelectionSet": "{ __typename }",
+				"InsertionPoint": null,
+				"Then": null
 			  }
 			]
 		  }

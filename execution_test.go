@@ -458,6 +458,78 @@ func TestQueryExecutionWithTypename(t *testing.T) {
 	f.run(t)
 }
 
+func TestQueryExecutionWithTypenameAndNamespaces(t *testing.T) {
+	f := &queryExecutionFixture{
+		services: []testService{
+			{
+				schema: `
+				directive @namespace on OBJECT
+
+				type Movie {
+					id: ID!
+					title: String!
+				}
+
+				type Cinema {
+					id: ID!
+				}
+
+				type MovieQuery @namespace {
+					movies: [Movie!]!
+				}
+
+				type CinemaQuery @namespace {
+					cinemas: [Cinema!]!
+				}
+
+				type Query {
+					movie: MovieQuery!
+					cinema: CinemaQuery!
+				}
+				`,
+				handler: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+					w.Write([]byte(`{
+						"data": {
+							"movie": {
+								"movies": [
+									{"__typename": "Movie", "id": "1"}
+								]
+							}
+						}
+					}`))
+				}),
+			},
+		},
+		query: `{
+			__typename
+			movie {
+				__typename
+				movies {
+					__typename
+					id
+				}
+			}
+			cinema {
+				__typename
+			}
+		}`,
+		expected: `{
+			"__typename": "Query",
+			"movie": {
+				"__typename": "MovieQuery",
+				"movies": [
+					{"__typename": "Movie", "id": "1"}
+				]
+			},
+			"cinema": {
+				"__typename": "CinemaQuery"
+			}
+		}`,
+	}
+
+	f.run(t)
+}
+
 func TestQueryExecutionWithMultipleNodeQueries(t *testing.T) {
 	schema1 := `directive @boundary on OBJECT
 				type Movie @boundary {
