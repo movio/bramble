@@ -50,7 +50,7 @@ func TestGatewayQuery(t *testing.T) {
 			w.Write([]byte(`{ "data": { "test": "Hello" }}`))
 		}
 	}))
-	executableSchema := newExecutableSchema(nil, 50, &Service{ServiceURL: server.URL})
+	executableSchema := newExecutableSchema(nil, 50, 1024*1024, &Service{ServiceURL: server.URL})
 	err := executableSchema.UpdateSchema(true)
 	require.NoError(t, err)
 	gtw := NewGateway(executableSchema, []Plugin{})
@@ -71,7 +71,7 @@ func TestRequestJSONBodyLogging(t *testing.T) {
 	logrusLock.Lock()
 	defer logrusLock.Unlock()
 
-	server := NewGateway(newExecutableSchema(nil, 50), nil).Router()
+	server := NewGateway(newExecutableSchema(nil, 50, 1024*1024), nil).Router()
 
 	body := map[string]interface{}{
 		"foo": "bar",

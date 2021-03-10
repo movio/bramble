@@ -21,12 +21,12 @@ type GraphQLClient struct {
 	Tracer          opentracing.Tracer
 }
 
-func NewClient() *GraphQLClient {
+func NewClient(maxResponseSize int64) *GraphQLClient {
 	return &GraphQLClient{
 		HTTPClient: &http.Client{
 			Timeout: 5 * time.Second,
 		},
-		MaxResponseSize: 1024 * 1024,
+		MaxResponseSize: maxResponseSize,
 	}
 }
 
