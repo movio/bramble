@@ -15,6 +15,7 @@ Sample configuration:
   "log-level": "info",
   "poll-interval": "5s",
   "max-requests-per-query": 50,
+  "max-client-response-size": ...
   "plugins": [
     {
       "name": "admin-ui"
@@ -69,6 +70,10 @@ Sample configuration:
   federated services.
 
   - Default: 50
+  - Supports hot-reload: No
+
+- `max-client-response-size`: The max response size you can receive from the gateway
+  - Default: 1MB
   - Supports hot-reload: No
 
 - `plugins`: Optional list of plugins to enable. See [plugins](plugins.md) for plugins-specific config.
