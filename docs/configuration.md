@@ -15,7 +15,7 @@ Sample configuration:
   "log-level": "info",
   "poll-interval": "5s",
   "max-requests-per-query": 50,
-  "max-client-response-size": ...
+  "max-client-response-size": 1048576,
   "plugins": [
     {
       "name": "admin-ui"
