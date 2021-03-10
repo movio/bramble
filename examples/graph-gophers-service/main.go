@@ -10,10 +10,7 @@ import (
 
 var schema = `
 directive @boundary on OBJECT
-
-interface Node {
-  id: ID!
-}
+directive @getter(public: Boolean) on FIELD_DEFINITION
 
 type Service {
   name: String!
@@ -22,11 +19,11 @@ type Service {
 }
 
 type Query {
-  node(id: ID!): Node
+  foo(id: ID!): Foo @getter
   service: Service!
 }
 
-type Foo implements Node @boundary {
+type Foo @boundary {
   id: ID!
   graphGophers: Boolean!
 }

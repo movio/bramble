@@ -10,6 +10,9 @@ import (
 )
 
 func ValidateSchema(schema *ast.Schema) error {
+	// FIXME
+	return nil
+
 	if err := validateRootObjectNames(schema); err != nil {
 		return err
 	}

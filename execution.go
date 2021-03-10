@@ -40,6 +40,7 @@ type ExecutableSchema struct {
 	Locations           FieldURLMap
 	IsBoundary          map[string]bool
 	Services            map[string]*Service
+	Getters             map[string]map[string]string
 	GraphqlClient       *GraphQLClient
 	Tracer              opentracing.Tracer
 	MaxRequestsPerQuery int64
@@ -98,6 +99,7 @@ func (s *ExecutableSchema) UpdateSchema(forceRebuild bool) error {
 
 	if len(updatedServices) > 0 || forceRebuild {
 		log.Info("rebuilding merged schema")
+		getters := buildGetterMap(services...)
 		schema, err := MergeSchemas(schemas...)
 		if err != nil {
 			invalidschema = 1
@@ -111,6 +113,7 @@ func (s *ExecutableSchema) UpdateSchema(forceRebuild bool) error {
 		s.Locations = locations
 		s.IsBoundary = isBoundary
 		s.MergedSchema = schema
+		s.Getters = getters
 		s.mutex.Unlock()
 	}
 
@@ -175,7 +178,7 @@ func (s *ExecutableSchema) ExecuteQuery(ctx context.Context) *graphql.Response {
 	AddField(ctx, "operation.name", op.Name)
 	AddField(ctx, "operation.type", op.Operation)
 
-	qe := newQueryExecution(s.GraphqlClient, s.Schema(), s.Tracer, s.MaxRequestsPerQuery)
+	qe := newQueryExecution(s.GraphqlClient, s.Schema(), s.Tracer, s.MaxRequestsPerQuery, s.Getters)
 	executionErrors := qe.execute(ctx, plan, result)
 	errs = append(errs, executionErrors...)
 	extensions := make(map[string]interface{})
@@ -545,14 +548,16 @@ type QueryExecution struct {
 	wg            sync.WaitGroup
 	m             sync.Mutex
 	graphqlClient *GraphQLClient
+	getters       map[string]map[string]string
 }
 
-func newQueryExecution(client *GraphQLClient, schema *ast.Schema, tracer opentracing.Tracer, maxRequest int64) *QueryExecution {
+func newQueryExecution(client *GraphQLClient, schema *ast.Schema, tracer opentracing.Tracer, maxRequest int64, getters map[string]map[string]string) *QueryExecution {
 	return &QueryExecution{
 		Schema:        schema,
 		graphqlClient: client,
 		tracer:        tracer,
 		maxRequest:    maxRequest,
+		getters:       getters,
 	}
 }
 
@@ -708,7 +713,7 @@ func (e *QueryExecution) executeChildStep(ctx context.Context, step *queryPlanSt
 	var b strings.Builder
 	b.WriteString("{")
 	for i, ip := range insertionPoints {
-		b.WriteString(fmt.Sprintf("%s: node(id: %q) { ... on %s %s } ", nodeAlias(i), ip.ID, step.ParentType, selectionSet))
+		b.WriteString(fmt.Sprintf("%s: %s(id: %q) { ... on %s %s } ", nodeAlias(i), e.getters[step.ServiceURL][step.ParentType], ip.ID, step.ParentType, selectionSet))
 	}
 	b.WriteString("}")
 

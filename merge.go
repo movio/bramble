@@ -92,6 +92,21 @@ func buildIsBoundaryMap(services ...*Service) map[string]bool {
 	return result
 }
 
+func buildGetterMap(services ...*Service) map[string]map[string]string {
+	result := make(map[string]map[string]string)
+	for _, rs := range services {
+		for _, f := range rs.Schema.Query.Fields {
+			if f.Directives.ForName("getter") != nil {
+				if _, ok := result[rs.ServiceURL]; !ok {
+					result[rs.ServiceURL] = make(map[string]string)
+				}
+				result[rs.ServiceURL][f.Type.Name()] = f.Name
+			}
+		}
+	}
+	return result
+}
+
 func mergeTypes(a, b map[string]*ast.Definition) (map[string]*ast.Definition, error) {
 	result := make(map[string]*ast.Definition)
 	for k, v := range a {
@@ -346,11 +361,17 @@ func cleanDirectives(directives ast.DirectiveList) ast.DirectiveList {
 }
 
 func cleanFields(fields ast.FieldList) ast.FieldList {
+	var res ast.FieldList
 	for _, f := range fields {
+		if d := f.Directives.ForName("getter"); d != nil && d.Arguments.ForName("public") != nil /* FIXME: check the value */ {
+			continue
+		}
+
 		f.Directives = cleanDirectives(f.Directives)
+		res = append(res, f)
 	}
 
-	return fields
+	return res
 }
 
 func allowedDirective(name string) bool {
