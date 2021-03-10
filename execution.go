@@ -44,6 +44,7 @@ type ExecutableSchema struct {
 	Locations           FieldURLMap
 	IsBoundary          map[string]bool
 	Services            map[string]*Service
+	BoundaryQueries     BoundaryQueriesMap
 	GraphqlClient       *GraphQLClient
 	Tracer              opentracing.Tracer
 	MaxRequestsPerQuery int64
@@ -108,6 +109,7 @@ func (s *ExecutableSchema) UpdateSchema(forceRebuild bool) error {
 			return fmt.Errorf("update of service %v caused schema error: %w", updatedServices, err)
 		}
 
+		boundaryQueries := buildBoundaryQueriesMap(services...)
 		locations := buildFieldURLMap(services...)
 		isBoundary := buildIsBoundaryMap(services...)
 
@@ -115,6 +117,7 @@ func (s *ExecutableSchema) UpdateSchema(forceRebuild bool) error {
 		s.Locations = locations
 		s.IsBoundary = isBoundary
 		s.MergedSchema = schema
+		s.BoundaryQueries = boundaryQueries
 		s.mutex.Unlock()
 	}
 
@@ -183,7 +186,7 @@ func (s *ExecutableSchema) ExecuteQuery(ctx context.Context) *graphql.Response {
 	AddField(ctx, "operation.name", op.Name)
 	AddField(ctx, "operation.type", op.Operation)
 
-	qe := newQueryExecution(s.GraphqlClient, s.Schema(), s.Tracer, s.MaxRequestsPerQuery)
+	qe := newQueryExecution(s.GraphqlClient, s.Schema(), s.Tracer, s.MaxRequestsPerQuery, s.BoundaryQueries)
 	executionErrors := qe.execute(ctx, plan, result)
 	errs = append(errs, executionErrors...)
 	extensions := make(map[string]interface{})
@@ -548,19 +551,21 @@ type QueryExecution struct {
 	Errors       []*gqlerror.Error
 	RequestCount int64
 
-	maxRequest    int64
-	tracer        opentracing.Tracer
-	wg            sync.WaitGroup
-	m             sync.Mutex
-	graphqlClient *GraphQLClient
+	maxRequest      int64
+	tracer          opentracing.Tracer
+	wg              sync.WaitGroup
+	m               sync.Mutex
+	graphqlClient   *GraphQLClient
+	boundaryQueries BoundaryQueriesMap
 }
 
-func newQueryExecution(client *GraphQLClient, schema *ast.Schema, tracer opentracing.Tracer, maxRequest int64) *QueryExecution {
+func newQueryExecution(client *GraphQLClient, schema *ast.Schema, tracer opentracing.Tracer, maxRequest int64, boundaryQueries BoundaryQueriesMap) *QueryExecution {
 	return &QueryExecution{
-		Schema:        schema,
-		graphqlClient: client,
-		tracer:        tracer,
-		maxRequest:    maxRequest,
+		Schema:          schema,
+		graphqlClient:   client,
+		tracer:          tracer,
+		maxRequest:      maxRequest,
+		boundaryQueries: boundaryQueries,
 	}
 }
 
@@ -712,15 +717,83 @@ func (e *QueryExecution) executeChildStep(ctx context.Context, step *queryPlanSt
 		return
 	}
 
+	boundaryQuery := e.boundaryQueries.Query(step.ServiceURL, step.ParentType)
 	selectionSet := formatSelectionSet(ctx, e.Schema, step.SelectionSet)
 	var b strings.Builder
+
 	b.WriteString("{")
-	for i, ip := range insertionPoints {
-		b.WriteString(fmt.Sprintf("%s: node(id: %q) { ... on %s %s } ", nodeAlias(i), ip.ID, step.ParentType, selectionSet))
+	if boundaryQuery.Array {
+		var ids string
+		for _, ip := range insertionPoints {
+			ids += fmt.Sprintf("%q ", ip.ID)
+		}
+		b.WriteString(fmt.Sprintf("_result: %s(ids: [%s]) %s", boundaryQuery.Query, ids, selectionSet))
+	} else {
+		for i, ip := range insertionPoints {
+			b.WriteString(fmt.Sprintf("%s: %s(id: %q) { ... on %s %s } ", nodeAlias(i), boundaryQuery.Query, ip.ID, step.ParentType, selectionSet))
+		}
 	}
 	b.WriteString("}")
 
 	query := b.String()
+
+	if boundaryQuery.Array {
+		if len(step.Then) == 0 {
+			resp := struct {
+				Result []map[string]json.RawMessage `json:"_result"`
+			}{}
+			promHTTPInFlightGauge.Inc()
+			req := NewRequest(query)
+			req.Headers = GetOutgoingRequestHeadersFromContext(ctx)
+			err := e.graphqlClient.Request(ctx, step.ServiceURL, req, &resp)
+			promHTTPInFlightGauge.Dec()
+			if err != nil {
+				e.addError(step, fmt.Sprintf("error while querying %s with %s: %s", step.ServiceURL, formatSelectionSetSingleLine(ctx, e.Schema, step.SelectionSet), err))
+			}
+			if len(resp.Result) != len(insertionPoints) {
+				e.addError(step, fmt.Sprintf("error while querying %s: service returned incorrect number of elements", step.ServiceURL))
+				return
+			}
+			e.m.Lock()
+			for i := range insertionPoints {
+				for k, v := range resp.Result[i] {
+					insertionPoints[i].Target[k] = v
+				}
+			}
+			e.m.Unlock()
+			return
+		}
+
+		resp := struct {
+			Result []map[string]interface{} `json:"_result"`
+		}{}
+		promHTTPInFlightGauge.Inc()
+		req := NewRequest(query)
+		req.Headers = GetOutgoingRequestHeadersFromContext(ctx)
+		err := e.graphqlClient.Request(ctx, step.ServiceURL, req, &resp)
+		promHTTPInFlightGauge.Dec()
+		if err != nil {
+			e.addError(step, fmt.Sprintf("error while querying %s with %s: %s", step.ServiceURL, formatSelectionSetSingleLine(ctx, e.Schema, step.SelectionSet), err))
+			return
+		}
+		if len(resp.Result) != len(insertionPoints) {
+			e.addError(step, fmt.Sprintf("error while querying %s: service returned incorrect number of elements", step.ServiceURL))
+			return
+		}
+		e.m.Lock()
+		for i := range insertionPoints {
+			for k, v := range resp.Result[i] {
+				insertionPoints[i].Target[k] = v
+			}
+		}
+		e.m.Unlock()
+
+		for _, subStep := range step.Then {
+			e.wg.Add(1)
+			go e.executeChildStep(ctx, subStep, result)
+		}
+		return
+	}
 
 	// If there's no sub-calls on the data we want to store it as returned.
 	// This is to preserve fields order with inline fragments on unions, as we
@@ -735,6 +808,11 @@ func (e *QueryExecution) executeChildStep(ctx context.Context, step *queryPlanSt
 		promHTTPInFlightGauge.Dec()
 		if err != nil {
 			e.addError(step, fmt.Sprintf("error while querying %s with %s: %s", step.ServiceURL, formatSelectionSetSingleLine(ctx, e.Schema, step.SelectionSet), err))
+			return
+		}
+		if len(resp) != len(insertionPoints) {
+			e.addError(step, fmt.Sprintf("error while querying %s: service returned incorrect number of elements", step.ServiceURL))
+			return
 		}
 		e.m.Lock()
 		for i := range insertionPoints {
@@ -754,6 +832,11 @@ func (e *QueryExecution) executeChildStep(ctx context.Context, step *queryPlanSt
 	promHTTPInFlightGauge.Dec()
 	if err != nil {
 		e.addError(step, fmt.Sprintf("error while querying %s with %s: %s", step.ServiceURL, formatSelectionSetSingleLine(ctx, e.Schema, step.SelectionSet), err))
+		return
+	}
+	if len(resp) != len(insertionPoints) {
+		e.addError(step, fmt.Sprintf("error while querying %s: service returned incorrect number of elements", step.ServiceURL))
+		return
 	}
 	e.m.Lock()
 	for i := range insertionPoints {

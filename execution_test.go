@@ -1935,6 +1935,178 @@ func TestDebugExtensions(t *testing.T) {
 	assert.NotNil(t, f.resp.Extensions["variables"])
 }
 
+func TestQueryWithBoundaryFields(t *testing.T) {
+	f := &queryExecutionFixture{
+		services: []testService{
+			{
+				schema: `directive @boundary on OBJECT | FIELD_DEFINITION
+
+				type Movie @boundary {
+					id: ID!
+					title: String
+				}
+
+				type Query {
+					movie(id: ID!): Movie
+					_movie(id: ID!): Movie @boundary
+				}`,
+				handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.Write([]byte(`{
+						"data": {
+							"movie": {
+								"id": "1",
+								"title": "Test title"
+							}
+						}
+					}
+					`))
+				}),
+			},
+			{
+				schema: `directive @boundary on OBJECT | FIELD_DEFINITION
+
+				type Movie @boundary {
+					id: ID!
+					release: Int
+				}
+
+				type Query {
+					movie(id: ID!): Movie @boundary
+				}`,
+				handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.Write([]byte(`{
+						"data": {
+							"_0": {
+								"id": "1",
+								"release": 2007
+							}
+						}
+					}
+					`))
+				}),
+			},
+		},
+		query: `{
+			movie(id: "1") {
+				id
+				title
+				release
+			}
+		}`,
+		expected: `{
+			"movie": {
+				"id": "1",
+				"title": "Test title",
+				"release": 2007
+			}
+		}`,
+	}
+
+	f.run(t)
+}
+
+func TestQueryWithArrayBoundaryFields(t *testing.T) {
+	f := &queryExecutionFixture{
+		services: []testService{
+			{
+				schema: `directive @boundary on OBJECT | FIELD_DEFINITION
+
+				type Movie @boundary {
+					id: ID!
+					title: String
+				}
+
+				type Query {
+					randomMovies: [Movie!]!
+					movie(id: ID!): Movie @boundary
+				}`,
+				handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.Write([]byte(`{
+						"data": {
+							"randomMovies": [
+								{
+									"id": "1",
+									"title": "Movie 1"
+								},
+								{
+									"id": "2",
+									"title": "Movie 2"
+								},
+								{
+									"id": "3",
+									"title": "Movie 3"
+								}
+							]
+						}
+					}
+					`))
+				}),
+			},
+			{
+				schema: `directive @boundary on OBJECT | FIELD_DEFINITION
+
+				type Movie @boundary {
+					id: ID!
+					release: Int
+				}
+
+				type Query {
+					movies(ids: [ID!]): [Movie]! @boundary
+				}`,
+				handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.Write([]byte(`{
+						"data": {
+							"_result": [
+								{
+									"id": "1",
+									"release": 2007
+								},
+								{
+									"id": "2",
+									"release": 2008
+								},
+								{
+									"id": "3",
+									"release": 2009
+								}
+							]
+						}
+					}
+					`))
+				}),
+			},
+		},
+		query: `{
+			randomMovies {
+				id
+				title
+				release
+			}
+		}`,
+		expected: `{
+			"randomMovies": [
+				{
+					"id": "1",
+					"title": "Movie 1",
+					"release": 2007
+				},
+				{
+					"id": "2",
+					"title": "Movie 2",
+					"release": 2008
+				},
+				{
+					"id": "3",
+					"title": "Movie 3",
+					"release": 2009
+				}
+			]
+		}`,
+	}
+
+	f.run(t)
+}
+
 type testService struct {
 	schema  string
 	handler http.Handler
@@ -1971,6 +2143,7 @@ func (f *queryExecutionFixture) run(t *testing.T) {
 
 	es := newExecutableSchema(nil, 50, nil, services...)
 	es.MergedSchema = merged
+	es.BoundaryQueries = buildBoundaryQueriesMap(services...)
 	es.Locations = buildFieldURLMap(services...)
 	es.IsBoundary = buildIsBoundaryMap(services...)
 	query := gqlparser.MustLoadQuery(merged, f.query)

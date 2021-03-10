@@ -342,3 +342,33 @@ func stringArraysEqual(a, b []string) bool {
 
 	return true
 }
+
+type BoundaryQuery struct {
+	Query string
+	// Whether the query is in the array format
+	Array bool
+}
+
+type BoundaryQueriesMap map[string]map[string]BoundaryQuery
+
+func (m BoundaryQueriesMap) RegisterQuery(serviceURL, typeName, query string, array bool) {
+	if _, ok := m[serviceURL]; !ok {
+		m[serviceURL] = make(map[string]BoundaryQuery)
+	}
+
+	m[serviceURL][typeName] = BoundaryQuery{Query: query, Array: array}
+}
+
+func (m BoundaryQueriesMap) Query(serviceURL, typeName string) BoundaryQuery {
+	serviceMap, ok := m[serviceURL]
+	if !ok {
+		return BoundaryQuery{Query: "node"}
+	}
+
+	query, ok := serviceMap[typeName]
+	if !ok {
+		return BoundaryQuery{Query: "node"}
+	}
+
+	return query
+}

@@ -66,9 +66,10 @@ go test ./...
 
   Nautilus provided a lot of inspiration for Bramble.
 
-  Although the approach to federation is similar Bramble has support for a
-  few more things: fine-grained permissions, namespaces, easy plugin
-  configuration, configuration hot-reloading...
+  Although the approach to federation was initially similar, Bramble now uses
+  a different approach and supports for a few more things:
+  fine-grained permissions, namespaces, easy plugin configuration,
+  configuration hot-reloading...
 
   Bramble is also a central piece of software for [Movio](https://movio.co)
   products and thus is actively maintained and developed.

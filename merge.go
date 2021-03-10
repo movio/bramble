@@ -72,6 +72,10 @@ func buildFieldURLMap(services ...*Service) FieldURLMap {
 					continue
 				}
 
+				if isBoundaryField(f) {
+					continue
+				}
+
 				result.RegisterURL(t.Name, f.Name, rs.ServiceURL)
 			}
 		}
@@ -92,16 +96,36 @@ func buildIsBoundaryMap(services ...*Service) map[string]bool {
 	return result
 }
 
+func buildBoundaryQueriesMap(services ...*Service) BoundaryQueriesMap {
+	result := make(BoundaryQueriesMap)
+	for _, rs := range services {
+		for _, f := range rs.Schema.Query.Fields {
+			if isBoundaryField(f) {
+				queryType := f.Type.Name()
+				array := false
+				if f.Type.Elem != nil {
+					queryType = f.Type.Elem.Name()
+					array = true
+				}
+
+				result.RegisterQuery(rs.ServiceURL, queryType, f.Name, array)
+			}
+		}
+	}
+	return result
+}
+
 func mergeTypes(a, b map[string]*ast.Definition) (map[string]*ast.Definition, error) {
 	result := make(map[string]*ast.Definition)
 	for k, v := range a {
 		if k == nodeInterfaceName || k == serviceObjectName {
 			continue
 		}
-		v.Interfaces = cleanInterfaces(v.Interfaces)
-		v.Directives = cleanDirectives(v.Directives)
-		v.Fields = cleanFields(v.Fields)
-		result[k] = v
+		newV := *v
+		newV.Interfaces = cleanInterfaces(v.Interfaces)
+		newV.Directives = cleanDirectives(v.Directives)
+		newV.Fields = cleanFields(v.Fields)
+		result[k] = &newV
 	}
 
 	if b == nil {
@@ -112,36 +136,37 @@ func mergeTypes(a, b map[string]*ast.Definition) (map[string]*ast.Definition, er
 		if isGraphQLBuiltinName(k) || k == nodeInterfaceName || k == serviceObjectName {
 			continue
 		}
-		vb.Interfaces = cleanInterfaces(vb.Interfaces)
-		vb.Directives = cleanDirectives(vb.Directives)
-		vb.Fields = cleanFields(vb.Fields)
+		newVB := *vb
+		newVB.Interfaces = cleanInterfaces(vb.Interfaces)
+		newVB.Directives = cleanDirectives(vb.Directives)
+		newVB.Fields = cleanFields(vb.Fields)
 
 		va, found := result[k]
 		if !found {
-			result[k] = vb
+			result[k] = &newVB
 			continue
 		}
 
-		if vb.Kind != va.Kind {
-			return nil, fmt.Errorf("name collision: %s(%s) conflicts with %s(%s)", vb.Name, vb.Kind, va.Name, va.Kind)
+		if newVB.Kind != va.Kind {
+			return nil, fmt.Errorf("name collision: %s(%s) conflicts with %s(%s)", newVB.Name, newVB.Kind, va.Name, va.Kind)
 		}
 
-		if vb.Kind == ast.Scalar {
-			result[k] = vb
+		if newVB.Kind == ast.Scalar {
+			result[k] = &newVB
 			continue
 		}
 
-		if !hasFederationDirectives(vb) || !hasFederationDirectives(va) {
+		if !hasFederationDirectives(&newVB) || !hasFederationDirectives(va) {
 			if k != queryObjectName && k != mutationObjectName {
-				if vb.Kind == ast.Interface {
+				if newVB.Kind == ast.Interface {
 					return nil, fmt.Errorf("conflicting interface: %s (interfaces may not span multiple services)", k)
 				}
 				return nil, fmt.Errorf("conflicting non boundary type: %s", k)
 			}
 		}
 
-		if isBoundaryObject(va) != isBoundaryObject(vb) || isNamespaceObject(va) != isNamespaceObject(vb) {
-			return nil, fmt.Errorf("conflicting object directives, merged objects %q should both be boundary or namespaces", vb.Name)
+		if isBoundaryObject(va) != isBoundaryObject(&newVB) || isNamespaceObject(va) != isNamespaceObject(&newVB) {
+			return nil, fmt.Errorf("conflicting object directives, merged objects %q should both be boundary or namespaces", newVB.Name)
 		}
 
 		// now, either it's boundary type, namespace type or the Query/Mutation type
@@ -150,8 +175,8 @@ func mergeTypes(a, b map[string]*ast.Definition) (map[string]*ast.Definition, er
 			return nil, fmt.Errorf("non object boundary type")
 		}
 
-		if isNamespaceObject(vb) || k == queryObjectName || k == mutationObjectName || k == subscriptionObjectName {
-			mergedObject, err := mergeNamespaceObjects(a, b, vb, va)
+		if isNamespaceObject(&newVB) || k == queryObjectName || k == mutationObjectName || k == subscriptionObjectName {
+			mergedObject, err := mergeNamespaceObjects(a, b, &newVB, va)
 			if err != nil {
 				return nil, err
 			}
@@ -159,7 +184,7 @@ func mergeTypes(a, b map[string]*ast.Definition) (map[string]*ast.Definition, er
 			continue
 		}
 
-		mergedBoundaryObject, err := mergeBoundaryObjects(a, b, vb, va)
+		mergedBoundaryObject, err := mergeBoundaryObjects(a, b, &newVB, va)
 		if err != nil {
 			return nil, err
 		}
@@ -346,11 +371,17 @@ func cleanDirectives(directives ast.DirectiveList) ast.DirectiveList {
 }
 
 func cleanFields(fields ast.FieldList) ast.FieldList {
+	var res ast.FieldList
 	for _, f := range fields {
+		if isBoundaryField(f) {
+			continue
+		}
+
 		f.Directives = cleanDirectives(f.Directives)
+		res = append(res, f)
 	}
 
-	return fields
+	return res
 }
 
 func allowedDirective(name string) bool {
@@ -400,12 +431,20 @@ func isBoundaryObject(a *ast.Definition) bool {
 	return a.Directives.ForName(boundaryDirectiveName) != nil
 }
 
+func isBoundaryField(f *ast.FieldDefinition) bool {
+	return f.Directives.ForName(boundaryDirectiveName) != nil
+}
+
 func isNamespaceObject(a *ast.Definition) bool {
 	return a.Directives.ForName(namespaceDirectiveName) != nil
 }
 
 func hasFederationDirectives(o *ast.Definition) bool {
 	return isBoundaryObject(o) || isNamespaceObject(o)
+}
+
+func hasBoundaryDirective(f *ast.FieldDefinition) bool {
+	return f.Directives.ForName(boundaryDirectiveName) != nil
 }
 
 func filterBuiltinFields(fields ast.FieldList) ast.FieldList {

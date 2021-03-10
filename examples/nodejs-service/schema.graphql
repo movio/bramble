@@ -1,13 +1,6 @@
 # This is the prerequsite schema required
 # for fedaration by the gateway
-directive @boundary on OBJECT
-
-# The Node interface enables the gateway to
-# request an object of any type by using a
-# fragment spread
-interface Node {
-  id: ID!
-}
+directive @boundary on OBJECT | FIELD_DEFINITION
 
 # The Service type provides the gateway a schema
 # to merge into the graph and a name/version to
@@ -19,18 +12,15 @@ type Service {
 }
 
 type Query {
-  # The node query is used by the gateway to
-  # request objects for merging
-  node(id: ID!): Node
   # The service query is used by the gateway when
   # the service is first registered
   service: Service!
 
   # example Foo type
-  foo(id: ID!): Foo
+  foo(id: ID!): Foo @boundary
 }
 
-type Foo implements Node @boundary {
+type Foo @boundary {
   # required by all services that add a field to
   # the Foo type
   id: ID!

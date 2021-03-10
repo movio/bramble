@@ -35,20 +35,44 @@ func ValidateSchema(schema *ast.Schema) error {
 }
 
 func validateBoundaryObjects(schema *ast.Schema) error {
-	if usesBoundaryDirective(schema) {
-		if err := validateBoundaryDirective(schema); err != nil {
+	if !usesBoundaryDirective(schema) {
+		return nil
+	}
+
+	if err := validateBoundaryDirective(schema); err != nil {
+		return err
+	}
+
+	if err := validateBoundaryObjectsFormat(schema); err != nil {
+		return err
+	}
+
+	if usesFieldsBoundaryDirective(schema) {
+		if err := validateBoundaryQueries(schema); err != nil {
 			return err
 		}
+
+		// node compatibility
+		if !hasNodeQuery(schema) {
+			if err := validateBoundaryFields(schema); err != nil {
+				return err
+			}
+		}
+	} else {
 		if err := validateNodeInterface(schema); err != nil {
 			return err
 		}
 		if err := validateImplementsNode(schema); err != nil {
 			return err
 		}
+	}
+
+	if hasNodeQuery(schema) {
 		if err := validateNodeQuery(schema); err != nil {
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -192,6 +216,10 @@ func implementsNode(schema *ast.Schema, def *ast.Definition) bool {
 	return false
 }
 
+func hasNodeQuery(schema *ast.Schema) bool {
+	return schema.Query.Fields.ForName(nodeRootFieldName) != nil
+}
+
 func usesNamespaceDirective(schema *ast.Schema) bool {
 	for _, t := range schema.Types {
 		if t.Kind != ast.Object {
@@ -287,15 +315,123 @@ func validateBoundaryDirective(schema *ast.Schema) error {
 		if len(d.Arguments) != 0 {
 			return fmt.Errorf("@boundary directive may not take arguments")
 		}
-		if len(d.Locations) != 1 {
-			return fmt.Errorf("@boundary directive should have 1 location")
-		}
-		if d.Locations[0] != ast.LocationObject {
-			return fmt.Errorf("@boundary directive should have location OBJECT")
+		if len(d.Locations) == 1 {
+			// compatibility with existing @boundary directives
+			if d.Locations[0] != ast.LocationObject {
+				return fmt.Errorf("@boundary directive should have location OBJECT")
+			}
+		} else if len(d.Locations) == 2 {
+			if (d.Locations[0] != ast.LocationObject && d.Locations[0] != ast.LocationFieldDefinition) ||
+				(d.Locations[1] != ast.LocationObject && d.Locations[1] != ast.LocationFieldDefinition) ||
+				(d.Locations[0] == d.Locations[1]) {
+				return fmt.Errorf("@boundary directive should have locations OBJECT | FIELD_DEFINITION")
+			}
+		} else {
+			return fmt.Errorf("@boundary directive should have locations OBJECT | FIELD_DEFINITION")
 		}
 		return nil
 	}
 	return fmt.Errorf("@boundary directive not found")
+}
+
+func usesFieldsBoundaryDirective(schema *ast.Schema) bool {
+	d, ok := schema.Directives[boundaryDirectiveName]
+	if !ok {
+		return false
+	}
+	return len(d.Locations) == 2
+}
+
+// validateBoundaryFields checks that all boundary types have a getter and all getters are matching with a boundary type
+func validateBoundaryFields(schema *ast.Schema) error {
+	boundaryTypes := make(map[string]struct{})
+	for _, t := range schema.Types {
+		if t.Kind == ast.Object && isBoundaryObject(t) {
+			boundaryTypes[t.Name] = struct{}{}
+		}
+	}
+
+	for _, f := range schema.Query.Fields {
+		if hasBoundaryDirective(f) {
+			if _, ok := boundaryTypes[f.Type.Name()]; !ok {
+				return fmt.Errorf("declared boundary query for non-boundary type %q", f.Type.Name())
+			}
+
+			delete(boundaryTypes, f.Type.Name())
+		}
+	}
+
+	if len(boundaryTypes) > 0 {
+		var missingBoundaryQueries []string
+		for k := range boundaryTypes {
+			missingBoundaryQueries = append(missingBoundaryQueries, k)
+		}
+
+		return fmt.Errorf("missing boundary queries for the following types: %v", missingBoundaryQueries)
+	}
+
+	return nil
+}
+
+func validateBoundaryObjectsFormat(schema *ast.Schema) error {
+	for _, t := range schema.Types {
+		if t.Directives.ForName(boundaryDirectiveName) == nil {
+			continue
+		}
+
+		idField := t.Fields.ForName(idFieldName)
+		if idField == nil {
+			return fmt.Errorf(`missing "id: ID!" field in boundary type %q`, t.Name)
+		}
+
+		if idField.Type.String() != "ID!" {
+			return fmt.Errorf(`id field should have type "ID!" in boundary type %q`, t.Name)
+		}
+	}
+
+	return nil
+}
+
+func validateBoundaryQueries(schema *ast.Schema) error {
+	for _, f := range schema.Query.Fields {
+		if hasBoundaryDirective(f) {
+			if err := validateBoundaryQuery(f); err != nil {
+				return fmt.Errorf("invalid boundary query %q: %w", f.Name, err)
+			}
+		}
+	}
+
+	return nil
+}
+
+func validateBoundaryQuery(f *ast.FieldDefinition) error {
+	if len(f.Arguments) != 1 {
+		return fmt.Errorf(`boundary query must have a single "id: ID!" argument`)
+	}
+
+	if f.Arguments[0].Type.Elem != nil {
+		// array type check
+		if idsField := f.Arguments.ForName("ids"); idsField == nil || idsField.Type.String() != "[ID!]" {
+			return fmt.Errorf(`boundary query must have a single "id: ID!" argument`)
+		}
+
+		if !f.Type.NonNull || f.Type.Elem == nil {
+			return fmt.Errorf("return type should be a non-null array of nullable elements")
+		}
+
+		return nil
+	}
+
+	// regular type check
+	if idField := f.Arguments.ForName(idFieldName); idField == nil || idField.Type.String() != "ID!" {
+		return fmt.Errorf(`boundary query must have a single "id: ID!" argument`)
+	}
+
+	if f.Type.NonNull {
+		return fmt.Errorf("return type of boundary query should be nullable")
+	}
+
+	return nil
 }
 
 func validateNamingConventions(schema *ast.Schema) error {

@@ -1,0 +1,17 @@
+directive @boundary on OBJECT | FIELD_DEFINITION
+
+type Service {
+  name: String!
+  version: String!
+  schema: String!
+}
+
+type Query {
+  foo(id: ID!): Foo @boundary
+  service: Service!
+}
+
+type Foo @boundary {
+  id: ID!
+  graphGophers: Boolean!
+}
