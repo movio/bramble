@@ -40,7 +40,7 @@ An example query / response might be:
     "service": {
       "name": "service-a",
       "version": "v0.0.1",
-      "schema": "directive @boundary on OBJECT\ntype Movie implements Node @boundary {\n\tid: ID!\n\ttitle: String!\n\tgenre: MovieGenre!\n}\nenum MovieGenre {\n\tACTION @deprecated(reason: \"testing, yo\")\n\tCOMEDY\n\tHORROR\n\tDRAMA\n\tANIMATION\n\tADVENTURE\n\tSCIENCE_FICTION\n}\ninterface Node {\n\tid: ID!\n}\ntype Query {\n\tnode(id: ID!): Node\n\tservice: Service!\n\tmovie(id: ID!): Movie!\n\tmovies: [Movie!]!\n}\ntype Service {\n\tname: String!\n\tversion: String!\n\tschema: String!\n}\n"
+      "schema": "directive @boundary on OBJECT | FIELD_DEFINITION\ntype Movie @boundary {\n\tid: ID!\n\ttitle: String!\n\tgenre: MovieGenre!\n}\nenum MovieGenre {\n\tACTION @deprecated(reason: \"testing, yo\")\n\tCOMEDY\n\tHORROR\n\tDRAMA\n\tANIMATION\n\tADVENTURE\n\tSCIENCE_FICTION\n}\ntype Query {\n\tservice: Service!\n\tmovie(id: ID!): Movie! @boundary\n\tmovies: [Movie!]!\n}\ntype Service {\n\tname: String!\n\tversion: String!\n\tschema: String!\n}\n"
     }
   }
 }
@@ -48,14 +48,10 @@ An example query / response might be:
 
 ### Boundary Directive
 
-A service may optionally define the `boundary` directive, and use it in object definitions. When using the `boundary` directive, you must also define the standard `Node` interface (see [Relay Global Object Identification Specification](https://facebook.github.io/relay/graphql/objectidentification.htm)). Defining a type with the `@boundary` directive without implementing the `Node` interface is an error and will be rejected.
+A service may optionally define the `boundary` directive, and use it in object definitions.
 
 ```graphql
-directive @boundary on OBJECT
-
-interface Node {
-  id: ID!
-}
+directive @boundary on OBJECT | FIELD_DEFINITION
 
 type Gizmo implements Node @boundary {
   id: ID!
@@ -63,11 +59,11 @@ type Gizmo implements Node @boundary {
 }
 ```
 
-Additionally, a service that defines at least one type with the `@boundary` directive _must_ implement the `node` root Query field, as follows:
+Additionally, a service that defines objects with a `@boundary` directive _must_ implement boundary queries for all boundary objects, as follows:
 
 ```graphql
 type Query {
-  node(id: ID!): Node
+  gizmo(id: ID!): Gizmo @boundary
 }
 ```
 
@@ -185,7 +181,7 @@ Object definitions that have the `@boundary` directive and that have the same na
 1. its description contains both `A` and `B`'s descriptions, separated with a blank line
 1. it has the `@boundary` directive and only that directive
 1. it implements all of `A` and `B`'s interfaces
-1. it has an `id: ID!` field as required by the `Node` interface
+1. it has an `id: ID!` field
 1. it has all of `A` and `B`'s fields, none of which may overlap (except for `id: ID!`)
 1. its copied fields from `A` and `B` are not modified (type, arguments, description, etc.)
 
@@ -208,8 +204,8 @@ The resulting object definition `M` from the merge of the object definitions `A`
 
 Bramble's field resolution semantics is quite easy to define, thanks to its simple design. From the section above you can see that the following is true:
 
-> **With the exception of namespaces and the `Node` interface's `id` field in objects with the `@boundary` directive, every field in the merged schema is defined in exactly one federated service.**
+> **With the exception of namespaces and the `id` field in objects with the `@boundary` directive, every field in the merged schema is defined in exactly one federated service.**
 
-As a consequence of the statement above, with the exception of the `Node` interface's `id` field in objects with the `@boundary` directive, every field in the merged schema has exactly one resolver. Therefore, with the exception of the `Node` interface's `id` fields in objects with the `@boundary` directive, the semantics of resolving fields in the merged schema is identical to that of a normal GraphQL schema. The resolvers are distributed among different services, but that is an implementation concern, that does not affect the resolution semantics. Of course, this semantics definition doesn't explain _how_ Bramble executes operations and is able to invoke remote resolvers; this is covered in the _"Algorithm Definitions"_ section.
+As a consequence of the statement above, with the exception of the `id` field in objects with the `@boundary` directive, every field in the merged schema has exactly one resolver. Therefore, with the exception of the `id` fields in objects with the `@boundary` directive, the semantics of resolving fields in the merged schema is identical to that of a normal GraphQL schema. The resolvers are distributed among different services, but that is an implementation concern, that does not affect the resolution semantics. Of course, this semantics definition doesn't explain _how_ Bramble executes operations and is able to invoke remote resolvers; this is covered in the _"Algorithm Definitions"_ section.
 
-Finally, we need to define the resolution semantics of the `Node` interface's `id` fields in objects with the `@boundary` directive. First note that any service that defines the `@boundary` directive and `Node` interface, must have a resolver for the `id` field. Also, in any query document, all such `id` fields will have a _parent field_ (i.e. it cannot be a root field). As observed before, that parent field's resolver is located in exactly one service, and that service must necessarily define both the `@boundary` directive and the `Node` interface. The resolution semantics of the `Node` interface's `id` fields in objects with the `@boundary` directive is the resolution semantics of the resolver for that `id` field in that service.
+Finally, we need to define the resolution semantics of `id` fields in objects with the `@boundary` directive. First note that any service that defines the `@boundary` directive, must have a resolver for the `id` field. Also, in any query document, all such `id` fields will have a _parent field_ (i.e. it cannot be a root field). As observed before, that parent field's resolver is located in exactly one service, and that service must necessarily define the `@boundary` directive. The resolution semantics of the `id` fields in objects with the `@boundary` directive is the resolution semantics of the resolver for that `id` field in that service.

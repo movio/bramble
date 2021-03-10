@@ -46,47 +46,14 @@ Here are the steps to make a type a boundary type:
 
 ```graphql
 type Movie @boundary {
+  id: ID!
   title: String!
 }
 ```
 
 This tells Bramble that the type can be merged with others.
 
-2. **Add and implement the `Node` interface**
-
-```graphql
-interface Node {
-  id: ID!
-}
-
-type Movie implements Node @boundary {
-  id: ID!
-  title: String!
-}
-```
-
-Boundary types need to share an ID across services so that they can be linked together and requested.
-This ID should uniquely identify both the type and the object.
-
-For example:
-
-- Good IDs: `urn:bramble:Movie:1234`, `{"type": "Movie", "id": "1234"}`, `eyJ0eXBlIjogIk1vdmllIiwgImlkIjogIjEyMzQifQo=` (base64 encoded)
-- Bad ID: `1234`
-
-The ID format is free but should be consistent across your services.
-
-3. **Add a `node` query**
-
-```graphql
-extend Query {
-    node(id: ID!): Node
-}
-```
-
-For Bramble to be able to request an arbitrary boundary object, every service defining boundary types must also implement a `node` query.
-The `node` query takes a node id and returns the associated object.
-
-For an example `node` query implementation see the [example services](examples.md).
+!> Boundary types must have an `id: ID!` field. This id must be common across services for a given object.
 
 ?> **A note on boundary types and nullability**<br />
 As with regular GraphQL types, a null response can sometimes have big
@@ -95,12 +62,68 @@ This is no different with boundary types, so when extending a boundary type
 make sure fields are nullable if your service will sometimes return no
 response for a given ID.
 
+2. **Add and implement boundary queries**
+
+```graphql
+extend Query {
+    movie(id: ID!): Movie @boundary
+}
+```
+
+For Bramble to be able to request an arbitrary boundary object, every service
+defining boundary types must also implement a boundary query for each
+boundary object.
+This query takes an id and returns the associated object.
+
+There are no restrictions on the name of a boundary query, only the return
+type is used to determine the matching boundary object.
+
+**Array syntax**
+
+Alternatively it is possible to define the boundary query with an array syntax:
+
+```graphql
+extend Query {
+    movies(ids: [ID!]): [Movie]! @boundary
+}
+```
+
+In that case Bramble can query multiple IDs in the same query instead of
+doing multiple queries. This can make services more performant in some cases by
+reducing the need for dataloaders and the query complexity.
+
+_Bramble query with regular boundary query_
+
+```graphql
+{
+  _0: movie(id: "1") {
+    id
+    title
+  }
+  _1: movie(id: "2") {
+    id
+    title
+  }
+}
+```
+
+_Bramble query with array boundary query_
+
+```graphql
+{
+  _result: movies(ids: ["1", "2"]) {
+    id
+    title
+  }
+}
+```
+
 ### How it works
 
 When dealing with boundary types, Bramble will split the query into multiple steps:
 
 1. Execute the root query
-2. Execute `node` queries on the previous result
+2. Execute boundary queries on the previous result
 3. Merge the results
 
 For example:

@@ -2,12 +2,14 @@
 package main
 
 import (
+	"context"
 	"log"
 	"math/rand"
 	"net/http"
 	"os"
 	"time"
 
+	"github.com/99designs/gqlgen/graphql"
 	"github.com/99designs/gqlgen/handler"
 )
 
@@ -24,7 +26,11 @@ func main() {
 	}
 
 	http.Handle("/", handler.Playground("GraphQL playground", "/query"))
-	http.Handle("/query", handler.GraphQL(NewExecutableSchema(Config{Resolvers: &Resolver{}})))
+	c := Config{Resolvers: &Resolver{}}
+	c.Directives.Boundary = func(ctx context.Context, obj interface{}, next graphql.Resolver) (res interface{}, err error) {
+		return next(ctx)
+	}
+	http.Handle("/query", handler.GraphQL(NewExecutableSchema(c)))
 
 	log.Printf("example gqlgen-service running on http://localhost:%s/", port)
 	log.Fatal(http.ListenAndServe(":"+port, nil))

@@ -75,7 +75,7 @@ func TestBoundaryDirectiveRequirements(t *testing.T) {
 	t.Run("@boundary has one location", func(t *testing.T) {
 		withSchema(t, `
 		directive @boundary on FIELD | OBJECT
-		`).assertInvalid("@boundary directive should have 1 location", validateBoundaryDirective)
+		`).assertInvalid("@boundary directive should have locations OBJECT | FIELD_DEFINITION", validateBoundaryDirective)
 	})
 	t.Run("@boundary has no arguments", func(t *testing.T) {
 		withSchema(t, `
@@ -228,56 +228,6 @@ func TestNodeInterface(t *testing.T) {
 		interface Node {
 			id: ID!
 		}`).assertValid(validateNodeInterface)
-	})
-	t.Run("Node is checked if @boundary is used", func(t *testing.T) {
-		withSchema(t, `
-		directive @boundary on OBJECT
-		interface Node {
-			incorrect: String
-		}
-		type Gizmo implements Node @boundary {
-			incorrect: String
-		}
-		`).assertInvalid("the Node interface should have a field called 'id'", validateBoundaryObjects)
-	})
-}
-
-func TestNodeImplementation(t *testing.T) {
-	t.Run("boundary object does not implement Node", func(t *testing.T) {
-		withSchema(t, `
-		directive @boundary on OBJECT
-		type Gizmo @boundary {
-			id: ID!
-		}
-		`).assertInvalid("object 'Gizmo' has the boundary directive but doesn't implement Node", validateImplementsNode)
-	})
-	t.Run("all boundary objects are checked", func(t *testing.T) {
-		withSchema(t, `
-		directive @boundary on OBJECT
-		interface Node {
-			id: ID!
-		}
-		type Gizmo implements Node @boundary {
-			id: ID!
-		}
-		type Gimmick @boundary {
-			id: ID!
-		}
-		`).assertInvalid("object 'Gimmick' has the boundary directive but doesn't implement Node", validateImplementsNode)
-	})
-	t.Run("node implementation is checked if @boundary used", func(t *testing.T) {
-		withSchema(t, `
-		directive @boundary on OBJECT
-		interface Node {
-			id: ID!
-		}
-		type Gizmo @boundary {
-			incorrect: String
-		}
-		type Query {
-			node(id: ID!): Node
-		}
-		`).assertInvalid("object 'Gizmo' has the boundary directive but doesn't implement Node", validateBoundaryObjects)
 	})
 }
 
@@ -739,5 +689,135 @@ func TestSchemaValidAfterMerge(t *testing.T) {
 		type Mutation {
 			a: String!
 		}`).assertValid(validateSchemaValidAfterMerge)
+	})
+}
+
+func TestSchemaValidateBoundaryFields(t *testing.T) {
+	t.Run("valid boundary field", func(t *testing.T) {
+		withSchema(t, `
+		directive @boundary on OBJECT | FIELD_DEFINITION
+
+		type Foo @boundary {
+			id: ID!
+		}
+
+		type Bar @boundary {
+			id: ID!
+		}
+
+		type Query {
+			foo(id: ID!): Foo @boundary
+			barGetter(id: ID!): Bar @boundary
+		}
+		`).assertValid(validateBoundaryFields)
+	})
+
+	t.Run("missing boundary field", func(t *testing.T) {
+		withSchema(t, `
+		directive @boundary on OBJECT | FIELD_DEFINITION
+
+		type Foo @boundary {
+			id: ID!
+		}
+
+		type Bar @boundary {
+			id: ID!
+		}
+
+		type Query {
+			foo(id: ID!): Foo @boundary
+		}
+		`).assertInvalid("missing boundary queries for the following types: [Bar]", validateBoundaryFields)
+	})
+
+	t.Run("boundary field for non-boundary type", func(t *testing.T) {
+		withSchema(t, `
+		directive @boundary on OBJECT | FIELD_DEFINITION
+
+		type Foo {
+			id: ID!
+		}
+
+		type Query {
+			foo(id: ID!): Foo @boundary
+		}
+		`).assertInvalid(`declared boundary query for non-boundary type "Foo"`, validateBoundaryFields)
+	})
+
+	t.Run("valid boundary fields", func(t *testing.T) {
+		withSchema(t, `
+		directive @boundary on OBJECT | FIELD_DEFINITION
+
+		type Foo @boundary {
+			id: ID!
+		}
+
+		type Bar @boundary {
+			id: ID!
+		}
+
+		type Query {
+			foo(id: ID!): Foo @boundary
+			barGetter(id: ID!): Bar @boundary
+		}
+		`).assertValid(validateBoundaryFields)
+	})
+
+	t.Run("valid array boundary field", func(t *testing.T) {
+		withSchema(t, `
+		directive @boundary on OBJECT | FIELD_DEFINITION
+
+		type Foo @boundary {
+			id: ID!
+		}
+
+		type Query {
+			foo(ids: [ID!]!): [Foo]! @boundary
+		}
+		`).assertValid(validateBoundaryFields)
+	})
+
+	t.Run("invalid array boundary query", func(t *testing.T) {
+		withSchema(t, `
+		directive @boundary on OBJECT | FIELD_DEFINITION
+
+		type Foo @boundary {
+			id: ID!
+		}
+
+		type Bar @boundary {
+			id: ID!
+		}
+
+		type Query {
+			foo(ids: [ID!]): [Foo!] @boundary
+		}
+		`).assertInvalid(`invalid boundary query "foo": return type should be a non-null array of nullable elements`, validateBoundaryQueries)
+	})
+}
+
+func TestSchemaValidateBoundaryObjectsFormat(t *testing.T) {
+	t.Run("valid boundary objects", func(t *testing.T) {
+		withSchema(t, `
+		directive @boundary on OBJECT | FIELD_DEFINITION
+
+		type Foo @boundary {
+			id: ID!
+		}
+
+		type Bar @boundary {
+			id: ID!
+		}
+		`).assertValid(validateBoundaryObjectsFormat)
+	})
+
+	t.Run("missing id field", func(t *testing.T) {
+		withSchema(t, `
+		directive @boundary on OBJECT | FIELD_DEFINITION
+
+		type Foo @boundary {
+			foo: String
+		}
+		`).assertInvalid(`missing "id: ID!" field in boundary type "Foo"`, validateBoundaryObjectsFormat)
 	})
 }
