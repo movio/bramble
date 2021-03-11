@@ -342,3 +342,27 @@ func stringArraysEqual(a, b []string) bool {
 
 	return true
 }
+
+type GetterMap map[string]map[string]string
+
+func (m GetterMap) RegisterQuery(serviceURL, typeName, query string) {
+	if _, ok := m[serviceURL]; !ok {
+		m[serviceURL] = make(map[string]string)
+	}
+
+	m[serviceURL][typeName] = query
+}
+
+func (m GetterMap) Query(serviceURL, typeName string) string {
+	serviceMap, ok := m[serviceURL]
+	if !ok {
+		return "node"
+	}
+
+	query, ok := serviceMap[typeName]
+	if !ok {
+		return "node"
+	}
+
+	return query
+}

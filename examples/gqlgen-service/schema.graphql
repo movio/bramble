@@ -2,6 +2,9 @@
 # for fedaration by the gateway
 directive @boundary on OBJECT
 directive @getter(public: Boolean) on FIELD_DEFINITION
+interface Node {
+  id: ID!
+}
 
 # The Service type provides the gateway a schema
 # to merge into the graph and a name/version to
@@ -24,7 +27,7 @@ type Query {
   randomFoo: Foo!
 }
 
-type Foo @boundary {
+type Foo implements Node @boundary {
   # required by all services that add a field to
   # the Foo type
   id: ID!

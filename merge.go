@@ -92,15 +92,12 @@ func buildIsBoundaryMap(services ...*Service) map[string]bool {
 	return result
 }
 
-func buildGetterMap(services ...*Service) map[string]map[string]string {
-	result := make(map[string]map[string]string)
+func buildGetterMap(services ...*Service) GetterMap {
+	result := make(GetterMap)
 	for _, rs := range services {
 		for _, f := range rs.Schema.Query.Fields {
 			if f.Directives.ForName("getter") != nil {
-				if _, ok := result[rs.ServiceURL]; !ok {
-					result[rs.ServiceURL] = make(map[string]string)
-				}
-				result[rs.ServiceURL][f.Type.Name()] = f.Name
+				result.RegisterQuery(rs.ServiceURL, f.Type.Name(), f.Name)
 			}
 		}
 	}

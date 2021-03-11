@@ -40,7 +40,7 @@ type ExecutableSchema struct {
 	Locations           FieldURLMap
 	IsBoundary          map[string]bool
 	Services            map[string]*Service
-	Getters             map[string]map[string]string
+	Getters             GetterMap
 	GraphqlClient       *GraphQLClient
 	Tracer              opentracing.Tracer
 	MaxRequestsPerQuery int64
@@ -99,7 +99,7 @@ func (s *ExecutableSchema) UpdateSchema(forceRebuild bool) error {
 
 	if len(updatedServices) > 0 || forceRebuild {
 		log.Info("rebuilding merged schema")
-		getters := buildGetterMap(services...)
+		getters := buildGetterMap(services...) // TODO: fix schema merging to not modify services
 		schema, err := MergeSchemas(schemas...)
 		if err != nil {
 			invalidschema = 1
@@ -552,7 +552,7 @@ type QueryExecution struct {
 	wg            sync.WaitGroup
 	m             sync.Mutex
 	graphqlClient *GraphQLClient
-	getters       map[string]map[string]string
+	getters       GetterMap
 }
 
 func newQueryExecution(client *GraphQLClient, schema *ast.Schema, tracer opentracing.Tracer, maxRequest int64, getters map[string]map[string]string) *QueryExecution {
@@ -717,7 +717,7 @@ func (e *QueryExecution) executeChildStep(ctx context.Context, step *queryPlanSt
 	var b strings.Builder
 	b.WriteString("{")
 	for i, ip := range insertionPoints {
-		b.WriteString(fmt.Sprintf("%s: %s(id: %q) { ... on %s %s } ", nodeAlias(i), e.getters[step.ServiceURL][step.ParentType], ip.ID, step.ParentType, selectionSet))
+		b.WriteString(fmt.Sprintf("%s: %s(id: %q) { ... on %s %s } ", nodeAlias(i), e.getters.Query(step.ServiceURL, step.ParentType), ip.ID, step.ParentType, selectionSet))
 	}
 	b.WriteString("}")
 

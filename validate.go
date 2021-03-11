@@ -10,9 +10,6 @@ import (
 )
 
 func ValidateSchema(schema *ast.Schema) error {
-	// FIXME
-	return nil
-
 	if err := validateRootObjectNames(schema); err != nil {
 		return err
 	}
@@ -48,10 +45,19 @@ func validateBoundaryObjects(schema *ast.Schema) error {
 		if err := validateImplementsNode(schema); err != nil {
 			return err
 		}
+	}
+
+	if usesGetterDirective(schema) {
+		if err := validateGetterDirective(schema); err != nil {
+			return err
+		}
+		// TODO: validate all boundary objects have a getter
+	} else {
 		if err := validateNodeQuery(schema); err != nil {
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -299,6 +305,42 @@ func validateBoundaryDirective(schema *ast.Schema) error {
 		return nil
 	}
 	return fmt.Errorf("@boundary directive not found")
+}
+
+func usesGetterDirective(schema *ast.Schema) bool {
+	for _, t := range schema.Types {
+		if t.Kind != ast.Object {
+			continue
+		}
+		if t.Directives.ForName(boundaryDirectiveName) != nil {
+			return true
+		}
+	}
+	return false
+}
+
+func validateGetterDirective(schema *ast.Schema) error {
+	for _, d := range schema.Directives {
+		if d.Name != getterDirectiveName {
+			continue
+		}
+		if len(d.Arguments) != 1 || d.Arguments[0].Name != "public" || d.Arguments[0].Type.String() != "Boolean" {
+			return fmt.Errorf(`@getter directive must have an optional "public" argument, expected "@getter(public: Boolean)"`)
+		}
+		if len(d.Locations) != 1 {
+			return fmt.Errorf("@getter directive should have 1 location")
+		}
+		if d.Locations[0] != ast.LocationFieldDefinition {
+			return fmt.Errorf("@getter directive should have location FIELD_DEFINITION")
+		}
+		return nil
+	}
+	return fmt.Errorf("@getter directive not found")
+}
+
+func validateGetters(schema *ast.Schema) error {
+	// TODO
+	return nil
 }
 
 func validateNamingConventions(schema *ast.Schema) error {
