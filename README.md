@@ -1,4 +1,4 @@
-# Bramble
+![Bramble](docs/bramble-header.png)
 
 [**Full documentation**](https://movio.github.io/bramble)
 
