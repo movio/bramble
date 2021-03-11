@@ -19,11 +19,15 @@ import (
 	"github.com/vektah/gqlparser/v2/gqlerror"
 )
 
-func newExecutableSchema(plugins []Plugin, maxRequestsPerQuery, maxResponseSize int64, services ...*Service) *ExecutableSchema {
-	client := NewClient(maxResponseSize)
+func newExecutableSchema(plugins []Plugin, maxRequestsPerQuery int64, client *GraphQLClient, services ...*Service) *ExecutableSchema {
 	serviceMap := make(map[string]*Service)
+
 	for _, s := range services {
 		serviceMap[s.ServiceURL] = s
+	}
+
+	if client == nil {
+		client = NewClient()
 	}
 
 	return &ExecutableSchema{

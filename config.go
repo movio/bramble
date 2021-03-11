@@ -27,7 +27,7 @@ type Config struct {
 	PollInterval         string    `json:"poll-interval"`
 	PollIntervalDuration time.Duration
 	MaxRequestsPerQuery  int64 `json:"max-requests-per-query"`
-	MaxResponseSize      int64 `json:"max-client-response-size"`
+	MaxResponseSize      int64 `json:"max-service-response-size"`
 	Plugins              []PluginConfig
 	// Config extensions that can be shared among plugins
 	Extensions map[string]json.RawMessage
@@ -233,7 +233,8 @@ func (c *Config) Init() error {
 		services = append(services, NewService(s))
 	}
 
-	es := newExecutableSchema(c.plugins, c.MaxRequestsPerQuery, c.MaxResponseSize, services...)
+	client := NewClient(WithMaxResponseSize(c.MaxRequestsPerQuery))
+	es := newExecutableSchema(c.plugins, c.MaxRequestsPerQuery, client, services...)
 	err = es.UpdateSchema(true)
 	if err != nil {
 		return err

@@ -72,7 +72,7 @@ Sample configuration:
   - Default: 50
   - Supports hot-reload: No
 
-- `max-client-response-size`: The max response size you can receive from the gateway
+- `max-service-response-size`: The max response size that Bramble can receive from federated services
   - Default: 1MB
   - Supports hot-reload: No
 

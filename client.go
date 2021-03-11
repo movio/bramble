@@ -21,12 +21,26 @@ type GraphQLClient struct {
 	Tracer          opentracing.Tracer
 }
 
-func NewClient(maxResponseSize int64) *GraphQLClient {
-	return &GraphQLClient{
+type ClientOpt func(*GraphQLClient)
+
+func NewClient(opts ...ClientOpt) *GraphQLClient {
+	c := &GraphQLClient{
 		HTTPClient: &http.Client{
 			Timeout: 5 * time.Second,
 		},
-		MaxResponseSize: maxResponseSize,
+		MaxResponseSize: 1024 * 1024,
+	}
+
+	for _, opt := range opts {
+		opt(c)
+	}
+
+	return c
+}
+
+func WithMaxResponseSize(maxResponseSize int64) ClientOpt {
+	return func(s *GraphQLClient) {
+		s.MaxResponseSize = maxResponseSize
 	}
 }
 

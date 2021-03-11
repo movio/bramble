@@ -34,7 +34,7 @@ func (s *Service) Update() (bool, error) {
 		} `json:"service"`
 	}{}
 
-	client := NewClient(1024 * 1024)
+	client := NewClient()
 	if err := client.Request(context.Background(), s.ServiceURL, req, &response); err != nil {
 		s.Status = "Unreachable"
 		return false, err
