@@ -149,18 +149,22 @@ func (s *ExecutableSchema) ExecuteQuery(ctx context.Context) *graphql.Response {
 	op = s.evaluateSkipAndInclude(variables, op)
 
 	var errs gqlerror.List
-	perms, ok := GetPermissionsFromContext(ctx)
-	if ok {
+	perms, hasPerms := GetPermissionsFromContext(ctx)
+	if hasPerms {
 		errs = perms.FilterAuthorizedFields(op)
 	}
 
 	for _, f := range selectionSetToFields(op.SelectionSet) {
+		filteredSchema := s.MergedSchema
+		if hasPerms {
+			filteredSchema = perms.FilterSchema(s.MergedSchema)
+		}
 		switch f.Name {
 		case "__type":
 			name := f.Arguments.ForName("name").Value.Raw
-			result[f.Alias] = s.resolveType(ctx, perms.FilterSchema(s.MergedSchema), &ast.Type{NamedType: name}, f.SelectionSet)
+			result[f.Alias] = s.resolveType(ctx, filteredSchema, &ast.Type{NamedType: name}, f.SelectionSet)
 		case "__schema":
-			result[f.Alias] = s.resolveSchema(ctx, perms.FilterSchema(s.MergedSchema), f.SelectionSet)
+			result[f.Alias] = s.resolveSchema(ctx, filteredSchema, f.SelectionSet)
 		}
 	}
 
