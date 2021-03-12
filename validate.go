@@ -45,16 +45,16 @@ func validateBoundaryObjects(schema *ast.Schema) error {
 		if err := validateImplementsNode(schema); err != nil {
 			return err
 		}
-	}
 
-	if usesGetterDirective(schema) {
-		if err := validateGetterDirective(schema); err != nil {
-			return err
-		}
-		// TODO: validate all boundary objects have a getter
-	} else {
-		if err := validateNodeQuery(schema); err != nil {
-			return err
+		if usesGetterDirective(schema) {
+			if err := validateGetterDirective(schema); err != nil {
+				return err
+			}
+			// TODO: validate all boundary objects have a getter
+		} else {
+			if err := validateNodeQuery(schema); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -312,7 +312,7 @@ func usesGetterDirective(schema *ast.Schema) bool {
 		if t.Kind != ast.Object {
 			continue
 		}
-		if t.Directives.ForName(boundaryDirectiveName) != nil {
+		if t.Directives.ForName(getterDirectiveName) != nil {
 			return true
 		}
 	}
