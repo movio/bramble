@@ -1969,7 +1969,7 @@ func (f *queryExecutionFixture) run(t *testing.T) {
 	merged, err := MergeSchemas(schemas...)
 	require.NoError(t, err)
 
-	es := newExecutableSchema(nil, 50, services...)
+	es := newExecutableSchema(nil, 50, nil, services...)
 	es.MergedSchema = merged
 	es.Locations = buildFieldURLMap(services...)
 	es.IsBoundary = buildIsBoundaryMap(services...)

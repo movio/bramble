@@ -19,15 +19,16 @@ type PluginConfig struct {
 
 // Config contains the gateway configuration
 type Config struct {
-	GatewayPort          int       `json:"gateway-port"`
-	MetricsPort          int       `json:"metrics-port"`
-	PrivatePort          int       `json:"private-port"`
-	Services             []string  `json:"services"`
-	LogLevel             log.Level `json:"loglevel"`
-	PollInterval         string    `json:"poll-interval"`
-	PollIntervalDuration time.Duration
-	MaxRequestsPerQuery  int64 `json:"max-requests-per-query"`
-	Plugins              []PluginConfig
+	GatewayPort            int       `json:"gateway-port"`
+	MetricsPort            int       `json:"metrics-port"`
+	PrivatePort            int       `json:"private-port"`
+	Services               []string  `json:"services"`
+	LogLevel               log.Level `json:"loglevel"`
+	PollInterval           string    `json:"poll-interval"`
+	PollIntervalDuration   time.Duration
+	MaxRequestsPerQuery    int64 `json:"max-requests-per-query"`
+	MaxServiceResponseSize int64 `json:"max-service-response-size"`
+	Plugins                []PluginConfig
 	// Config extensions that can be shared among plugins
 	Extensions map[string]json.RawMessage
 
@@ -185,12 +186,13 @@ func GetConfig(configFiles []string) (*Config, error) {
 	}
 
 	cfg := Config{
-		GatewayPort:         8082,
-		PrivatePort:         8083,
-		MetricsPort:         9009,
-		LogLevel:            log.DebugLevel,
-		PollInterval:        "5s",
-		MaxRequestsPerQuery: 50,
+		GatewayPort:            8082,
+		PrivatePort:            8083,
+		MetricsPort:            9009,
+		LogLevel:               log.DebugLevel,
+		PollInterval:           "5s",
+		MaxRequestsPerQuery:    50,
+		MaxServiceResponseSize: 1024 * 1024,
 
 		watcher:     watcher,
 		configFiles: configFiles,
@@ -231,7 +233,8 @@ func (c *Config) Init() error {
 		services = append(services, NewService(s))
 	}
 
-	es := newExecutableSchema(c.plugins, c.MaxRequestsPerQuery, services...)
+	client := NewClient(WithMaxResponseSize(c.MaxServiceResponseSize))
+	es := newExecutableSchema(c.plugins, c.MaxRequestsPerQuery, client, services...)
 	err = es.UpdateSchema(true)
 	if err != nil {
 		return err
