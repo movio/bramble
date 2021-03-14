@@ -5,6 +5,7 @@
 *.nojekyll
 *.json
 *.png
+*.svg
 go.sum
 CODEOWNERS
 LICENSE
