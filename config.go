@@ -233,7 +233,7 @@ func (c *Config) Init() error {
 		services = append(services, NewService(s))
 	}
 
-	client := NewClient(WithMaxResponseSize(c.MaxRequestsPerQuery))
+	client := NewClient(WithMaxResponseSize(c.MaxServiceResponseSize))
 	es := newExecutableSchema(c.plugins, c.MaxRequestsPerQuery, client, services...)
 	err = es.UpdateSchema(true)
 	if err != nil {
