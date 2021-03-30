@@ -17,7 +17,7 @@ jobs:
           go-version: 1.16
 
       - name: Build cmd
-        run: CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bramble ./cmd
+        run: CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bramble ./cmd/bramble
 
       - name: Docker meta
         id: docker_meta
