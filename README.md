@@ -1,5 +1,8 @@
 ![Bramble](docs/bramble-header.png)
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/movio/bramble.svg)](https://pkg.go.dev/github.com/movio/bramble)
+[![Go Report Card](https://goreportcard.com/badge/github.com/movio/bramble)](https://goreportcard.com/report/github.com/movio/bramble)
+
 [**Full documentation**](https://movio.github.io/bramble)
 
 Bramble is a production-ready GraphQL federation gateway.
