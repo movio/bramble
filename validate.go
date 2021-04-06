@@ -2,8 +2,6 @@ package bramble
 
 import (
 	"fmt"
-	"regexp"
-	"strings"
 
 	"github.com/vektah/gqlparser/v2"
 	"github.com/vektah/gqlparser/v2/ast"
@@ -23,9 +21,6 @@ func ValidateSchema(schema *ast.Schema) error {
 		return err
 	}
 	if err := validateServiceObject(schema); err != nil {
-		return err
-	}
-	if err := validateNamingConventions(schema); err != nil {
 		return err
 	}
 	if err := validateSchemaValidAfterMerge(schema); err != nil {
@@ -84,13 +79,13 @@ func validateNamespaceObjects(schema *ast.Schema) error {
 		if err := validateNamespaceTypesAscendence(schema); err != nil {
 			return err
 		}
-		if err := validateNamespacesNaming(schema, schema.Query, "Query"); err != nil {
+		if err := validateNamespacesFields(schema, schema.Query, "Query"); err != nil {
 			return err
 		}
-		if err := validateNamespacesNaming(schema, schema.Mutation, "Mutation"); err != nil {
+		if err := validateNamespacesFields(schema, schema.Mutation, "Mutation"); err != nil {
 			return err
 		}
-		if err := validateNamespacesNaming(schema, schema.Subscription, "Subscription"); err != nil {
+		if err := validateNamespacesFields(schema, schema.Subscription, "Subscription"); err != nil {
 			return err
 		}
 	}
@@ -251,7 +246,7 @@ func validateNamespaceDirective(schema *ast.Schema) error {
 	return fmt.Errorf("@namespace directive not found")
 }
 
-func validateNamespacesNaming(schema *ast.Schema, currentType *ast.Definition, rootType string) error {
+func validateNamespacesFields(schema *ast.Schema, currentType *ast.Definition, rootType string) error {
 	if currentType == nil {
 		return nil
 	}
@@ -263,11 +258,7 @@ func validateNamespacesNaming(schema *ast.Schema, currentType *ast.Definition, r
 				return fmt.Errorf("namespace return type should be non nullable on %s.%s", currentType.Name, f.Name)
 			}
 
-			if !strings.HasSuffix(f.Type.Name(), rootType) {
-				return fmt.Errorf("type %q is used as a %s namespace but doesn't have the %q suffix", f.Type.Name(), strings.ToLower(rootType), rootType)
-			}
-
-			err := validateNamespacesNaming(schema, ft, rootType)
+			err := validateNamespacesFields(schema, ft, rootType)
 			if err != nil {
 				return err
 			}
@@ -434,51 +425,6 @@ func validateBoundaryQuery(f *ast.FieldDefinition) error {
 	return nil
 }
 
-func validateNamingConventions(schema *ast.Schema) error {
-	for _, t := range schema.Types {
-		if isGraphQLBuiltinName(t.Name) {
-			continue
-		}
-		if t.Kind == ast.Object || t.Kind == ast.InputObject || t.Kind == ast.Interface {
-			if !isPascalCase(t.Name) {
-				return fmt.Errorf("type '%s' isn't PascalCase", t.Name)
-			}
-
-			for _, f := range t.Fields {
-				if isGraphQLBuiltinName(f.Name) {
-					continue
-				}
-				if !isCamelCase(f.Name) {
-					return fmt.Errorf("field '%s.%s' isn't camelCase", t.Name, f.Name)
-				}
-				if t.Kind == ast.Object || t.Kind == ast.Interface {
-					for _, a := range f.Arguments {
-						if !isCamelCase(a.Name) {
-							return fmt.Errorf("argument '%s' of field '%s.%s' isn't camelCase", a.Name, t.Name, f.Name)
-						}
-					}
-				}
-			}
-		}
-		if t.Kind == ast.Enum {
-			if !isPascalCase(t.Name) {
-				return fmt.Errorf("enum type '%s' isn't PascalCase", t.Name)
-			}
-			for _, v := range t.EnumValues {
-				if !isAllCaps(v.Name) {
-					return fmt.Errorf("enum value '%s.%s' isn't ALL_CAPS", t.Name, v.Name)
-				}
-			}
-		}
-		if t.Kind == ast.Union {
-			if !isPascalCase(t.Name) {
-				return fmt.Errorf("union type '%s' isn't PascalCase", t.Name)
-			}
-		}
-	}
-	return nil
-}
-
 func validateRootObjectNames(schema *ast.Schema) error {
 	if q := schema.Query; q != nil && q.Name != queryObjectName {
 		return fmt.Errorf("the schema Query type can not be renamed to %s", q.Name)
@@ -515,22 +461,4 @@ func validateSchemaValidAfterMerge(schema *ast.Schema) error {
 	}
 
 	return nil
-}
-
-var camelCaseRegexp = regexp.MustCompile(`^[a-z][A-Za-z0-9]+$`)
-
-func isCamelCase(s string) bool {
-	return camelCaseRegexp.MatchString(s)
-}
-
-var allCapsRegexp = regexp.MustCompile(`^[A-Z][A-Z0-9_]+$`)
-
-func isAllCaps(s string) bool {
-	return allCapsRegexp.MatchString(s)
-}
-
-var pascalCaseRegexp = regexp.MustCompile(`^[A-Z][A-Za-z0-9]+$`)
-
-func isPascalCase(s string) bool {
-	return pascalCaseRegexp.MatchString(s)
 }
