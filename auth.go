@@ -231,3 +231,49 @@ func filterFields(path []string, ss ast.SelectionSet, allowedFields AllowedField
 
 	return res, errs
 }
+
+// MergePermissions merges the given permissions. The result permissions are the
+// union of the given permissions (allow everything that is allowed in any of the given permissions).
+func MergePermissions(perms ...OperationPermissions) OperationPermissions {
+	var queries []AllowedFields
+	var mutations []AllowedFields
+	var subscriptions []AllowedFields
+
+	for _, p := range perms {
+		queries = append(queries, p.AllowedRootQueryFields)
+		mutations = append(mutations, p.AllowedRootMutationFields)
+		subscriptions = append(subscriptions, p.AllowedRootSubscriptionFields)
+	}
+
+	return OperationPermissions{
+		AllowedRootQueryFields:        MergeAllowedFields(queries...),
+		AllowedRootMutationFields:     MergeAllowedFields(mutations...),
+		AllowedRootSubscriptionFields: MergeAllowedFields(subscriptions...),
+	}
+}
+
+// MergeAllowedFields merges the given AllowedFields. The result is the union of
+// all the allowed fields.
+func MergeAllowedFields(allowedFields ...AllowedFields) AllowedFields {
+	res := AllowedFields{
+		AllowedSubfields: make(map[string]AllowedFields),
+	}
+
+	for _, af := range allowedFields {
+		if af.AllowAll {
+			return AllowedFields{
+				AllowAll: true,
+			}
+		}
+		for f, sf := range af.AllowedSubfields {
+			resSubFields, ok := res.AllowedSubfields[f]
+			if !ok {
+				res.AllowedSubfields[f] = sf
+				continue
+			}
+			res.AllowedSubfields[f] = MergeAllowedFields(sf, resSubFields)
+		}
+	}
+
+	return res
+}

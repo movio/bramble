@@ -327,6 +327,93 @@ func TestFilterSchema(t *testing.T) {
 	})
 }
 
+func TestMergePermissions(t *testing.T) {
+	permsStr := []string{
+		`{ "query": {"movie": ["title"]}, "mutation": {"movie": ["updateTitle"]} }`,
+		`{ "query": {"movie": ["releaseDate"]}, "mutation": {"movie": ["delete"]} }`,
+		`{ "mutation": {"movie": ["add"]} }`,
+	}
+	expectedStr := `{
+		"query": {"movie": ["title", "releaseDate"]},
+		"mutation": {"movie": ["updateTitle", "delete", "add"]},
+		"subscription": []
+	}`
+
+	var perms []OperationPermissions
+	for _, p := range permsStr {
+		var perm OperationPermissions
+		err := json.Unmarshal([]byte(p), &perm)
+		require.NoError(t, err)
+		perms = append(perms, perm)
+	}
+
+	res := MergePermissions(perms...)
+	var expected OperationPermissions
+	err := json.Unmarshal([]byte(expectedStr), &expected)
+	require.NoError(t, err)
+	assert.EqualValues(t, expected, res)
+}
+
+func TestMergeAllowedFields(t *testing.T) {
+	tts := []struct {
+		name     string
+		in       []string
+		expected string
+	}{
+		{
+			name: "basic merge",
+			in: []string{
+				`{"movie": ["title", "releaseDate"]}`,
+				`{"movie": ["cast", "length"]}`,
+			},
+			expected: `{"movie": ["title", "releaseDate", "cast", "length"]}`,
+		},
+		{
+			name: "recursive merge",
+			in: []string{
+				`{"movie": {"cast": ["lastName"] }}`,
+				`{"movie": {"title": "*", "cast": ["firstName"]}}`,
+			},
+			expected: `{"movie": {"title": "*", "cast": ["firstName", "lastName"]}}`,
+		},
+		{
+			name: "allow all takes precedence",
+			in: []string{
+				`{"movie": {"cast": "*" }}`,
+				`{"movie": {"title": "*", "cast": ["firstName"]}}`,
+			},
+			expected: `{"movie": {"title": "*", "cast": "*" }}`,
+		},
+		{
+			name: "overlapping fields",
+			in: []string{
+				`{"movie": ["title", "releaseDate"]}`,
+				`{"movie": ["title", "releaseDate", "cast", "length"]}`,
+			},
+			expected: `{"movie": ["title", "releaseDate", "cast", "length"]}`,
+		},
+	}
+
+	for _, tt := range tts {
+		t.Run(tt.name, func(t *testing.T) {
+			var perms []AllowedFields
+			for _, str := range tt.in {
+				var af AllowedFields
+				err := json.Unmarshal([]byte(str), &af)
+				require.NoError(t, err)
+				perms = append(perms, af)
+			}
+
+			res := MergeAllowedFields(perms...)
+
+			var expected AllowedFields
+			err := json.Unmarshal([]byte(tt.expected), &expected)
+			require.NoError(t, err)
+			assert.EqualValues(t, expected, res)
+		})
+	}
+}
+
 func strToSelectionSet(schema *ast.Schema, query string) ast.SelectionSet {
 	return gqlparser.MustLoadQuery(schema, query).Operations[0].SelectionSet
 }
