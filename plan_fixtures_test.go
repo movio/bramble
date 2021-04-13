@@ -20,9 +20,7 @@ type PlanTestFixture struct {
 
 var PlanTestFixture1 = &PlanTestFixture{
 	Schema: `
-	interface Node {
-		id: ID!
-	}
+	directive @boundary on OBJECT | FIELD_DEFINITION
 
 	enum Language {
 		French
@@ -30,13 +28,13 @@ var PlanTestFixture1 = &PlanTestFixture{
 		Italian
 	}
 
-	type Movie implements Node {
+	type Movie @boundary {
 		id: ID!
 		title(language: Language): String!
 		compTitles(limit: Int!): [Movie!]!
 	}
 
-	type Transaction implements Node {
+	type Transaction @boundary {
 		id: ID!
 		gross: Float!
 	}

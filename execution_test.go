@@ -1136,7 +1136,7 @@ func TestQueryExecutionWithInputObject(t *testing.T) {
 							id
 							title
 							otherMovie(arg: {id: "2", title: "another title"}) {
-								_id: id title
+								title
 							}
 						}
 					}`, q["query"])
