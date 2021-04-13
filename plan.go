@@ -60,7 +60,7 @@ func Plan(ctx *PlanningContext) (*queryPlan, error) {
 		return nil, fmt.Errorf("not implemented")
 	}
 
-	steps, err := createSteps(ctx, nil, parentType, "", ctx.Operation.SelectionSet)
+	steps, err := createSteps(ctx, nil, parentType, "", ctx.Operation.SelectionSet, false)
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +69,7 @@ func Plan(ctx *PlanningContext) (*queryPlan, error) {
 	}, nil
 }
 
-func createSteps(ctx *PlanningContext, insertionPoint []string, parentType, parentLocation string, selectionSet ast.SelectionSet) ([]*queryPlanStep, error) {
+func createSteps(ctx *PlanningContext, insertionPoint []string, parentType, parentLocation string, selectionSet ast.SelectionSet, childstep bool) ([]*queryPlanStep, error) {
 	var result []*queryPlanStep
 
 	routedSelectionSet, err := routeSelectionSet(ctx, parentType, parentLocation, selectionSet)
@@ -78,7 +78,7 @@ func createSteps(ctx *PlanningContext, insertionPoint []string, parentType, pare
 	}
 
 	for location, selectionSet := range routedSelectionSet {
-		selectionSetForLocation, childrenSteps, err := extractSelectionSet(ctx, insertionPoint, parentType, selectionSet, location)
+		selectionSetForLocation, childrenSteps, err := extractSelectionSet(ctx, insertionPoint, parentType, selectionSet, location, childstep)
 
 		if err != nil {
 			return nil, err
@@ -109,7 +109,7 @@ func createSteps(ctx *PlanningContext, insertionPoint []string, parentType, pare
 	return result, nil
 }
 
-func extractSelectionSet(ctx *PlanningContext, insertionPoint []string, parentType string, input ast.SelectionSet, location string) (ast.SelectionSet, []*queryPlanStep, error) {
+func extractSelectionSet(ctx *PlanningContext, insertionPoint []string, parentType string, input ast.SelectionSet, location string, childstep bool) (ast.SelectionSet, []*queryPlanStep, error) {
 	var selectionSetResult []ast.Selection
 	var childrenStepsResult []*queryPlanStep
 	for _, selection := range input {
@@ -122,7 +122,7 @@ func extractSelectionSet(ctx *PlanningContext, insertionPoint []string, parentTy
 			loc, err := ctx.Locations.UrlFor(parentType, location, selection.Name)
 			if err != nil {
 				// namespace
-				subSS, steps, err := extractSelectionSet(ctx, append(insertionPoint, selection.Name), selection.Definition.Type.Name(), selection.SelectionSet, location)
+				subSS, steps, err := extractSelectionSet(ctx, append(insertionPoint, selection.Name), selection.Definition.Type.Name(), selection.SelectionSet, location, childstep)
 				if err != nil {
 					return nil, nil, err
 				}
@@ -142,6 +142,7 @@ func extractSelectionSet(ctx *PlanningContext, insertionPoint []string, parentTy
 						selection.Definition.Type.Name(),
 						selection.SelectionSet,
 						location,
+						childstep,
 					)
 					if err != nil {
 						return nil, nil, err
@@ -162,7 +163,7 @@ func extractSelectionSet(ctx *PlanningContext, insertionPoint []string, parentTy
 
 				if !mergedWithExistingStep {
 					newSelectionSet := []ast.Selection{selection}
-					childrenSteps, err := createSteps(ctx, insertionPoint, parentType, location, newSelectionSet)
+					childrenSteps, err := createSteps(ctx, insertionPoint, parentType, location, newSelectionSet, true)
 					if err != nil {
 						return nil, nil, err
 					}
@@ -175,7 +176,9 @@ func extractSelectionSet(ctx *PlanningContext, insertionPoint []string, parentTy
 				insertionPoint,
 				selection.TypeCondition,
 				selection.SelectionSet,
-				location)
+				location,
+				childstep,
+			)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -189,7 +192,9 @@ func extractSelectionSet(ctx *PlanningContext, insertionPoint []string, parentTy
 				insertionPoint,
 				selection.Definition.TypeCondition,
 				selection.Definition.SelectionSet,
-				location)
+				location,
+				childstep,
+			)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -203,7 +208,14 @@ func extractSelectionSet(ctx *PlanningContext, insertionPoint []string, parentTy
 			return nil, nil, fmt.Errorf("unexpected %T in SelectionSet", selection)
 		}
 	}
-	if parentType != queryObjectName && parentType != mutationObjectName && ctx.IsBoundary[parentType] && ctx.Schema.Types[parentType].Fields.ForName("id") != nil {
+
+	// We need to add the id field only if it's a boundary type and the result
+	// is going to be merged with another step (we have children steps or it's a
+	// child step).
+	if parentType != queryObjectName && parentType != mutationObjectName &&
+		ctx.IsBoundary[parentType] &&
+		ctx.Schema.Types[parentType].Fields.ForName("id") != nil &&
+		(childstep || len(childrenStepsResult) > 0) {
 		if !selectionSetHasFieldNamed(selectionSetResult, "id") {
 			id := &ast.Field{
 				Alias:      "_id",

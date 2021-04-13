@@ -262,7 +262,7 @@ func TestQueryPlanInlineFragment(t *testing.T) {
 			{
 				"ServiceURL": "A",
 				"ParentType": "Query",
-				"SelectionSet": "{ movies { _id: id ... on Movie { id title(language: French) } } }",
+				"SelectionSet": "{ movies { ... on Movie { id title(language: French) } } }",
 				"InsertionPoint": null,
 				"Then": null
 			}
@@ -321,7 +321,7 @@ func TestQueryPlanFragmentSpread1(t *testing.T) {
 			{
 				"ServiceURL": "A",
 				"ParentType": "Query",
-				"SelectionSet": "{ movies { _id: id ... on Movie { id title(language: French) } } }",
+				"SelectionSet": "{ movies { ... on Movie { id title(language: French) } } }",
 				"InsertionPoint": null,
 				"Then": null
 			}
@@ -680,7 +680,7 @@ func TestQueryPlanWithNestedNamespaces(t *testing.T) {
 		  {
 			"ServiceURL": "A",
 			"ParentType": "Mutation",
-			"SelectionSet": "{ firstLevel { secondLevel { movie { id compTitles { id } releases { _id: id date } } } } }",
+			"SelectionSet": "{ firstLevel { secondLevel { movie { id compTitles { id } releases { date } } } } }",
 			"InsertionPoint": null,
 			"Then": [
 			  {
@@ -696,6 +696,22 @@ func TestQueryPlanWithNestedNamespaces(t *testing.T) {
 				"Then": null
 			  }
 			]
+		  }
+		]
+	  }
+	`)
+}
+
+func TestQueryPlanNoUnnessecaryID(t *testing.T) {
+	PlanTestFixture1.Check(t, "{ movies { title } }", `
+	  {
+		"RootSteps": [
+		  {
+			"ServiceURL": "A",
+			"ParentType": "Query",
+			"SelectionSet": "{ movies { title } }",
+			"InsertionPoint": null,
+			"Then": null
 		  }
 		]
 	  }
