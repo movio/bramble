@@ -179,7 +179,7 @@ This function is where most of the complexity of query planning lies. It recursi
 
 This function processes each selection of the selectionSet one by one.
 
-If the selection is the `id` field of a boundary type, we know we can resolve it, since all boundary types implement the `Node` interface.
+If the selection is the `id` field of a boundary type, we know we can resolve it, since all boundary types have the `id` field.
 
 If the field's location matches the given location, we know it will be part of the filtered result. Then,
 
@@ -342,7 +342,7 @@ all the target elements for the operation (where we need to insert the data).
 They are represented by the id of the element along with a pointer to a
 structure that can receive JSON document. See `buildInsertionSlice` below.
 
-Then we build the document: one node query per insertion target. To avoid
+Then we build the document: one boundary query per insertion target. To avoid
 conflict we alias each query with an id.
 
 Once we have the document is constructed we invoke the remote GraphQL service
@@ -358,10 +358,8 @@ function ExecuteChildStep(ctx, step, resultPtr) {
     for target in targets {
         query = """
             {
-                ${id}: node(id: ${target.Id}) {
-                    ... on ${step.ParentType} {
-                        ${step.SelectionSet}
-                    }
+                ${id}: $boundaryQuery(id: ${target.Id}) {
+                    ${step.SelectionSet}
                 }
             }
         """

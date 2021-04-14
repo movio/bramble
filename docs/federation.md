@@ -53,7 +53,7 @@ A service may optionally define the `boundary` directive, and use it in object d
 ```graphql
 directive @boundary on OBJECT | FIELD_DEFINITION
 
-type Gizmo implements Node @boundary {
+type Gizmo @boundary {
   id: ID!
   size: Float!
 }
