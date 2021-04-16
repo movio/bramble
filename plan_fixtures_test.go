@@ -235,20 +235,20 @@ func (f *PlanTestFixture) Check(t *testing.T, query, expectedJSON string) {
 	assert.JSONEq(t, expectedJSON, jsonMustMarshal(actual))
 }
 
-type ByServiceURL []*queryPlanStep
+type ByServiceURL []*QueryPlanStep
 
 func (a ByServiceURL) Len() int           { return len(a) }
 func (a ByServiceURL) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a ByServiceURL) Less(i, j int) bool { return a[i].ServiceURL < a[j].ServiceURL }
 
-func (p *queryPlan) SortSteps() {
+func (p *QueryPlan) SortSteps() {
 	sort.Sort(ByServiceURL(p.RootSteps))
 	for _, s := range p.RootSteps {
 		s.SortSteps()
 	}
 }
 
-func (s *queryPlanStep) SortSteps() {
+func (s *QueryPlanStep) SortSteps() {
 	sort.Sort(ByServiceURL(s.Then))
 	for _, s := range s.Then {
 		s.SortSteps()

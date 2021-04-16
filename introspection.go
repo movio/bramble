@@ -8,7 +8,7 @@ import (
 	"github.com/vektah/gqlparser/v2/ast"
 )
 
-// Service ...
+// Service is a federated service.
 type Service struct {
 	ServiceURL   string
 	Name         string
@@ -20,6 +20,7 @@ type Service struct {
 	client *GraphQLClient
 }
 
+// NewService returns a new Service.
 func NewService(serviceURL string) *Service {
 	s := &Service{
 		ServiceURL: serviceURL,
@@ -28,6 +29,7 @@ func NewService(serviceURL string) *Service {
 	return s
 }
 
+// Update queries the service's schema, name and version and updates its status.
 func (s *Service) Update() (bool, error) {
 	req := NewRequest("{ service { name, version, schema} }")
 	response := struct {

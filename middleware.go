@@ -16,12 +16,14 @@ import (
 
 type middleware func(http.Handler) http.Handler
 
+// DebugKey is used to request debug info from the context
 const DebugKey contextKey = "debug"
 
 const (
 	debugHeader = "X-Bramble-Debug"
 )
 
+// DebugInfo contains the requested debug info for a query
 type DebugInfo struct {
 	Variables bool
 	Query     bool

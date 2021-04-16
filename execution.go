@@ -40,6 +40,7 @@ func newExecutableSchema(plugins []Plugin, maxRequestsPerQuery int64, client *Gr
 	}
 }
 
+// ExecutableSchema contains all the necessary information to execute queries
 type ExecutableSchema struct {
 	MergedSchema        *ast.Schema
 	Locations           FieldURLMap
@@ -54,6 +55,8 @@ type ExecutableSchema struct {
 	plugins []Plugin
 }
 
+// UpdateServiceList replaces the list of services with the provided one and
+// update the schema.
 func (s *ExecutableSchema) UpdateServiceList(services []string) error {
 	newServices := make(map[string]*Service)
 	for _, svcURL := range services {
@@ -68,6 +71,8 @@ func (s *ExecutableSchema) UpdateServiceList(services []string) error {
 	return s.UpdateSchema(true)
 }
 
+// UpdateSchema updates the schema from every service and then update the merged
+// schema.
 func (s *ExecutableSchema) UpdateSchema(forceRebuild bool) error {
 	var services []*Service
 	var schemas []*ast.Schema
@@ -125,10 +130,12 @@ func (s *ExecutableSchema) UpdateSchema(forceRebuild bool) error {
 	return nil
 }
 
+// Exec returns the query execution handler
 func (s *ExecutableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 	return s.ExecuteQuery
 }
 
+// ExecuteQuery executes an incoming query
 func (s *ExecutableSchema) ExecuteQuery(ctx context.Context) *graphql.Response {
 	start := time.Now()
 
@@ -238,6 +245,8 @@ func (s *ExecutableSchema) ExecuteQuery(ctx context.Context) *graphql.Response {
 
 }
 
+// TraceIDFromContext retrieves the trace ID from the context if it exists.
+// Returns an empty string otherwise.
 func TraceIDFromContext(ctx context.Context) string {
 	span := opentracing.SpanFromContext(ctx)
 	if span == nil {
@@ -250,10 +259,12 @@ func TraceIDFromContext(ctx context.Context) string {
 	return jaegerContext.TraceID().String()
 }
 
+// Schema returns the merged schema
 func (s *ExecutableSchema) Schema() *ast.Schema {
 	return s.MergedSchema
 }
 
+// Complexity returns the query complexity (unimplemented)
 func (s *ExecutableSchema) Complexity(typeName, fieldName string, childComplexity int, args map[string]interface{}) (int, bool) {
 	// FIXME: TBD
 	return 0, false
@@ -547,6 +558,7 @@ func hasDeprecatedDirective(directives ast.DirectiveList) (bool, *string) {
 	return false, nil
 }
 
+// QueryExecution is a single query execution
 type QueryExecution struct {
 	Schema       *ast.Schema
 	Errors       []*gqlerror.Error
@@ -570,7 +582,7 @@ func newQueryExecution(client *GraphQLClient, schema *ast.Schema, tracer opentra
 	}
 }
 
-func (e *QueryExecution) execute(ctx context.Context, plan *queryPlan, resData map[string]interface{}) []*gqlerror.Error {
+func (e *QueryExecution) execute(ctx context.Context, plan *QueryPlan, resData map[string]interface{}) []*gqlerror.Error {
 	e.wg.Add(len(plan.RootSteps))
 	for _, step := range plan.RootSteps {
 		if step.ServiceURL == internalServiceName {
@@ -591,7 +603,7 @@ func (e *QueryExecution) execute(ctx context.Context, plan *queryPlan, resData m
 	return e.Errors
 }
 
-func (e *QueryExecution) addError(ctx context.Context, step *queryPlanStep, err error) {
+func (e *QueryExecution) addError(ctx context.Context, step *QueryPlanStep, err error) {
 	var path ast.Path
 	for _, p := range step.InsertionPoint {
 		path = append(path, ast.PathName(p))
@@ -644,7 +656,7 @@ func (e *QueryExecution) addError(ctx context.Context, step *queryPlanStep, err 
 	}
 }
 
-func (e *QueryExecution) executeRootStep(ctx context.Context, step *queryPlanStep, result map[string]interface{}) {
+func (e *QueryExecution) executeRootStep(ctx context.Context, step *QueryPlanStep, result map[string]interface{}) {
 	defer e.wg.Done()
 	defer func() {
 		if r := recover(); r != nil {
@@ -704,7 +716,7 @@ func jsonMapToInterfaceMap(m map[string]json.RawMessage) map[string]interface{} 
 // executeChildStep executes a child step. It finds the insertion targets for
 // the step's insertion point and queries the specified service using the node
 // query type.
-func (e *QueryExecution) executeChildStep(ctx context.Context, step *queryPlanStep, result map[string]interface{}) {
+func (e *QueryExecution) executeChildStep(ctx context.Context, step *QueryPlanStep, result map[string]interface{}) {
 	defer e.wg.Done()
 	defer func() {
 		if r := recover(); r != nil {
@@ -876,7 +888,7 @@ func (e *QueryExecution) executeChildStep(ctx context.Context, step *queryPlanSt
 }
 
 // executeBrambleStep executes the Bramble-specific operations
-func (e *QueryExecution) executeBrambleStep(ctx context.Context, step *queryPlanStep, result map[string]interface{}) {
+func (e *QueryExecution) executeBrambleStep(ctx context.Context, step *QueryPlanStep, result map[string]interface{}) {
 	m := buildTypenameResponseMap(step.SelectionSet, step.ParentType)
 	mergeMaps(result, m)
 	e.wg.Done()

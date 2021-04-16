@@ -1,6 +1,8 @@
 package plugins
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -11,6 +13,7 @@ import (
 	"github.com/movio/bramble"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/square/go-jose.v2"
 )
 
 const testPrivateKey = `-----BEGIN RSA PRIVATE KEY-----
@@ -51,7 +54,7 @@ p0iyWSAWba0DzesGGzUwknJJZ+Lw6aNRSBqgvmVia38YTyOCRxcaaTFHahc3hyNN
 QQIDAQAB
 -----END PUBLIC KEY-----`
 
-func TestAuthMiddleware(t *testing.T) {
+func TestJWTPlugin(t *testing.T) {
 	manualKeyProvider, err := NewManualSigningKeysProvider(map[string]string{"": testPublicKey})
 	require.NoError(t, err)
 	keyProviders := []SigningKeyProvider{manualKeyProvider}
@@ -66,6 +69,12 @@ func TestAuthMiddleware(t *testing.T) {
 
 		token, err := jwt.NewWithClaims(jwt.SigningMethodRS256, &Claims{
 			Role: "basic_role",
+			StandardClaims: jwt.StandardClaims{
+				Audience: "test-audience",
+				Id:       "test-id",
+				Issuer:   "test-issuer",
+				Subject:  "test-subject",
+			},
 		}).SignedString(privateKey)
 		require.NoError(t, err)
 
@@ -83,7 +92,6 @@ func TestAuthMiddleware(t *testing.T) {
 		handler := jwtPlugin.ApplyMiddlewarePublicMux(mockHandler)
 		req := httptest.NewRequest(http.MethodPost, "/query", strings.NewReader("{}"))
 		req.Header.Add("authorization", "Bearer "+token)
-		req.Header.Add("X-Bramble-Ingress-Source", "internal")
 		rr := httptest.NewRecorder()
 
 		handler.ServeHTTP(rr, req)
@@ -145,5 +153,57 @@ func TestAuthMiddleware(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusUnauthorized, rr.Result().StatusCode)
+	})
+
+	t.Run("JWKS", func(t *testing.T) {
+		privateKey, err := jwt.ParseRSAPrivateKeyFromPEM([]byte(testPrivateKey))
+		require.NoError(t, err)
+
+		jwksHandler := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			var jwks jose.JSONWebKeySet
+			jwks.Keys = append(jwks.Keys, jose.JSONWebKey{
+				Key:       &privateKey.PublicKey,
+				KeyID:     "test-key-id",
+				Algorithm: string(jose.RS256),
+			})
+			_ = json.NewEncoder(w).Encode(jwks)
+		}))
+
+		jwtPlugin := NewJWTPlugin(nil, nil)
+		err = jwtPlugin.Configure(&bramble.Config{}, json.RawMessage(fmt.Sprintf(`{
+			"jwks": [%q],
+			"roles": {
+				"basic_role": {
+					"query": "*"
+				}
+			}
+		}`, jwksHandler.URL)))
+		require.NoError(t, err)
+
+		token := jwt.NewWithClaims(jwt.SigningMethodRS256, &Claims{
+			Role: "basic_role",
+			StandardClaims: jwt.StandardClaims{
+				Audience: "test-audience",
+				Id:       "test-id",
+				Issuer:   "test-issuer",
+				Subject:  "test-subject",
+			},
+		})
+		token.Header["kid"] = "test-key-id"
+		tokenStr, err := token.SignedString(privateKey)
+		require.NoError(t, err)
+
+		mockHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusTeapot)
+		})
+
+		handler := jwtPlugin.ApplyMiddlewarePublicMux(mockHandler)
+		req := httptest.NewRequest(http.MethodPost, "/query", strings.NewReader("{}"))
+		req.Header.Add("authorization", "Bearer "+tokenStr)
+		rr := httptest.NewRecorder()
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusTeapot, rr.Result().StatusCode)
 	})
 }

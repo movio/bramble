@@ -14,6 +14,7 @@ import (
 
 var Version = "dev"
 
+// PluginConfig contains the configuration for the named plugin
 type PluginConfig struct {
 	Name   string
 	Config json.RawMessage
@@ -46,69 +47,72 @@ func (c *Config) GatewayAddress() string {
 	return fmt.Sprintf(":%d", c.GatewayPort)
 }
 
+// PrivateAddress returns the address for private port
 func (c *Config) PrivateAddress() string {
 	return fmt.Sprintf(":%d", c.PrivatePort)
 }
 
+// MetricAddress returns the address for the metric port
 func (c *Config) MetricAddress() string {
 	return fmt.Sprintf(":%d", c.MetricsPort)
 }
 
-func (cfg *Config) Load() error {
-	cfg.Extensions = nil
+// Load loads or reloads all the config files.
+func (c *Config) Load() error {
+	c.Extensions = nil
 	// concatenate plugins from all the config files
 	var plugins []PluginConfig
-	for _, configFile := range cfg.configFiles {
-		cfg.Plugins = nil
+	for _, configFile := range c.configFiles {
+		c.Plugins = nil
 		f, err := os.Open(configFile)
 		if err != nil {
 			return err
 		}
 		defer f.Close()
-		if err := json.NewDecoder(f).Decode(&cfg); err != nil {
+		if err := json.NewDecoder(f).Decode(&c); err != nil {
 			return fmt.Errorf("error decoding config file %q: %w", configFile, err)
 		}
-		plugins = append(plugins, cfg.Plugins...)
+		plugins = append(plugins, c.Plugins...)
 	}
-	cfg.Plugins = plugins
+	c.Plugins = plugins
 
 	logLevel := os.Getenv("BRAMBLE_LOG_LEVEL")
 	if level, err := log.ParseLevel(logLevel); err == nil {
-		cfg.LogLevel = level
+		c.LogLevel = level
 	} else if logLevel != "" {
 		log.WithField("loglevel", logLevel).Warn("invalid loglevel")
 	}
-	log.SetLevel(cfg.LogLevel)
+	log.SetLevel(c.LogLevel)
 
 	var err error
-	cfg.PollIntervalDuration, err = time.ParseDuration(cfg.PollInterval)
+	c.PollIntervalDuration, err = time.ParseDuration(c.PollInterval)
 	if err != nil {
 		return fmt.Errorf("invalid poll interval: %w", err)
 	}
 
-	services, err := cfg.buildServiceList()
+	services, err := c.buildServiceList()
 	if err != nil {
 		return err
 	}
-	cfg.Services = services
+	c.Services = services
 
-	cfg.plugins = cfg.ConfigurePlugins()
+	c.plugins = c.ConfigurePlugins()
 
 	return nil
 }
 
-func (cfg *Config) buildServiceList() ([]string, error) {
+func (c *Config) buildServiceList() ([]string, error) {
 	serviceSet := map[string]bool{}
-	for _, service := range cfg.Services {
+	for _, service := range c.Services {
 		serviceSet[service] = true
 	}
 	for _, service := range strings.Fields(os.Getenv("BRAMBLE_SERVICE_LIST")) {
 		serviceSet[service] = true
 	}
-	for _, plugin := range cfg.plugins {
+	for _, plugin := range c.plugins {
 		ok, path := plugin.GraphqlQueryPath()
 		if ok {
-			service := fmt.Sprintf("http://localhost:%d/%s", cfg.PrivatePort, path)
+			service := fmt.Sprintf("http://localhost:%d/%s", c.PrivatePort, path)
 			serviceSet[service] = true
 		}
 	}
@@ -117,30 +121,31 @@ func (cfg *Config) buildServiceList() ([]string, error) {
 		services = append(services, service)
 	}
 	if len(services) == 0 {
-		return nil, fmt.Errorf("no services found in BRAMBLE_SERVICE_LIST or %s", cfg.configFiles)
+		return nil, fmt.Errorf("no services found in BRAMBLE_SERVICE_LIST or %s", c.configFiles)
 	}
 	return services, nil
 }
 
-func (cfg *Config) Watch() {
+// Watch starts watching the config files for change.
+func (c *Config) Watch() {
 	for {
 		select {
-		case err := <-cfg.watcher.Errors:
+		case err := <-c.watcher.Errors:
 			log.WithError(err).Error("config watch error")
-		case e := <-cfg.watcher.Events:
-			log.WithFields(log.Fields{"event": e, "files": cfg.configFiles, "links": cfg.linkedFiles}).Debug("received config file event")
+		case e := <-c.watcher.Events:
+			log.WithFields(log.Fields{"event": e, "files": c.configFiles, "links": c.linkedFiles}).Debug("received config file event")
 			shouldUpdate := false
-			for i := range cfg.configFiles {
+			for i := range c.configFiles {
 				// we want to reload the config if:
 				// - the config file was updated, or
 				// - the config file is a symlink and was changed (k8s config map update)
-				if filepath.Clean(e.Name) == cfg.configFiles[i] && (e.Op == fsnotify.Write || e.Op == fsnotify.Create) {
+				if filepath.Clean(e.Name) == c.configFiles[i] && (e.Op == fsnotify.Write || e.Op == fsnotify.Create) {
 					shouldUpdate = true
 					break
 				}
-				currentFile, _ := filepath.EvalSymlinks(cfg.configFiles[i])
-				if cfg.linkedFiles[i] != "" && cfg.linkedFiles[i] != currentFile {
-					cfg.linkedFiles[i] = currentFile
+				currentFile, _ := filepath.EvalSymlinks(c.configFiles[i])
+				if c.linkedFiles[i] != "" && c.linkedFiles[i] != currentFile {
+					c.linkedFiles[i] = currentFile
 					shouldUpdate = true
 					break
 				}
@@ -156,16 +161,16 @@ func (cfg *Config) Watch() {
 				continue
 			}
 
-			err := cfg.Load()
+			err := c.Load()
 			if err != nil {
 				log.WithError(err).Error("error reloading config")
 			}
-			log.WithField("services", cfg.Services).Info("config file updated")
-			err = cfg.executableSchema.UpdateServiceList(cfg.Services)
+			log.WithField("services", c.Services).Info("config file updated")
+			err = c.executableSchema.UpdateServiceList(c.Services)
 			if err != nil {
 				log.WithError(err).Error("error updating services")
 			}
-			log.WithField("services", cfg.Services).Info("updated services")
+			log.WithField("services", c.Services).Info("updated services")
 		}
 	}
 }
@@ -205,6 +210,7 @@ func GetConfig(configFiles []string) (*Config, error) {
 	return &cfg, err
 }
 
+// ConfigurePlugins calls the Configure method on each plugin.
 func (c *Config) ConfigurePlugins() []Plugin {
 	var enabledPlugins []Plugin
 	for _, pl := range c.Plugins {
@@ -223,6 +229,7 @@ func (c *Config) ConfigurePlugins() []Plugin {
 	return enabledPlugins
 }
 
+// Init initializes the config and does an initial fetch of the services.
 func (c *Config) Init() error {
 	var err error
 	c.Services, err = c.buildServiceList()
