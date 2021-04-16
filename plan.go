@@ -9,16 +9,18 @@ import (
 	"github.com/vektah/gqlparser/v2/ast"
 )
 
-type queryPlanStep struct {
+// QueryPlanStep is a single execution step
+type QueryPlanStep struct {
 	ServiceURL     string
 	ServiceName    string
 	ParentType     string
 	SelectionSet   ast.SelectionSet
 	InsertionPoint []string
-	Then           []*queryPlanStep
+	Then           []*QueryPlanStep
 }
 
-func (s *queryPlanStep) MarshalJSON() ([]byte, error) {
+// MarshalJSON marshals the step the JSON
+func (s *QueryPlanStep) MarshalJSON() ([]byte, error) {
 	ctx := graphql.WithOperationContext(context.Background(), &graphql.OperationContext{
 		Variables: map[string]interface{}{},
 	})
@@ -27,7 +29,7 @@ func (s *queryPlanStep) MarshalJSON() ([]byte, error) {
 		ParentType     string
 		SelectionSet   string
 		InsertionPoint []string
-		Then           []*queryPlanStep
+		Then           []*QueryPlanStep
 	}{
 		ServiceURL:     s.ServiceURL,
 		ParentType:     s.ParentType,
@@ -37,10 +39,12 @@ func (s *queryPlanStep) MarshalJSON() ([]byte, error) {
 	})
 }
 
-type queryPlan struct {
-	RootSteps []*queryPlanStep
+// QueryPlan is a query execution plan
+type QueryPlan struct {
+	RootSteps []*QueryPlanStep
 }
 
+// PlanningContext contains the necessary information used to plan a query.
 type PlanningContext struct {
 	Operation  *ast.OperationDefinition
 	Schema     *ast.Schema
@@ -49,7 +53,8 @@ type PlanningContext struct {
 	Services   map[string]*Service
 }
 
-func Plan(ctx *PlanningContext) (*queryPlan, error) {
+// Plan returns a query plan from the given planning context
+func Plan(ctx *PlanningContext) (*QueryPlan, error) {
 	var parentType string
 	switch ctx.Operation.Operation {
 	case ast.Query:
@@ -64,13 +69,13 @@ func Plan(ctx *PlanningContext) (*queryPlan, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &queryPlan{
+	return &QueryPlan{
 		RootSteps: steps,
 	}, nil
 }
 
-func createSteps(ctx *PlanningContext, insertionPoint []string, parentType, parentLocation string, selectionSet ast.SelectionSet, childstep bool) ([]*queryPlanStep, error) {
-	var result []*queryPlanStep
+func createSteps(ctx *PlanningContext, insertionPoint []string, parentType, parentLocation string, selectionSet ast.SelectionSet, childstep bool) ([]*QueryPlanStep, error) {
+	var result []*QueryPlanStep
 
 	routedSelectionSet, err := routeSelectionSet(ctx, parentType, parentLocation, selectionSet)
 	if err != nil {
@@ -97,7 +102,7 @@ func createSteps(ctx *PlanningContext, insertionPoint []string, parentType, pare
 			copy(insertionPointCopy, insertionPoint)
 		}
 
-		result = append(result, &queryPlanStep{
+		result = append(result, &QueryPlanStep{
 			InsertionPoint: insertionPointCopy,
 			Then:           childrenSteps,
 			ServiceURL:     location,
@@ -109,9 +114,9 @@ func createSteps(ctx *PlanningContext, insertionPoint []string, parentType, pare
 	return result, nil
 }
 
-func extractSelectionSet(ctx *PlanningContext, insertionPoint []string, parentType string, input ast.SelectionSet, location string, childstep bool) (ast.SelectionSet, []*queryPlanStep, error) {
+func extractSelectionSet(ctx *PlanningContext, insertionPoint []string, parentType string, input ast.SelectionSet, location string, childstep bool) (ast.SelectionSet, []*QueryPlanStep, error) {
 	var selectionSetResult []ast.Selection
-	var childrenStepsResult []*queryPlanStep
+	var childrenStepsResult []*QueryPlanStep
 	for _, selection := range input {
 		switch selection := selection.(type) {
 		case *ast.Field:
@@ -119,7 +124,7 @@ func extractSelectionSet(ctx *PlanningContext, insertionPoint []string, parentTy
 				selectionSetResult = append(selectionSetResult, selection)
 				continue
 			}
-			loc, err := ctx.Locations.UrlFor(parentType, location, selection.Name)
+			loc, err := ctx.Locations.URLFor(parentType, location, selection.Name)
 			if err != nil {
 				// namespace
 				subSS, steps, err := extractSelectionSet(ctx, append(insertionPoint, selection.Name), selection.Definition.Type.Name(), selection.SelectionSet, location, childstep)
@@ -256,7 +261,7 @@ func routeSelectionSet(ctx *PlanningContext, parentType, parentLocation string, 
 			if isGraphQLBuiltinName(selection.Name) && parentLocation == "" {
 				continue
 			}
-			loc, err := ctx.Locations.UrlFor(parentType, parentLocation, selection.Name)
+			loc, err := ctx.Locations.URLFor(parentType, parentLocation, selection.Name)
 			if err != nil {
 				return nil, err
 			}
@@ -287,7 +292,7 @@ func routeSelectionSet(ctx *PlanningContext, parentType, parentLocation string, 
 func filterSelectionSetByLoc(ctx *PlanningContext, ss ast.SelectionSet, loc, parentType string) ast.SelectionSet {
 	var res ast.SelectionSet
 	for _, selection := range selectionSetToFields(ss) {
-		fieldLocation, err := ctx.Locations.UrlFor(parentType, "", selection.Name)
+		fieldLocation, err := ctx.Locations.URLFor(parentType, "", selection.Name)
 		if err != nil {
 			// Namespace
 			subSS := filterSelectionSetByLoc(ctx, selection.SelectionSet, loc, selection.Definition.Type.Name())
@@ -318,13 +323,15 @@ func selectionSetHasFieldNamed(selectionSet []ast.Selection, fieldName string) b
 	return false
 }
 
+// FieldURLMap maps fields to service URLs
 type FieldURLMap map[string]string
 
-func (m FieldURLMap) UrlFor(parent, parentLocation, field string) (string, error) {
+// URLFor returns the URL for the given field
+func (m FieldURLMap) URLFor(parent, parentLocation, field string) (string, error) {
 	if field == "__typename" {
 		return parentLocation, nil
 	}
-	key := m.KeyFor(parent, field)
+	key := m.keyFor(parent, field)
 	value, exists := m[key]
 	if !exists {
 		return "", fmt.Errorf("could not find location for %q", key)
@@ -332,12 +339,13 @@ func (m FieldURLMap) UrlFor(parent, parentLocation, field string) (string, error
 	return value, nil
 }
 
+// RegisterURL registers the location for the given field
 func (m FieldURLMap) RegisterURL(parent string, field string, location string) {
-	key := m.KeyFor(parent, field)
+	key := m.keyFor(parent, field)
 	m[key] = location
 }
 
-func (m FieldURLMap) KeyFor(parent string, field string) string {
+func (m FieldURLMap) keyFor(parent string, field string) string {
 	return fmt.Sprintf("%s.%s", parent, field)
 }
 
@@ -355,14 +363,17 @@ func stringArraysEqual(a, b []string) bool {
 	return true
 }
 
+// BoundaryQuery contains the name and format for a boundary query
 type BoundaryQuery struct {
 	Query string
 	// Whether the query is in the array format
 	Array bool
 }
 
+// BoundaryQueriesMap is a mapping service -> type -> boundary query
 type BoundaryQueriesMap map[string]map[string]BoundaryQuery
 
+// RegisterQuery registers a boundary query
 func (m BoundaryQueriesMap) RegisterQuery(serviceURL, typeName, query string, array bool) {
 	if _, ok := m[serviceURL]; !ok {
 		m[serviceURL] = make(map[string]BoundaryQuery)
@@ -371,6 +382,7 @@ func (m BoundaryQueriesMap) RegisterQuery(serviceURL, typeName, query string, ar
 	m[serviceURL][typeName] = BoundaryQuery{Query: query, Array: array}
 }
 
+// Query returns the boundary query for the given service and type
 func (m BoundaryQueriesMap) Query(serviceURL, typeName string) BoundaryQuery {
 	serviceMap, ok := m[serviceURL]
 	if !ok {

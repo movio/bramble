@@ -7,6 +7,7 @@ import (
 	"github.com/vektah/gqlparser/v2/ast"
 )
 
+// ValidateSchema validates that the schema respects the Bramble specs
 func ValidateSchema(schema *ast.Schema) error {
 	if err := validateRootObjectNames(schema); err != nil {
 		return err

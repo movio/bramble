@@ -7,6 +7,7 @@ import (
 	"github.com/vektah/gqlparser/v2/ast"
 )
 
+// MergeSchemas merges the provided schemas together
 func MergeSchemas(schemas ...*ast.Schema) (*ast.Schema, error) {
 	if len(schemas) < 1 {
 		return nil, fmt.Errorf("no source schemas")

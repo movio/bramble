@@ -18,6 +18,7 @@ type event struct {
 	writeLock sync.Once
 }
 
+// EventFields contains fields to be logged for the event
 type EventFields map[string]interface{}
 
 func newEvent(name string) *event {
@@ -56,12 +57,14 @@ func (e *event) finish() {
 	})
 }
 
+// AddField adds the given field to the event contained in the context (if any)
 func AddField(ctx context.Context, name string, value interface{}) {
 	if e := getEvent(ctx); e != nil {
 		e.addField(name, value)
 	}
 }
 
+// AddFields adds the given fields to the event contained in the context (if any)
 func AddFields(ctx context.Context, fields EventFields) {
 	if e := getEvent(ctx); e != nil {
 		e.addFields(fields)

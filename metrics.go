@@ -70,6 +70,7 @@ var (
 	)
 )
 
+// RegisterMetrics register the prometheus metrics.
 func RegisterMetrics() {
 	prometheus.MustRegister(promInvalidSchema)
 	prometheus.MustRegister(promServiceUpdateError)
@@ -80,6 +81,7 @@ func RegisterMetrics() {
 	prometheus.MustRegister(promHTTPResponseSizes)
 }
 
+// NewMetricsHandler returns a new Prometheus metrics handler.
 func NewMetricsHandler() http.Handler {
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())

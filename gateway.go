@@ -8,6 +8,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+// Gateway contains the public and private routers
 type Gateway struct {
 	ExecutableSchema *ExecutableSchema
 
@@ -22,6 +23,7 @@ func NewGateway(executableSchema *ExecutableSchema, plugins []Plugin) *Gateway {
 	}
 }
 
+// UpdateSchemas periodically updates the execute schema
 func (g *Gateway) UpdateSchemas(interval time.Duration) {
 	for range time.Tick(interval) {
 		err := g.ExecutableSchema.UpdateSchema(false)
@@ -31,6 +33,7 @@ func (g *Gateway) UpdateSchemas(interval time.Duration) {
 	}
 }
 
+// Router returns the public http handler
 func (g *Gateway) Router() http.Handler {
 	mux := http.NewServeMux()
 
@@ -54,6 +57,7 @@ func (g *Gateway) Router() http.Handler {
 	return applyMiddleware(result, monitoringMiddleware)
 }
 
+// PrivateRouter returns the private http handler
 func (g *Gateway) PrivateRouter() http.Handler {
 	mux := http.NewServeMux()
 

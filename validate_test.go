@@ -109,6 +109,23 @@ func TestBoundaryDirectiveRequirements(t *testing.T) {
 }
 
 func TestNamespaceDirectiveRequirements(t *testing.T) {
+	t.Run("valid namespaces", func(t *testing.T) {
+		withSchema(t, `
+		directive @namespace on OBJECT
+
+		type SubNamespace @namespace {
+			someField: String!
+		}
+
+		type RootNamespace @namespace {
+			sub: SubNamespace!
+		}
+
+		type Query {
+			root: RootNamespace!
+		}
+		`).assertValid(validateNamespaceObjects)
+	})
 	t.Run("invalid @namespace directive", func(t *testing.T) {
 		withSchema(t, `
 		directive @namespace(incorrect: String) on OBJECT
@@ -620,6 +637,24 @@ func TestSchemaValidateBoundaryFields(t *testing.T) {
 			foo(ids: [ID!]): [Foo!] @boundary
 		}
 		`).assertInvalid(`invalid boundary query "foo": return type should be a non-null array of nullable elements`, validateBoundaryQueries)
+	})
+
+	t.Run("non-nullable boundary query result", func(t *testing.T) {
+		withSchema(t, `
+		directive @boundary on OBJECT | FIELD_DEFINITION
+
+		type Foo @boundary {
+			id: ID!
+		}
+
+		type Bar @boundary {
+			id: ID!
+		}
+
+		type Query {
+			foo(id: ID!): Foo! @boundary
+		}
+		`).assertInvalid(`invalid boundary query "foo": return type of boundary query should be nullable`, validateBoundaryQueries)
 	})
 }
 

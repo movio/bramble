@@ -12,6 +12,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+// Main runs the gateway. This function is exported so that it can be reused
+// when building Bramble with custom plugins.
 func Main() {
 	var configFiles arrayFlags
 	flag.Var(&configFiles, "conf", "Config file (can appear multiple times)")

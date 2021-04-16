@@ -16,7 +16,7 @@ import (
 )
 
 func init() {
-	bramble.RegisterPlugin(&JWTPlugin{})
+	bramble.RegisterPlugin(NewJWTPlugin(nil, nil))
 }
 
 func NewJWTPlugin(keyProviders []SigningKeyProvider, roles map[string]bramble.OperationPermissions) *JWTPlugin {

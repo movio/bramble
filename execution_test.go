@@ -328,6 +328,119 @@ func TestIntrospectionQuery(t *testing.T) {
 		`, string(resp.Data))
 	})
 
+	t.Run("directive", func(t *testing.T) {
+		query := gqlparser.MustLoadQuery(es.MergedSchema, `
+		{
+			__schema {
+				directives {
+					name
+					args {
+						name
+						type {
+							name
+						}
+					}
+				}
+			}
+		}
+		`)
+		ctx := testContextWithoutVariables(query.Operations[0])
+		resp := es.ExecuteQuery(ctx)
+
+		// directive order is random so we need to unmarshal and compare the elements
+		type expectedType struct {
+			Schema struct {
+				Directives []struct {
+					Name string
+					Args []struct {
+						Name string
+						Type struct {
+							Name string
+						}
+					}
+				}
+			} `json:"__schema"`
+		}
+
+		var actual expectedType
+		err := json.Unmarshal([]byte(resp.Data), &actual)
+		require.NoError(t, err)
+		var expected expectedType
+		err = json.Unmarshal([]byte(`
+		{
+			"__schema": {
+			  "directives": [
+				{
+				  "name": "include",
+				  "args": [
+					{
+					  "name": "if",
+					  "type": {
+						"name": null
+					  }
+					}
+				  ]
+				},
+				{
+				  "name": "skip",
+				  "args": [
+					{
+					  "name": "if",
+					  "type": {
+						"name": null
+					  }
+					}
+				  ]
+				},
+				{
+				  "name": "deprecated",
+				  "args": [
+					{
+					  "name": "reason",
+					  "type": {
+						"name": "String"
+					  }
+					}
+				  ]
+				}
+			  ]
+			}
+		  }
+		`), &expected)
+		require.NoError(t, err)
+		assert.ElementsMatch(t, expected.Schema.Directives, actual.Schema.Directives)
+	})
+
+	t.Run("__schema", func(t *testing.T) {
+		query := gqlparser.MustLoadQuery(es.MergedSchema, `
+		{
+			__schema {
+				queryType {
+					name
+				}
+				mutationType {
+					name
+				}
+				subscriptionType {
+					name
+				}
+			}
+		}
+		`)
+		ctx := testContextWithoutVariables(query.Operations[0])
+		resp := es.ExecuteQuery(ctx)
+		assert.JSONEq(t, `
+		{
+			"__schema": {
+				"queryType": {
+					"name": "Query"
+				},
+				"mutationType": null,
+				"subscriptionType": null
+			}
+			}
+		`, string(resp.Data))
+	})
 }
 
 func TestQueryExecutionWithSingleService(t *testing.T) {
@@ -369,7 +482,7 @@ func TestQueryExecutionWithSingleService(t *testing.T) {
 		}`,
 	}
 
-	f.run(t)
+	f.checkSuccess(t)
 }
 
 func TestQueryExecutionMultipleServices(t *testing.T) {
@@ -438,7 +551,7 @@ func TestQueryExecutionMultipleServices(t *testing.T) {
 		}`,
 	}
 
-	f.run(t)
+	f.checkSuccess(t)
 }
 
 func TestQueryExecutionNamespaceAndFragmentSpread(t *testing.T) {
@@ -584,7 +697,7 @@ func TestQueryExecutionWithTypename(t *testing.T) {
 		}`,
 	}
 
-	f.run(t)
+	f.checkSuccess(t)
 }
 
 func TestQueryExecutionWithTypenameAndNamespaces(t *testing.T) {
@@ -656,7 +769,7 @@ func TestQueryExecutionWithTypenameAndNamespaces(t *testing.T) {
 		}`,
 	}
 
-	f.run(t)
+	f.checkSuccess(t)
 }
 
 func TestQueryExecutionWithMultipleNodeQueries(t *testing.T) {
@@ -747,7 +860,7 @@ func TestQueryExecutionWithMultipleNodeQueries(t *testing.T) {
 		}`,
 	}
 
-	f.run(t)
+	f.checkSuccess(t)
 }
 
 func TestQueryExecutionMultipleServicesWithArray(t *testing.T) {
@@ -893,7 +1006,7 @@ func TestQueryExecutionMultipleServicesWithArray(t *testing.T) {
 		}`,
 	}
 
-	f.run(t)
+	f.checkSuccess(t)
 }
 
 func TestQueryExecutionMultipleServicesWithEmptyArray(t *testing.T) {
@@ -946,7 +1059,7 @@ func TestQueryExecutionMultipleServicesWithEmptyArray(t *testing.T) {
 		}`,
 	}
 
-	f.run(t)
+	f.checkSuccess(t)
 }
 
 func TestQueryExecutionMultipleServicesWithNestedArrays(t *testing.T) {
@@ -1060,7 +1173,7 @@ func TestQueryExecutionMultipleServicesWithNestedArrays(t *testing.T) {
 		}`,
 	}
 
-	f.run(t)
+	f.checkSuccess(t)
 }
 
 func TestQueryExecutionEmptyNodeResponse(t *testing.T) {
@@ -1126,7 +1239,7 @@ func TestQueryExecutionEmptyNodeResponse(t *testing.T) {
 		}`,
 	}
 
-	f.run(t)
+	f.checkSuccess(t)
 }
 
 func TestQueryExecutionWithNullResponse(t *testing.T) {
@@ -1178,7 +1291,7 @@ func TestQueryExecutionWithNullResponse(t *testing.T) {
 		}`,
 	}
 
-	f.run(t)
+	f.checkSuccess(t)
 }
 
 func TestQueryExecutionWithNullResponseAndSubBoundaryType(t *testing.T) {
@@ -1234,7 +1347,7 @@ func TestQueryExecutionWithNullResponseAndSubBoundaryType(t *testing.T) {
 		}`,
 	}
 
-	f.run(t)
+	f.checkSuccess(t)
 }
 
 func TestQueryExecutionWithInputObject(t *testing.T) {
@@ -1330,7 +1443,7 @@ func TestQueryExecutionWithInputObject(t *testing.T) {
 		}`,
 	}
 
-	f.run(t)
+	f.checkSuccess(t)
 }
 
 func TestQueryExecutionMultipleObjects(t *testing.T) {
@@ -1422,7 +1535,7 @@ func TestQueryExecutionMultipleObjects(t *testing.T) {
 		}`,
 	}
 
-	f.run(t)
+	f.checkSuccess(t)
 }
 
 func TestQueryExecutionMultipleServicesWithSkipTrueDirectives(t *testing.T) {
@@ -1488,7 +1601,7 @@ func TestQueryExecutionMultipleServicesWithSkipTrueDirectives(t *testing.T) {
 		}`,
 	}
 
-	f.run(t)
+	f.checkSuccess(t)
 }
 
 func TestQueryExecutionMultipleServicesWithSkipFalseDirectives(t *testing.T) {
@@ -1571,7 +1684,7 @@ func TestQueryExecutionMultipleServicesWithSkipFalseDirectives(t *testing.T) {
 		}`,
 	}
 
-	f.run(t)
+	f.checkSuccess(t)
 }
 
 func TestQueryExecutionMultipleServicesWithIncludeFalseDirectives(t *testing.T) {
@@ -1637,7 +1750,7 @@ func TestQueryExecutionMultipleServicesWithIncludeFalseDirectives(t *testing.T) 
 		}`,
 	}
 
-	f.run(t)
+	f.checkSuccess(t)
 }
 
 func TestQueryExecutionMultipleServicesWithIncludeTrueDirectives(t *testing.T) {
@@ -1720,7 +1833,7 @@ func TestQueryExecutionMultipleServicesWithIncludeTrueDirectives(t *testing.T) {
 		}`,
 	}
 
-	f.run(t)
+	f.checkSuccess(t)
 }
 
 func TestMutationExecution(t *testing.T) {
@@ -1792,7 +1905,7 @@ func TestMutationExecution(t *testing.T) {
 		}`,
 	}
 
-	f.run(t)
+	f.checkSuccess(t)
 }
 func TestQueryExecutionWithUnions(t *testing.T) {
 	f := &queryExecutionFixture{
@@ -1901,7 +2014,7 @@ func TestQueryExecutionWithUnions(t *testing.T) {
 		}`,
 	}
 
-	f.run(t)
+	f.checkSuccess(t)
 }
 
 func TestQueryExecutionWithNamespaces(t *testing.T) {
@@ -2023,7 +2136,7 @@ func TestQueryExecutionWithNamespaces(t *testing.T) {
 		}`,
 	}
 
-	f.run(t)
+	f.checkSuccess(t)
 }
 
 func TestDebugExtensions(t *testing.T) {
@@ -2059,7 +2172,7 @@ func TestDebugExtensions(t *testing.T) {
 		}`,
 	}
 
-	f.run(t)
+	f.checkSuccess(t)
 	assert.True(t, called)
 	assert.NotNil(t, f.resp.Extensions["variables"])
 }
@@ -2131,7 +2244,7 @@ func TestQueryWithBoundaryFields(t *testing.T) {
 		}`,
 	}
 
-	f.run(t)
+	f.checkSuccess(t)
 }
 
 func TestQueryWithArrayBoundaryFields(t *testing.T) {
@@ -2233,7 +2346,105 @@ func TestQueryWithArrayBoundaryFields(t *testing.T) {
 		}`,
 	}
 
-	f.run(t)
+	f.checkSuccess(t)
+}
+
+func TestQueryWithArrayBoundaryFieldsAndMultipleChildrenSteps(t *testing.T) {
+	f := &queryExecutionFixture{
+		services: []testService{
+			{
+				schema: `directive @boundary on OBJECT | FIELD_DEFINITION
+
+				type Movie @boundary {
+					id: ID!
+					title: String
+				}
+
+				type Query {
+					randomMovie: Movie!
+					movies(ids: [ID!]!): [Movie]! @boundary
+				}`,
+				handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					b, _ := io.ReadAll(r.Body)
+					if strings.Contains(string(b), "randomMovie") {
+						w.Write([]byte(`{
+						"data": {
+							"randomMovie": {
+									"id": "1",
+									"title": "Movie 1"
+							}
+						}
+					}
+					`))
+					} else {
+						w.Write([]byte(`{
+						"data": {
+							"_result": [
+								{ "id": 2, "title": "Movie 2" },
+								{ "id": 3, "title": "Movie 3" },
+								{ "id": 4, "title": "Movie 4" }
+							]
+						}
+					}
+					`))
+					}
+				}),
+			},
+			{
+				schema: `directive @boundary on OBJECT | FIELD_DEFINITION
+
+				type Movie @boundary {
+					id: ID!
+					compTitles: [Movie!]!
+				}
+
+				type Query {
+					movies(ids: [ID!]): [Movie]! @boundary
+				}`,
+				handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.Write([]byte(`{
+						"data": {
+							"_result": [
+								{
+									"_id": "1",
+									"compTitles": [
+										{"id": "2"},
+										{"id": "3"},
+										{"id": "4"}
+									]
+								}
+							]
+						}
+					}
+					`))
+				}),
+			},
+		},
+		query: `{
+			randomMovie {
+				id
+				title
+				compTitles {
+					id
+					title
+				}
+			}
+		}`,
+		expected: `{
+			"randomMovie":
+				{
+					"id": "1",
+					"title": "Movie 1",
+					"compTitles": [
+						{ "id": 2, "title": "Movie 2" },
+						{ "id": 3, "title": "Movie 3" },
+						{ "id": 4, "title": "Movie 4" }
+					]
+				}
+		}`,
+	}
+
+	f.checkSuccess(t)
 }
 
 func TestQueryError(t *testing.T) {
@@ -2305,6 +2516,13 @@ type queryExecutionFixture struct {
 	resp      *graphql.Response
 	debug     *DebugInfo
 	errors    gqlerror.List
+}
+
+func (f *queryExecutionFixture) checkSuccess(t *testing.T) {
+	f.run(t)
+
+	assert.Empty(t, f.resp.Errors)
+	jsonEqWithOrder(t, f.expected, string(f.resp.Data))
 }
 
 func (f *queryExecutionFixture) run(t *testing.T) {

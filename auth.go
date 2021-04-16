@@ -10,6 +10,7 @@ import (
 	"github.com/vektah/gqlparser/v2/gqlerror"
 )
 
+// AllowedFields is a recursive set of allowed fields.
 type AllowedFields struct {
 	AllowAll         bool
 	AllowedSubfields map[string]AllowedFields
@@ -53,6 +54,7 @@ func (f fieldList) Swap(i, j int) {
 	f[i], f[j] = f[j], f[i]
 }
 
+// MarshalJSON marshals to a JSON representation.
 func (a AllowedFields) MarshalJSON() ([]byte, error) {
 	if a.AllowAll {
 		return json.Marshal("*")
@@ -69,6 +71,7 @@ func (a AllowedFields) MarshalJSON() ([]byte, error) {
 	return json.Marshal(fields)
 }
 
+// UnmarshalJSON unmarshals from a JSON representation.
 func (a *AllowedFields) UnmarshalJSON(input []byte) error {
 	a.AllowAll = false
 	var str string
@@ -89,6 +92,7 @@ func (a *AllowedFields) UnmarshalJSON(input []byte) error {
 	return json.Unmarshal(input, &a.AllowedSubfields)
 }
 
+// MarshalJSON marshals to a JSON representation.
 func (o OperationPermissions) MarshalJSON() ([]byte, error) {
 	m := make(map[string]AllowedFields)
 	if o.AllowedRootQueryFields.AllowAll || o.AllowedRootQueryFields.AllowedSubfields != nil {

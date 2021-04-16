@@ -15,6 +15,7 @@ import (
 	opentracing "github.com/opentracing/opentracing-go"
 )
 
+// GraphQLClient is a GraphQL client.
 type GraphQLClient struct {
 	HTTPClient      *http.Client
 	MaxResponseSize int64
@@ -22,8 +23,10 @@ type GraphQLClient struct {
 	UserAgent       string
 }
 
+// ClientOpt is a function used to set a GraphQL client option
 type ClientOpt func(*GraphQLClient)
 
+// NewClient creates a new GraphQLClient from the given options.
 func NewClient(opts ...ClientOpt) *GraphQLClient {
 	c := &GraphQLClient{
 		HTTPClient: &http.Client{
@@ -39,18 +42,23 @@ func NewClient(opts ...ClientOpt) *GraphQLClient {
 	return c
 }
 
+// WithMaxResponseSize sets the max allowed response size. The client will only
+// read up to maxResponseSize and that size is exceeded an an error will be
+// returned.
 func WithMaxResponseSize(maxResponseSize int64) ClientOpt {
 	return func(s *GraphQLClient) {
 		s.MaxResponseSize = maxResponseSize
 	}
 }
 
+// WithUserAgent set the user agent used by the client.
 func WithUserAgent(userAgent string) ClientOpt {
 	return func(s *GraphQLClient) {
 		s.UserAgent = userAgent
 	}
 }
 
+// Request executes a GraphQL request.
 func (c *GraphQLClient) Request(ctx context.Context, url string, request *Request, out interface{}) error {
 	var buf bytes.Buffer
 	err := json.NewEncoder(&buf).Encode(request)
@@ -121,6 +129,7 @@ func (c *GraphQLClient) Request(ctx context.Context, url string, request *Reques
 	return nil
 }
 
+// Request is a GraphQL request.
 type Request struct {
 	Query         string                 `json:"query"`
 	OperationName string                 `json:"operationName,omitempty"`
@@ -128,24 +137,30 @@ type Request struct {
 	Headers       http.Header            `json:"-"`
 }
 
+// NewRequest creates a new GraphQL requests from the provided body.
 func NewRequest(body string) *Request {
 	return &Request{
 		Query: body,
 	}
 }
 
+// Response is a GraphQL response
 type Response struct {
 	Errors GraphqlErrors `json:"errors"`
 	Data   interface{}
 }
 
+// GraphqlErrors represents a list of GraphQL errors, as returned in a GraphQL
+// response.
 type GraphqlErrors []GraphqlError
 
+// GraphqlError is a single GraphQL error
 type GraphqlError struct {
 	Message    string                 `json:"message"`
 	Extensions map[string]interface{} `json:"extensions"`
 }
 
+// Error returns a string representation of the error list
 func (e GraphqlErrors) Error() string {
 	var errs []string
 	for _, err := range e {
