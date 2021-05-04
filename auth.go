@@ -154,7 +154,17 @@ func filterDefinition(sourceSchema *ast.Schema, visited map[string]bool, types m
 				continue
 			}
 			visited[def.Name+f.Name] = true
-			types[typeName] = sourceSchema.Types[typeName]
+			typ := sourceSchema.Types[typeName]
+			if typ == nil {
+				// Node interface is not defined in the merged schema
+				continue
+			}
+			if typ.Kind == ast.Interface {
+				for _, pt := range sourceSchema.PossibleTypes[typ.Name] {
+					types[pt.Name] = pt
+				}
+			}
+			types[typeName] = typ
 			for _, a := range f.Arguments {
 				types[a.Type.Name()] = sourceSchema.Types[a.Type.Name()]
 				_ = filterDefinition(sourceSchema, visited, types, sourceSchema.Types[a.Type.Name()], AllowedFields{AllowAll: true})
@@ -175,7 +185,24 @@ func filterDefinition(sourceSchema *ast.Schema, visited map[string]bool, types m
 		if allowedSubFields, ok := allowedFields.AllowedSubfields[f.Name]; ok {
 			resDef.Fields = append(resDef.Fields, f)
 			typename := f.Type.Name()
-			newTypeDef := filterDefinition(sourceSchema, visited, types, sourceSchema.Types[typename], allowedSubFields)
+			typ := sourceSchema.Types[typename]
+			if typ == nil {
+				// Node interface is not defined in the merged schema
+				continue
+			}
+			// if the type is an interface we filter all the possible types
+			if typ.Kind == ast.Interface {
+				for _, pt := range sourceSchema.PossibleTypes[typ.Name] {
+					newTypeDef := filterDefinition(sourceSchema, visited, types, pt, allowedSubFields)
+					if typeDef, ok := types[pt.Name]; ok {
+						addFields(typeDef, newTypeDef)
+					} else {
+						types[pt.Name] = newTypeDef
+					}
+				}
+			}
+
+			newTypeDef := filterDefinition(sourceSchema, visited, types, typ, allowedSubFields)
 			if typeDef, ok := types[typename]; ok {
 				// a type could be accessed through multiple paths, so we need
 				// to merge the fields
