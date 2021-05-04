@@ -138,6 +138,19 @@ func TestFilterSchema(t *testing.T) {
 	schemaStr := `
 	scalar Year
 
+	interface Person { name: String! }
+
+	type Cast implements Person {
+		id: ID!
+		name: String!
+	}
+
+	type Director implements Person {
+		id: ID!
+		name: String!
+		movies: [Movie!]
+	}
+
 	union MovieOrCinema = Movie | Cinema
 
 	type Cinema {
@@ -166,6 +179,7 @@ func TestFilterSchema(t *testing.T) {
 		movieByTitle(title: String!): Movie
 		movieSearch(in: MovieSearch!): [Movie!]
 		somethingRandom: MovieOrCinema!
+		someone: Person!
 	}
 	`
 
@@ -322,6 +336,35 @@ func TestFilterSchema(t *testing.T) {
 
 			type Query {
 				somethingRandom: MovieOrCinema!
+			}
+		`), formatSchema(filteredSchema))
+	})
+
+	t.Run(`interface`, func(t *testing.T) {
+		perms := OperationPermissions{
+			AllowedRootQueryFields: AllowedFields{AllowedSubfields: map[string]AllowedFields{
+				"someone": {
+					AllowedSubfields: map[string]AllowedFields{
+						"name": {},
+					},
+				},
+			},
+			},
+		}
+		filteredSchema := perms.FilterSchema(schema)
+		assert.Equal(t, loadAndFormatSchema(`
+			interface Person { name: String! }
+
+			type Cast implements Person {
+				name: String!
+			}
+
+			type Director implements Person {
+				name: String!
+			}
+
+			type Query {
+				someone: Person!
 			}
 		`), formatSchema(filteredSchema))
 	})

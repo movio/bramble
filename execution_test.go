@@ -23,6 +23,11 @@ import (
 func TestIntrospectionQuery(t *testing.T) {
 	schema := `
 	union MovieOrCinema = Movie | Cinema
+	interface Person { name: String! }
+
+	type Cast implements Person {
+		name: String!
+	}
 
 	"""
 	A bit like a film
@@ -52,6 +57,7 @@ func TestIntrospectionQuery(t *testing.T) {
 		movie(id: ID!): Movie!
 		movies: [Movie!]!
 		somethingRandom: MovieOrCinema
+		somePerson: Person
 	}`
 
 	// Make sure schema merging doesn't break introspection
@@ -300,6 +306,27 @@ func TestIntrospectionQuery(t *testing.T) {
 			}
 		`, string(resp.Data))
 	})
+
+	t.Run("type referenced only through an interface", func(t *testing.T) {
+		query := gqlparser.MustLoadQuery(es.MergedSchema, `{
+			__type(name: "Cast") {
+				kind
+				name
+			}
+		}`)
+		ctx := testContextWithoutVariables(query.Operations[0])
+		resp := es.ExecuteQuery(ctx)
+
+		assert.JSONEq(t, `
+		{
+			"__type": {
+				"kind": "OBJECT",
+				"name": "Cast"
+			}
+		}
+		`, string(resp.Data))
+	})
+
 }
 
 func TestQueryExecutionWithSingleService(t *testing.T) {
