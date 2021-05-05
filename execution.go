@@ -892,10 +892,12 @@ func mergeMaps(dst, src map[string]interface{}) {
 
 			switch value := v.(type) {
 			case json.RawMessage:
-				var m map[string]interface{}
+				// we want to unmarshal only what's necessary, so unmarshal only
+				// one level of the result
+				var m map[string]json.RawMessage
 				_ = json.Unmarshal([]byte(value), &m)
-				dst[k] = m
-				aValue = m
+				aValue = jsonMapToInterfaceMap(m)
+				dst[k] = aValue
 			case map[string]interface{}:
 				aValue = value
 			default:
@@ -904,9 +906,9 @@ func mergeMaps(dst, src map[string]interface{}) {
 
 			switch value := b.(type) {
 			case json.RawMessage:
-				var m map[string]interface{}
+				var m map[string]json.RawMessage
 				_ = json.Unmarshal([]byte(value), &m)
-				bValue = m
+				bValue = jsonMapToInterfaceMap(m)
 			case map[string]interface{}:
 				bValue = value
 			default:
