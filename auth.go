@@ -3,6 +3,7 @@ package bramble
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/vektah/gqlparser/v2/ast"
@@ -38,17 +39,33 @@ type OperationPermissions struct {
 	AllowedRootSubscriptionFields AllowedFields `json:"subscription"`
 }
 
+type fieldList []string
+
+func (f fieldList) Len() int {
+	return len(f)
+}
+
+func (f fieldList) Less(i, j int) bool {
+	return f[i] < f[j]
+}
+
+func (f fieldList) Swap(i, j int) {
+	f[i], f[j] = f[j], f[i]
+}
+
 func (a AllowedFields) MarshalJSON() ([]byte, error) {
 	if a.AllowAll {
 		return json.Marshal("*")
 	}
-	fields := make([]string, 0, len(a.AllowedSubfields))
+	fields := make(fieldList, 0, len(a.AllowedSubfields))
 	for field, subfields := range a.AllowedSubfields {
 		if !subfields.AllowAll {
 			return json.Marshal(a.AllowedSubfields)
 		}
 		fields = append(fields, field)
 	}
+	// ensure a deterministic order
+	sort.Sort(fields)
 	return json.Marshal(fields)
 }
 
