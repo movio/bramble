@@ -44,6 +44,24 @@ func TestUnmarshalRoles(t *testing.T) {
 	require.Equal(t, roles, newroles)
 }
 
+func TestAllowedFieldsMarshallingOrder(t *testing.T) {
+	fields := AllowedFields{
+		AllowedSubfields: map[string]AllowedFields{
+			"a": {AllowAll: true},
+			"b": {AllowAll: true},
+			"c": {AllowAll: true},
+			"d": {AllowAll: true},
+		},
+	}
+
+	b1, err := json.Marshal(fields)
+	require.NoError(t, err)
+	b2, err := json.Marshal(fields)
+	require.NoError(t, err)
+
+	assert.Equal(t, b1, b2)
+}
+
 func TestFilterAuthorizedFields(t *testing.T) {
 	schemaStr := `
 	type Movie {
