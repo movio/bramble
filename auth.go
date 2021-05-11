@@ -162,6 +162,7 @@ func filterDefinition(sourceSchema *ast.Schema, visited map[string]bool, types m
 			if typ.Kind == ast.Interface {
 				for _, pt := range sourceSchema.PossibleTypes[typ.Name] {
 					types[pt.Name] = pt
+					_ = filterDefinition(sourceSchema, visited, types, pt, AllowedFields{AllowAll: true})
 				}
 			}
 			types[typeName] = typ

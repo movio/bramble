@@ -138,17 +138,33 @@ func TestFilterSchema(t *testing.T) {
 	schemaStr := `
 	scalar Year
 
-	interface Person { name: String! }
+	interface Person {
+		name: String!
+		animals: [Animal!]
+	}
+
+	interface Animal { name: String! }
+
+	type Toy {
+		name: String!
+	}
+
+	type Dog implements Animal {
+		name: String!
+		toys: [Toy!]
+	}
 
 	type Cast implements Person {
 		id: ID!
 		name: String!
+		animals: [Animal!]
 	}
 
 	type Director implements Person {
 		id: ID!
 		name: String!
 		movies: [Movie!]
+		animals: [Animal!]
 	}
 
 	union MovieOrCinema = Movie | Cinema
@@ -353,7 +369,7 @@ func TestFilterSchema(t *testing.T) {
 		}
 		filteredSchema := perms.FilterSchema(schema)
 		assert.Equal(t, loadAndFormatSchema(`
-			interface Person { name: String! }
+			interface Person { name: String!  }
 
 			type Cast implements Person {
 				name: String!
@@ -361,6 +377,61 @@ func TestFilterSchema(t *testing.T) {
 
 			type Director implements Person {
 				name: String!
+			}
+
+			type Query {
+				someone: Person!
+			}
+		`), formatSchema(filteredSchema))
+	})
+
+	t.Run(`interface, allow all`, func(t *testing.T) {
+		perms := OperationPermissions{
+			AllowedRootQueryFields: AllowedFields{AllowedSubfields: map[string]AllowedFields{
+				"someone": {
+					AllowAll: true,
+				},
+			},
+			},
+		}
+		filteredSchema := perms.FilterSchema(schema)
+		assert.Equal(t, loadAndFormatSchema(`
+			scalar Year
+
+			interface Person {
+				name: String!
+				animals: [Animal!]
+			}
+
+			interface Animal { name: String! }
+
+			type Toy {
+				name: String!
+			}
+
+			type Dog implements Animal {
+				name: String!
+				toys: [Toy!]
+			}
+
+			type Cast implements Person {
+				id: ID!
+				name: String!
+				animals: [Animal!]
+			}
+
+			type Director implements Person {
+				id: ID!
+				name: String!
+				movies: [Movie!]
+				animals: [Animal!]
+			}
+
+			type Movie {
+				id: ID!
+				title: String
+				release: Year
+				compTitles: [Movie]
 			}
 
 			type Query {
