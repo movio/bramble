@@ -158,11 +158,11 @@ func (s *ExecutableSchema) ExecuteQuery(ctx context.Context) *graphql.Response {
 		errs = perms.FilterAuthorizedFields(op)
 	}
 
+	filteredSchema := s.MergedSchema
+	if hasPerms {
+		filteredSchema = perms.FilterSchema(s.MergedSchema)
+	}
 	for _, f := range selectionSetToFields(op.SelectionSet) {
-		filteredSchema := s.MergedSchema
-		if hasPerms {
-			filteredSchema = perms.FilterSchema(s.MergedSchema)
-		}
 		switch f.Name {
 		case "__type":
 			name := f.Arguments.ForName("name").Value.Raw
