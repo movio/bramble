@@ -18,6 +18,7 @@ import (
 	"github.com/vektah/gqlparser/v2"
 	"github.com/vektah/gqlparser/v2/ast"
 	"github.com/vektah/gqlparser/v2/formatter"
+	"github.com/vektah/gqlparser/v2/gqlerror"
 )
 
 func TestIntrospectionQuery(t *testing.T) {
@@ -2235,6 +2236,62 @@ func TestQueryWithArrayBoundaryFields(t *testing.T) {
 	f.run(t)
 }
 
+func TestQueryError(t *testing.T) {
+	f := &queryExecutionFixture{
+		services: []testService{
+			{
+				schema: `type Movie {
+					id: ID!
+					title: String
+				}
+
+				type Query {
+					movie(id: ID!): Movie!
+				}
+				`,
+				handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.Write([]byte(`{
+						"errors": [
+							{
+								"message": "Movie does not exist",
+								"path": ["movie"],
+								"extensions": {
+									"code": "NOT_FOUND"
+								}
+							}
+						]
+					}`))
+				}),
+			},
+		},
+		query: `{
+			movie(id: "1") {
+				id
+				title
+			}
+		}`,
+		errors: gqlerror.List{
+			&gqlerror.Error{
+				Message: "Movie does not exist",
+				Path:    ast.Path{ast.PathName("movie")},
+				Locations: []gqlerror.Location{
+					{Line: 2, Column: 4},
+				},
+				Extensions: map[string]interface{}{
+					"code":         "NOT_FOUND",
+					"selectionSet": `{ movie(id: "1") { id title } }`,
+					"serviceName":  "",
+				},
+			},
+			&gqlerror.Error{
+				Message: `got a null response for non-nullable field "movie"`,
+			},
+		},
+	}
+
+	f.run(t)
+}
+
 type testService struct {
 	schema  string
 	handler http.Handler
@@ -2247,6 +2304,7 @@ type queryExecutionFixture struct {
 	expected  string
 	resp      *graphql.Response
 	debug     *DebugInfo
+	errors    gqlerror.List
 }
 
 func (f *queryExecutionFixture) run(t *testing.T) {
@@ -2285,8 +2343,17 @@ func (f *queryExecutionFixture) run(t *testing.T) {
 	}
 	f.resp = es.ExecuteQuery(ctx)
 	f.resp.Extensions = graphql.GetExtensions(ctx)
-	assert.Empty(t, f.resp.Errors)
-	jsonEqWithOrder(t, f.expected, string(f.resp.Data))
+
+	if len(f.errors) == 0 {
+		assert.Empty(t, f.resp.Errors)
+		jsonEqWithOrder(t, f.expected, string(f.resp.Data))
+	} else {
+		require.Equal(t, len(f.errors), len(f.resp.Errors))
+		for i := range f.errors {
+			delete(f.resp.Errors[i].Extensions, "serviceUrl")
+			assert.Equal(t, *f.errors[i], *f.resp.Errors[i])
+		}
+	}
 }
 
 // jsonEqWithOrder checks that the JSON are equals, including the order of the

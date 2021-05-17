@@ -131,7 +131,8 @@ type Response struct {
 type GraphqlErrors []GraphqlError
 
 type GraphqlError struct {
-	Message string `json:"message"`
+	Message    string                 `json:"message"`
+	Extensions map[string]interface{} `json:"extensions"`
 }
 
 func (e GraphqlErrors) Error() string {
