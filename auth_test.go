@@ -150,6 +150,86 @@ func TestFilterAuthorizedFields(t *testing.T) {
 		assert.Len(t, errs, 1)
 		assert.Len(t, query.Operations[0].SelectionSet, 0)
 	})
+
+	t.Run("fragment spread", func(t *testing.T) {
+		query := gqlparser.MustLoadQuery(schema, `query {
+			movies {
+				... MovieFragment
+			}
+		}
+
+		fragment MovieFragment on Movie {
+			id
+			title
+			compTitles {
+				id
+			}
+		}
+		`)
+		perms := OperationPermissions{
+			AllowedRootQueryFields: AllowedFields{AllowedSubfields: map[string]AllowedFields{
+				"movies": {
+					AllowedSubfields: map[string]AllowedFields{
+						"id":    {},
+						"title": {},
+					},
+				},
+			},
+			},
+		}
+		errs := perms.FilterAuthorizedFields(query.Operations[0])
+		assert.Len(t, errs, 1)
+		expectedQuery := gqlparser.MustLoadQuery(schema, `query {
+			movies {
+				... MovieFragment
+			}
+		}
+
+		fragment MovieFragment on Movie {
+			id
+			title
+		}
+		`)
+		assertSelectionSetsEqual(t, schema, expectedQuery.Operations[0].SelectionSet, query.Operations[0].SelectionSet)
+		assertSelectionSetsEqual(t, schema, expectedQuery.Fragments[0].SelectionSet, query.Fragments[0].SelectionSet)
+	})
+
+	t.Run("inline fragment", func(t *testing.T) {
+		query := gqlparser.MustLoadQuery(schema, `query {
+			movies {
+				... on Movie {
+					id
+					title
+					compTitles {
+						id
+					}
+				}
+			}
+		}`)
+		perms := OperationPermissions{
+			AllowedRootQueryFields: AllowedFields{AllowedSubfields: map[string]AllowedFields{
+				"movies": {
+					AllowedSubfields: map[string]AllowedFields{
+						"id":    {},
+						"title": {},
+					},
+				},
+			},
+			},
+		}
+		errs := perms.FilterAuthorizedFields(query.Operations[0])
+		require.Len(t, errs, 1)
+		assert.Equal(t, errs[0].Message, "user do not have permission to access field query.movies.compTitles")
+
+		assertSelectionSetsEqual(t, schema, strToSelectionSet(schema, `{
+		movies {
+			... on Movie {
+				id
+				title
+			}
+		}
+		}`), query.Operations[0].SelectionSet)
+	})
 }
 
 func TestFilterSchema(t *testing.T) {

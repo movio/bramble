@@ -257,20 +257,33 @@ func filterFields(path []string, ss ast.SelectionSet, allowedFields AllowedField
 		return ss, nil
 	}
 
-	for _, f := range selectionSetToFields(ss) {
-		if allowed, fieldsPerms := allowedFields.IsAllowed(f.Name); allowed {
-			if fieldsPerms.AllowAll {
-				res = append(res, f)
-				continue
-			}
+	for _, s := range ss {
+		switch s := s.(type) {
+		case *ast.Field:
+			if allowed, fieldsPerms := allowedFields.IsAllowed(s.Name); allowed {
+				if fieldsPerms.AllowAll {
+					res = append(res, s)
+					continue
+				}
 
+				var ferrs gqlerror.List
+				fieldPath := append(path, s.Name)
+				s.SelectionSet, ferrs = filterFields(fieldPath, s.SelectionSet, fieldsPerms)
+				res = append(res, s)
+				errs = append(errs, ferrs...)
+			} else {
+				errs = append(errs, gqlerror.Errorf("user do not have permission to access field %s.%s", strings.Join(path, "."), s.Name))
+			}
+		case *ast.FragmentSpread:
 			var ferrs gqlerror.List
-			fieldPath := append(path, f.Name)
-			f.SelectionSet, ferrs = filterFields(fieldPath, f.SelectionSet, fieldsPerms)
-			res = append(res, f)
+			s.Definition.SelectionSet, ferrs = filterFields(path, s.Definition.SelectionSet, allowedFields)
+			res = append(res, s)
 			errs = append(errs, ferrs...)
-		} else {
-			errs = append(errs, gqlerror.Errorf("user do not have permission to access field %s.%s", strings.Join(path, "."), f.Name))
+		case *ast.InlineFragment:
+			var ferrs gqlerror.List
+			s.SelectionSet, ferrs = filterFields(path, s.SelectionSet, allowedFields)
+			res = append(res, s)
+			errs = append(errs, ferrs...)
 		}
 	}
 
