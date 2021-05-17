@@ -3,6 +3,7 @@ package bramble
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"reflect"
 	"runtime/debug"
@@ -590,7 +591,7 @@ func (e *QueryExecution) execute(ctx context.Context, plan *queryPlan, resData m
 	return e.Errors
 }
 
-func (e *QueryExecution) addError(step *queryPlanStep, msg string) {
+func (e *QueryExecution) addError(ctx context.Context, step *queryPlanStep, err error) {
 	var path ast.Path
 	for _, p := range step.InsertionPoint {
 		path = append(path, ast.PathName(p))
@@ -610,15 +611,37 @@ func (e *QueryExecution) addError(step *queryPlanStep, msg string) {
 		}
 	}
 
-	err := &gqlerror.Error{
-		Message:   msg,
-		Path:      path,
-		Locations: locs,
-	}
-
 	e.m.Lock()
-	e.Errors = append(e.Errors, err)
-	e.m.Unlock()
+	defer e.m.Unlock()
+
+	var gqlErr GraphqlErrors
+	if errors.As(err, &gqlErr) {
+		for _, ge := range gqlErr {
+			extensions := ge.Extensions
+			if extensions == nil {
+				extensions = make(map[string]interface{})
+			}
+			extensions["selectionSet"] = formatSelectionSetSingleLine(ctx, e.Schema, step.SelectionSet)
+			extensions["serviceName"] = step.ServiceName
+			extensions["serviceUrl"] = step.ServiceURL
+
+			e.Errors = append(e.Errors, &gqlerror.Error{
+				Message:    ge.Message,
+				Path:       path,
+				Locations:  locs,
+				Extensions: extensions,
+			})
+		}
+	} else {
+		e.Errors = append(e.Errors, &gqlerror.Error{
+			Message:   err.Error(),
+			Path:      path,
+			Locations: locs,
+			Extensions: map[string]interface{}{
+				"selectionSet": formatSelectionSetSingleLine(ctx, e.Schema, step.SelectionSet),
+			},
+		})
+	}
 }
 
 func (e *QueryExecution) executeRootStep(ctx context.Context, step *queryPlanStep, result map[string]interface{}) {
@@ -629,7 +652,7 @@ func (e *QueryExecution) executeRootStep(ctx context.Context, step *queryPlanSte
 				"err":        r,
 				"stacktrace": string(debug.Stack()),
 			})
-			e.addError(step, "an error happened during query execution")
+			e.addError(ctx, step, errors.New("an error happened during query execution"))
 		}
 	}()
 
@@ -656,7 +679,7 @@ func (e *QueryExecution) executeRootStep(ctx context.Context, step *queryPlanSte
 	err := e.graphqlClient.Request(ctx, step.ServiceURL, req, &resp)
 	promHTTPInFlightGauge.Dec()
 	if err != nil {
-		e.addError(step, fmt.Sprintf("error while querying %s with %s: %s", step.ServiceURL, formatSelectionSetSingleLine(ctx, e.Schema, step.SelectionSet), err))
+		e.addError(ctx, step, err)
 	}
 
 	e.m.Lock()
@@ -689,7 +712,7 @@ func (e *QueryExecution) executeChildStep(ctx context.Context, step *queryPlanSt
 				"err":        r,
 				"stacktrace": string(debug.Stack()),
 			})
-			e.addError(step, "an error happened during query execution")
+			e.addError(ctx, step, errors.New("an error happened during query execution"))
 		}
 	}()
 
@@ -748,10 +771,10 @@ func (e *QueryExecution) executeChildStep(ctx context.Context, step *queryPlanSt
 			err := e.graphqlClient.Request(ctx, step.ServiceURL, req, &resp)
 			promHTTPInFlightGauge.Dec()
 			if err != nil {
-				e.addError(step, fmt.Sprintf("error while querying %s with %s: %s", step.ServiceURL, formatSelectionSetSingleLine(ctx, e.Schema, step.SelectionSet), err))
+				e.addError(ctx, step, err)
 			}
 			if len(resp.Result) != len(insertionPoints) {
-				e.addError(step, fmt.Sprintf("error while querying %s: service returned incorrect number of elements", step.ServiceURL))
+				e.addError(ctx, step, fmt.Errorf("error while querying %s: service returned incorrect number of elements", step.ServiceURL))
 				return
 			}
 			e.m.Lock()
@@ -773,11 +796,11 @@ func (e *QueryExecution) executeChildStep(ctx context.Context, step *queryPlanSt
 		err := e.graphqlClient.Request(ctx, step.ServiceURL, req, &resp)
 		promHTTPInFlightGauge.Dec()
 		if err != nil {
-			e.addError(step, fmt.Sprintf("error while querying %s with %s: %s", step.ServiceURL, formatSelectionSetSingleLine(ctx, e.Schema, step.SelectionSet), err))
+			e.addError(ctx, step, err)
 			return
 		}
 		if len(resp.Result) != len(insertionPoints) {
-			e.addError(step, fmt.Sprintf("error while querying %s: service returned incorrect number of elements", step.ServiceURL))
+			e.addError(ctx, step, fmt.Errorf("error while querying %s: service returned incorrect number of elements", step.ServiceURL))
 			return
 		}
 		e.m.Lock()
@@ -807,11 +830,11 @@ func (e *QueryExecution) executeChildStep(ctx context.Context, step *queryPlanSt
 		err := e.graphqlClient.Request(ctx, step.ServiceURL, req, &resp)
 		promHTTPInFlightGauge.Dec()
 		if err != nil {
-			e.addError(step, fmt.Sprintf("error while querying %s with %s: %s", step.ServiceURL, formatSelectionSetSingleLine(ctx, e.Schema, step.SelectionSet), err))
+			e.addError(ctx, step, err)
 			return
 		}
 		if len(resp) != len(insertionPoints) {
-			e.addError(step, fmt.Sprintf("error while querying %s: service returned incorrect number of elements", step.ServiceURL))
+			e.addError(ctx, step, fmt.Errorf("error while querying %s: service returned incorrect number of elements", step.ServiceURL))
 			return
 		}
 		e.m.Lock()
@@ -831,11 +854,11 @@ func (e *QueryExecution) executeChildStep(ctx context.Context, step *queryPlanSt
 	err := e.graphqlClient.Request(ctx, step.ServiceURL, req, &resp)
 	promHTTPInFlightGauge.Dec()
 	if err != nil {
-		e.addError(step, fmt.Sprintf("error while querying %s with %s: %s", step.ServiceURL, formatSelectionSetSingleLine(ctx, e.Schema, step.SelectionSet), err))
+		e.addError(ctx, step, err)
 		return
 	}
 	if len(resp) != len(insertionPoints) {
-		e.addError(step, fmt.Sprintf("error while querying %s: service returned incorrect number of elements", step.ServiceURL))
+		e.addError(ctx, step, fmt.Errorf("error while querying %s: service returned incorrect number of elements", step.ServiceURL))
 		return
 	}
 	e.m.Lock()
