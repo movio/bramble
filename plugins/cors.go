@@ -23,6 +23,7 @@ type CorsPluginConfig struct {
 	AllowedOrigins   []string `json:"allowed-origins"`
 	AllowedHeaders   []string `json:"allowed-headers"`
 	AllowCredentials bool     `json:"allow-credentials"`
+	MaxAge           int      `json:"max-age"`
 	Debug            bool     `json:"debug"`
 }
 
@@ -43,6 +44,7 @@ func (p *CorsPlugin) middleware(h http.Handler) http.Handler {
 		AllowedOrigins:   p.config.AllowedOrigins,
 		AllowedHeaders:   p.config.AllowedHeaders,
 		AllowCredentials: p.config.AllowCredentials,
+		MaxAge:           p.config.MaxAge,
 		Debug:            p.config.Debug,
 	})
 	if p.config.Debug {
