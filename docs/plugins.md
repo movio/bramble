@@ -21,6 +21,7 @@ Add `CORS` headers to queries.
     "allowed-origins": ["https://example.com"],
     "allowed-headers": ["X-Custom-Header"],
     "allow-credentials": true,
+    "max-age": 3600,
     "debug": true
   }
 }
