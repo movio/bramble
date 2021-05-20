@@ -19,6 +19,7 @@ type GraphQLClient struct {
 	HTTPClient      *http.Client
 	MaxResponseSize int64
 	Tracer          opentracing.Tracer
+	UserAgent       string
 }
 
 type ClientOpt func(*GraphQLClient)
@@ -44,6 +45,12 @@ func WithMaxResponseSize(maxResponseSize int64) ClientOpt {
 	}
 }
 
+func WithUserAgent(userAgent string) ClientOpt {
+	return func(s *GraphQLClient) {
+		s.UserAgent = userAgent
+	}
+}
+
 func (c *GraphQLClient) Request(ctx context.Context, url string, request *Request, out interface{}) error {
 	var buf bytes.Buffer
 	err := json.NewEncoder(&buf).Encode(request)
@@ -62,6 +69,10 @@ func (c *GraphQLClient) Request(ctx context.Context, url string, request *Reques
 
 	httpReq.Header.Set("Content-Type", "application/json; charset=utf-8")
 	httpReq.Header.Set("Accept", "application/json; charset=utf-8")
+
+	if c.UserAgent != "" {
+		httpReq.Header.Set("User-Agent", c.UserAgent)
+	}
 
 	if c.Tracer != nil {
 		span := opentracing.SpanFromContext(ctx)
