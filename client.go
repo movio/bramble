@@ -153,3 +153,7 @@ func (e GraphqlErrors) Error() string {
 	}
 	return strings.Join(errs, ",")
 }
+
+func generateBrambleUserAgent(operation string) string {
+	return fmt.Sprintf("Bramble/%s (%s)", version, operation)
+}

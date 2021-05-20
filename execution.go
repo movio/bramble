@@ -60,7 +60,7 @@ func (s *ExecutableSchema) UpdateServiceList(services []string) error {
 		if svc, ok := s.Services[svcURL]; ok {
 			newServices[svcURL] = svc
 		} else {
-			newServices[svcURL] = NewService(svcURL)
+			newServices[svcURL] = NewService(svcURL, NewClient(WithUserAgent(generateBrambleUserAgent("update"))))
 		}
 	}
 	s.Services = newServices

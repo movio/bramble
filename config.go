@@ -230,13 +230,15 @@ func (c *Config) Init() error {
 		return fmt.Errorf("error building service list: %w", err)
 	}
 
+	updateClient := NewClient(WithUserAgent(generateBrambleUserAgent("update")))
+
 	var services []*Service
 	for _, s := range c.Services {
-		services = append(services, NewService(s))
+		services = append(services, NewService(s, updateClient))
 	}
 
-	client := NewClient(WithMaxResponseSize(c.MaxServiceResponseSize))
-	es := newExecutableSchema(c.plugins, c.MaxRequestsPerQuery, client, services...)
+	queryClient := NewClient(WithMaxResponseSize(c.MaxServiceResponseSize), WithUserAgent(generateBrambleUserAgent("query")))
+	es := newExecutableSchema(c.plugins, c.MaxRequestsPerQuery, queryClient, services...)
 	err = es.UpdateSchema(true)
 	if err != nil {
 		return err

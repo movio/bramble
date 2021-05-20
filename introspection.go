@@ -16,12 +16,20 @@ type Service struct {
 	SchemaSource string
 	Schema       *ast.Schema
 	Status       string
+
+	client *GraphQLClient
 }
 
-func NewService(serviceURL string) *Service {
-	return &Service{
+func NewService(serviceURL string, client *GraphQLClient) *Service {
+	s := &Service{
 		ServiceURL: serviceURL,
 	}
+	if client == nil {
+		s.client = NewClient()
+	} else {
+		s.client = client
+	}
+	return s
 }
 
 func (s *Service) Update() (bool, error) {
@@ -34,8 +42,7 @@ func (s *Service) Update() (bool, error) {
 		} `json:"service"`
 	}{}
 
-	client := NewClient()
-	if err := client.Request(context.Background(), s.ServiceURL, req, &response); err != nil {
+	if err := s.client.Request(context.Background(), s.ServiceURL, req, &response); err != nil {
 		s.Status = "Unreachable"
 		return false, err
 	}
