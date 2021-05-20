@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/movio/bramble"
 	"github.com/opentracing/opentracing-go"
@@ -52,7 +53,7 @@ func (p *OpenTracingPlugin) Init(s *bramble.ExecutableSchema) {
 func (p *OpenTracingPlugin) ApplyMiddlewarePublicMux(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		// do not trace healthcheck
-		if r.Header.Get("user-agent") == "bramble-healthcheck" {
+		if strings.HasPrefix(r.Header.Get("user-agent"), "Bramble") {
 			h.ServeHTTP(rw, r)
 			return
 		}
