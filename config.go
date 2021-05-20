@@ -12,6 +12,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+var version = "dev"
+
 type PluginConfig struct {
 	Name   string
 	Config json.RawMessage
