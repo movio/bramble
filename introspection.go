@@ -16,12 +16,16 @@ type Service struct {
 	SchemaSource string
 	Schema       *ast.Schema
 	Status       string
+
+	client *GraphQLClient
 }
 
 func NewService(serviceURL string) *Service {
-	return &Service{
+	s := &Service{
 		ServiceURL: serviceURL,
+		client:     NewClient(WithUserAgent(generateBrambleUserAgent("update"))),
 	}
+	return s
 }
 
 func (s *Service) Update() (bool, error) {
@@ -34,8 +38,7 @@ func (s *Service) Update() (bool, error) {
 		} `json:"service"`
 	}{}
 
-	client := NewClient()
-	if err := client.Request(context.Background(), s.ServiceURL, req, &response); err != nil {
+	if err := s.client.Request(context.Background(), s.ServiceURL, req, &response); err != nil {
 		s.Status = "Unreachable"
 		return false, err
 	}

@@ -12,6 +12,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+var version = "dev"
+
 type PluginConfig struct {
 	Name   string
 	Config json.RawMessage
@@ -233,8 +235,8 @@ func (c *Config) Init() error {
 		services = append(services, NewService(s))
 	}
 
-	client := NewClient(WithMaxResponseSize(c.MaxServiceResponseSize))
-	es := newExecutableSchema(c.plugins, c.MaxRequestsPerQuery, client, services...)
+	queryClient := NewClient(WithMaxResponseSize(c.MaxServiceResponseSize), WithUserAgent(generateBrambleUserAgent("query")))
+	es := newExecutableSchema(c.plugins, c.MaxRequestsPerQuery, queryClient, services...)
 	err = es.UpdateSchema(true)
 	if err != nil {
 		return err

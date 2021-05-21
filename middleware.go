@@ -62,7 +62,7 @@ func debugMiddleware(h http.Handler) http.Handler {
 func monitoringMiddleware(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx, event := startEvent(r.Context(), "request")
-		if r.Header.Get("user-agent") != "bramble-healthcheck" {
+		if !strings.HasPrefix(r.Header.Get("user-agent"), "Bramble") {
 			defer event.finish()
 		}
 
