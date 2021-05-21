@@ -46,11 +46,14 @@ func TestGatewayQuery(t *testing.T) {
 					}
 				}
 			}`, string(encodedSchema))
+			assert.Equal(t, "Bramble/dev (update)", r.Header.Get("User-Agent"))
 		} else {
 			w.Write([]byte(`{ "data": { "test": "Hello" }}`))
+			assert.Equal(t, "Bramble/dev (query)", r.Header.Get("User-Agent"))
 		}
 	}))
-	executableSchema := newExecutableSchema(nil, 50, nil, NewService(server.URL))
+	client := NewClient(WithUserAgent(generateBrambleUserAgent("query")))
+	executableSchema := newExecutableSchema(nil, 50, client, NewService(server.URL))
 	err := executableSchema.UpdateSchema(true)
 	require.NoError(t, err)
 	gtw := NewGateway(executableSchema, []Plugin{})
