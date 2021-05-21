@@ -20,14 +20,10 @@ type Service struct {
 	client *GraphQLClient
 }
 
-func NewService(serviceURL string, client *GraphQLClient) *Service {
+func NewService(serviceURL string) *Service {
 	s := &Service{
 		ServiceURL: serviceURL,
-	}
-	if client == nil {
-		s.client = NewClient()
-	} else {
-		s.client = client
+		client:     NewClient(WithUserAgent(generateBrambleUserAgent("update"))),
 	}
 	return s
 }

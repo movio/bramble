@@ -230,11 +230,9 @@ func (c *Config) Init() error {
 		return fmt.Errorf("error building service list: %w", err)
 	}
 
-	updateClient := NewClient(WithUserAgent(generateBrambleUserAgent("update")))
-
 	var services []*Service
 	for _, s := range c.Services {
-		services = append(services, NewService(s, updateClient))
+		services = append(services, NewService(s))
 	}
 
 	queryClient := NewClient(WithMaxResponseSize(c.MaxServiceResponseSize), WithUserAgent(generateBrambleUserAgent("query")))

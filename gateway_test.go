@@ -50,7 +50,7 @@ func TestGatewayQuery(t *testing.T) {
 			w.Write([]byte(`{ "data": { "test": "Hello" }}`))
 		}
 	}))
-	executableSchema := newExecutableSchema(nil, 50, nil, NewService(server.URL, nil))
+	executableSchema := newExecutableSchema(nil, 50, nil, NewService(server.URL))
 	err := executableSchema.UpdateSchema(true)
 	require.NoError(t, err)
 	gtw := NewGateway(executableSchema, []Plugin{})
