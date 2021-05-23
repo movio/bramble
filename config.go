@@ -12,7 +12,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var version = "dev"
+var Version = "dev"
 
 type PluginConfig struct {
 	Name   string
@@ -235,7 +235,7 @@ func (c *Config) Init() error {
 		services = append(services, NewService(s))
 	}
 
-	queryClient := NewClient(WithMaxResponseSize(c.MaxServiceResponseSize), WithUserAgent(generateBrambleUserAgent("query")))
+	queryClient := NewClient(WithMaxResponseSize(c.MaxServiceResponseSize), WithUserAgent(GenerateUserAgent("query")))
 	es := newExecutableSchema(c.plugins, c.MaxRequestsPerQuery, queryClient, services...)
 	err = es.UpdateSchema(true)
 	if err != nil {

@@ -23,7 +23,7 @@ type Service struct {
 func NewService(serviceURL string) *Service {
 	s := &Service{
 		ServiceURL: serviceURL,
-		client:     NewClient(WithUserAgent(generateBrambleUserAgent("update"))),
+		client:     NewClient(WithUserAgent(GenerateUserAgent("update"))),
 	}
 	return s
 }
