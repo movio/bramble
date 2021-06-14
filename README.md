@@ -2,6 +2,7 @@
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/movio/bramble.svg)](https://pkg.go.dev/github.com/movio/bramble)
 [![Go Report Card](https://goreportcard.com/badge/github.com/movio/bramble)](https://goreportcard.com/report/github.com/movio/bramble)
+[![codecov](https://codecov.io/gh/movio/bramble/branch/main/graph/badge.svg)](https://codecov.io/gh/movio/bramble)
 
 [**Full documentation**](https://movio.github.io/bramble)
 
