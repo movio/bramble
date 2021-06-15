@@ -32,6 +32,10 @@ func (p *LimitsPlugin) ID() string {
 	return "limits"
 }
 
+func (p *LimitsPlugin) Init(es *bramble.ExecutableSchema) {
+	es.GraphqlClient.HTTPClient.Timeout = p.config.maxResponseDuration
+}
+
 func (p *LimitsPlugin) Configure(cfg *bramble.Config, data json.RawMessage) error {
 	err := json.Unmarshal(data, &p.config)
 	if err != nil {
