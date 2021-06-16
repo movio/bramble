@@ -2,7 +2,6 @@ package plugins
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"net/http"
 	"sort"
@@ -20,6 +19,7 @@ func init() {
 	bramble.RegisterPlugin(&AdminUIPlugin{})
 }
 
+// AdminUIPlugin serves a minimal administration interface.
 type AdminUIPlugin struct {
 	bramble.BasePlugin
 	executableSchema *bramble.ExecutableSchema
@@ -43,52 +43,6 @@ func (p *AdminUIPlugin) Init(s *bramble.ExecutableSchema) {
 
 func (p *AdminUIPlugin) SetupPrivateMux(mux *http.ServeMux) {
 	mux.HandleFunc("/admin", p.handler)
-	mux.HandleFunc("/services", p.servicesHandler)
-	mux.HandleFunc("/validate", p.validateHandler)
-}
-
-func (p *AdminUIPlugin) servicesHandler(w http.ResponseWriter, r *http.Request) {
-	var svcs services
-	for _, s := range p.executableSchema.Services {
-		svcs = append(svcs, service{
-			Name:       s.Name,
-			Version:    s.Version,
-			ServiceURL: s.ServiceURL,
-			Schema:     s.SchemaSource,
-			Status:     s.Status,
-		})
-	}
-
-	sort.Sort(svcs)
-	_ = json.NewEncoder(w).Encode(svcs)
-}
-
-type validateResponse struct {
-	Valid  bool
-	Schema string
-	Error  string
-}
-
-func (p *AdminUIPlugin) validateHandler(w http.ResponseWriter, r *http.Request) {
-	var resultError string
-	var resultSchema string
-	testSchema := r.FormValue("schema")
-
-	if testSchema != "" {
-		var err error
-		resultSchema, err = p.testSchema(testSchema)
-		if err != nil {
-			resultError = err.Error()
-		}
-	} else {
-		resultError = "Empty schema"
-	}
-
-	_ = json.NewEncoder(w).Encode(validateResponse{
-		Valid:  resultError == "",
-		Schema: resultSchema,
-		Error:  resultError,
-	})
 }
 
 type services []service
