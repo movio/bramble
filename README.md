@@ -49,7 +49,7 @@ Prerequisite: Go 1.16 or newer
 To build the `bramble` command:
 
 ```bash
-go build -o bramble ./cmd
+go build -o bramble ./cmd/bramble
 ./bramble -conf config.json
 ```
 
