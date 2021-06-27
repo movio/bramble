@@ -1,0 +1,28 @@
+{
+  "services": ["http://localhost:4000/graphql"],
+  "gateway-port": 8082,
+  "private-port": 8083,
+  "metrics-port": 8084,
+  "log-level": "info",
+  "poll-interval": "5s",
+  "max-requests-per-query": 50,
+  "max-client-response-size": 1048576,
+  "plugins": [
+    {
+      "name": "admin-ui"
+    },
+    {
+      "name": "cors",
+      "config": {
+        "allowed-origins": ["*"],
+        "allowed-headers": ["*"],
+        "allow-credentials": true,
+        "max-age": 3600,
+        "debug": true
+      }
+    },
+    {
+      "name": "playground"
+    }
+  ]
+}
