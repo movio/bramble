@@ -2,13 +2,15 @@
 
 ## Admin UI
 
-Admin UI provides a simple administation interface displaying the federated services.
+Admin UI provides a simple administration interface displaying the federated services.
 
 ```json
 {
   "name": "admin-ui"
 }
 ```
+
+You access the Admin UI by visiting `http://localhost:<private-port>/admin` in your browser.
 
 ## CORS
 
@@ -108,6 +110,8 @@ Exposes the GraphQL playground on `/playground`.
   "name": "playground"
 }
 ```
+
+You access the GraphQL playground by visiting `http://localhost:<gateway-port>/playground` in your browser.
 
 ## Open Tracing (Jaeger)
 
