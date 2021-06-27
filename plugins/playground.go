@@ -12,7 +12,7 @@ func init() {
 }
 
 type PlaygroundPlugin struct {
-	bramble.Plugin
+	*bramble.BasePlugin
 }
 
 func (p *PlaygroundPlugin) ID() string {
