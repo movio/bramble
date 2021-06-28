@@ -49,7 +49,8 @@ type BrambleEnumValue {
 	name: String!
 	description: String
 }
-type BrambleType {
+type BrambleType @boundary {
+	id: ID!
 	kind: String!
 	name: String!
 	directives: [String!]!
@@ -69,6 +70,7 @@ type Query {
 	service: Service!
 	meta: BrambleMetaQuery!
 	field(id: ID!): BrambleField @boundary
+	type(id: ID!): BrambleType @boundary
 }
 `
 
@@ -144,6 +146,10 @@ type brambleType struct {
 	Description *string
 }
 
+func (t brambleType) Id() graphql.ID {
+	return graphql.ID(t.Name)
+}
+
 type brambleTypes []brambleType
 
 func (t brambleTypes) Len() int {
@@ -166,62 +172,9 @@ func (r *metaPluginResolver) Schema() (*brambleSchema, error) {
 	schema := r.executableSchema.MergedSchema
 	var types brambleTypes
 	for name, def := range schema.Types {
-		if strings.HasPrefix(def.Name, "__") {
-			continue
-		}
-
-		var fields brambleFields
-		for _, f := range def.Fields {
-			if strings.HasPrefix(f.Name, "__") {
-				continue
-			}
-			var svcName string
-			if svcURL, err := r.executableSchema.Locations.URLFor(def.Name, "", f.Name); err == nil {
-				svc := r.executableSchema.Services[svcURL]
-				svcName = svc.Name
-			}
-			var args []brambleArg
-			for _, a := range f.Arguments {
-				args = append(args, brambleArg{
-					Name: a.Name,
-					Type: a.Type.String(),
-				})
-			}
-			fields = append(fields, brambleField{
-				ID:          graphql.ID(def.Name + "." + f.Name),
-				Name:        f.Name,
-				Type:        f.Type.String(),
-				Service:     svcName,
-				Description: strToPtr(f.Description),
-				Arguments:   args,
-			})
-		}
-		sort.Sort(fields)
-		var enum []brambleEnumValue
-		for _, v := range def.EnumValues {
-			enum = append(enum, brambleEnumValue{
-				Name:        v.Name,
-				Description: strToPtr(v.Description),
-			})
-		}
-
-		var directives []string
-		for _, d := range def.Directives {
-			directives = append(directives, d.Name)
-		}
-
-		types = append(types, brambleType{
-			Kind:        kindToStr(def.Kind),
-			Name:        name,
-			Directives:  directives,
-			Fields:      fields,
-			Description: strToPtr(def.Description),
-			EnumValues:  enum,
-		})
+		types = append(types, r.brambleType(name, def))
 	}
-
 	sort.Sort(types)
-
 	return &brambleSchema{
 		Types: types,
 	}, nil
@@ -249,6 +202,71 @@ func strToPtr(s string) *string {
 		return nil
 	}
 	return &s
+}
+
+func (p *metaPluginResolver) Type(ctx context.Context, args struct{ ID graphql.ID }) (*brambleType, error) {
+	typeName := string(args.ID)
+	var typeDef *ast.Definition
+	for _, def := range p.executableSchema.MergedSchema.Types {
+		if def.Name == typeName {
+			typeDef = def
+			break
+		}
+	}
+	if typeDef == nil {
+		return nil, nil
+	}
+	result := p.brambleType(typeName, typeDef)
+	return &result, nil
+}
+
+func (r *metaPluginResolver) brambleType(name string, def *ast.Definition) brambleType {
+	var fields brambleFields
+	for _, f := range def.Fields {
+		if strings.HasPrefix(f.Name, "__") {
+			continue
+		}
+		var svcName string
+		if svcURL, err := r.executableSchema.Locations.URLFor(def.Name, "", f.Name); err == nil {
+			svc := r.executableSchema.Services[svcURL]
+			svcName = svc.Name
+		}
+		var args []brambleArg
+		for _, a := range f.Arguments {
+			args = append(args, brambleArg{
+				Name: a.Name,
+				Type: a.Type.String(),
+			})
+		}
+		fields = append(fields, brambleField{
+			ID:          graphql.ID(def.Name + "." + f.Name),
+			Name:        f.Name,
+			Type:        f.Type.String(),
+			Service:     svcName,
+			Description: strToPtr(f.Description),
+			Arguments:   args,
+		})
+	}
+	sort.Sort(fields)
+	var enum []brambleEnumValue
+	for _, v := range def.EnumValues {
+		enum = append(enum, brambleEnumValue{
+			Name:        v.Name,
+			Description: strToPtr(v.Description),
+		})
+	}
+	var directives []string
+	for _, d := range def.Directives {
+		directives = append(directives, d.Name)
+	}
+	return brambleType{
+		Kind:        kindToStr(def.Kind),
+		Name:        name,
+		Directives:  directives,
+		Fields:      fields,
+		Description: strToPtr(def.Description),
+		EnumValues:  enum,
+	}
 }
 
 func (p *metaPluginResolver) Field(ctx context.Context, args struct{ ID graphql.ID }) (*brambleField, error) {

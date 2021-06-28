@@ -167,7 +167,7 @@ extend type Query {
 }
 ```
 
-Note that the Meta plugin offers an extensible schema since `BrambleMetaQuery` is a namespace and `BrambleField` is a boundary type.
+Note that the Meta plugin offers an extensible schema since `BrambleMetaQuery` is a namespace and `BrambleField` and `BrambleType` are a boundary types.
 
 ## Playground
 
