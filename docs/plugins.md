@@ -101,6 +101,74 @@ Set limits for response time and incoming requests size.
 }
 ```
 
+## Meta
+
+Adds meta-information to the graph.
+
+```json
+{
+  "name": "meta"
+}
+```
+
+With the Meta plugin, you can programmatically query Bramble's federation information. The typical use case for this plugin is to build tooling around Bramble (e.g. a schema explorer that show which service exposes each field).
+
+The Meta plugin federates the following GraphQL API in your graph:
+
+```graphql
+type BrambleService {
+  name: String!
+  version: String!
+  schema: String!
+  status: String!
+  serviceUrl: String!
+}
+
+type BrambleFieldArgument {
+  name: String!
+  type: String!
+}
+
+type BrambleField @boundary {
+  id: ID!
+  name: String!
+  type: String!
+  service: String!
+  arguments: [BrambleFieldArgument!]!
+  description: String
+}
+
+type BrambleEnumValue {
+  name: String!
+  description: String
+}
+
+type BrambleType {
+  kind: String!
+  name: String!
+  directives: [String!]!
+  fields: [BrambleField!]!
+  enumValues: [BrambleEnumValue!]!
+  description: String
+}
+
+type BrambleSchema {
+  types: [BrambleType!]!
+}
+
+type BrambleMetaQuery @namespace {
+  services: [BrambleService!]!
+  schema: BrambleSchema!
+  field(id: ID!): BrambleField
+}
+
+extend type Query {
+  meta: BrambleMetaQuery!
+}
+```
+
+Note that the Meta plugin offers an extensible schema since `BrambleMetaQuery` is a namespace and `BrambleField` is a boundary type.
+
 ## Playground
 
 Exposes the GraphQL playground on `/playground`.
