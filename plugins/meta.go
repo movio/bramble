@@ -26,7 +26,8 @@ type Service {
 	version: String!
 	schema: String!
 }
-type BrambleService {
+type BrambleService @boundary {
+	id: ID!
 	name: String!
 	version: String!
 	schema: String!
@@ -69,8 +70,9 @@ type BrambleMetaQuery @namespace {
 type Query {
 	service: Service!
 	meta: BrambleMetaQuery!
-	field(id: ID!): BrambleField @boundary
-	type(id: ID!): BrambleType @boundary
+	getField(id: ID!): BrambleField @boundary
+	getType(id: ID!): BrambleType @boundary
+	getService(id: ID!): BrambleService @boundary
 }
 `
 
@@ -204,7 +206,22 @@ func strToPtr(s string) *string {
 	return &s
 }
 
-func (p *metaPluginResolver) Type(ctx context.Context, args struct{ ID graphql.ID }) (*brambleType, error) {
+func (r *metaPluginResolver) GetService(ctx context.Context, args struct{ ID graphql.ID }) *brambleService {
+	for _, service := range r.executableSchema.Services {
+		if service.Name == string(args.ID) {
+			return &brambleService{
+				Name:       service.Name,
+				Version:    service.Version,
+				Schema:     service.SchemaSource,
+				Status:     service.Status,
+				ServiceURL: service.ServiceURL,
+			}
+		}
+	}
+	return nil
+}
+
+func (p *metaPluginResolver) GetType(ctx context.Context, args struct{ ID graphql.ID }) (*brambleType, error) {
 	typeName := string(args.ID)
 	var typeDef *ast.Definition
 	for _, def := range p.executableSchema.MergedSchema.Types {
@@ -270,6 +287,10 @@ func (r *metaPluginResolver) brambleType(name string, def *ast.Definition) bramb
 }
 
 func (p *metaPluginResolver) Field(ctx context.Context, args struct{ ID graphql.ID }) (*brambleField, error) {
+	return p.GetField(ctx, args)
+}
+
+func (p *metaPluginResolver) GetField(ctx context.Context, args struct{ ID graphql.ID }) (*brambleField, error) {
 	splitFieldName := strings.Split(string(args.ID), ".")
 	if len(splitFieldName) != 2 {
 		return nil, errors.New("invalid ID passed to query")
@@ -317,6 +338,10 @@ type brambleService struct {
 	Schema     string
 	Status     string
 	ServiceURL string
+}
+
+func (s brambleService) Id() graphql.ID {
+	return graphql.ID(s.Name)
 }
 
 type externalBrambleServices []brambleService
