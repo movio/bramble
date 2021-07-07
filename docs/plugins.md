@@ -116,7 +116,8 @@ With the Meta plugin, you can programmatically query Bramble's federation inform
 The Meta plugin federates the following GraphQL API in your graph:
 
 ```graphql
-type BrambleService {
+type BrambleService @boundary {
+  id: ID!
   name: String!
   version: String!
   schema: String!
@@ -143,7 +144,7 @@ type BrambleEnumValue {
   description: String
 }
 
-type BrambleType {
+type BrambleType @boundary {
   kind: String!
   name: String!
   directives: [String!]!
@@ -167,7 +168,7 @@ extend type Query {
 }
 ```
 
-Note that the Meta plugin offers an extensible schema since `BrambleMetaQuery` is a namespace and `BrambleField` and `BrambleType` are a boundary types.
+Note that the Meta plugin offers an extensible schema since `BrambleMetaQuery` is a namespace and `BrambleField`, `BrambleType`, and `BrambleService` are all boundary types.
 
 ## Playground
 
