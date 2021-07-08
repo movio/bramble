@@ -336,29 +336,36 @@ func usesFieldsBoundaryDirective(schema *ast.Schema) bool {
 
 // validateBoundaryFields checks that all boundary types have a getter and all getters are matching with a boundary type
 func validateBoundaryFields(schema *ast.Schema) error {
-	boundaryTypes := make(map[string]struct{})
+	boundaryTypes := make(map[string]bool)
 	for _, t := range schema.Types {
 		if t.Kind == ast.Object && isBoundaryObject(t) {
-			boundaryTypes[t.Name] = struct{}{}
+			boundaryTypes[t.Name] = false
 		}
 	}
 
 	for _, f := range schema.Query.Fields {
 		if hasBoundaryDirective(f) {
-			if _, ok := boundaryTypes[f.Type.Name()]; !ok {
+			hasBoundaryType, ok := boundaryTypes[f.Type.Name()]
+			if !ok {
 				return fmt.Errorf("declared boundary query for non-boundary type %q", f.Type.Name())
 			}
 
-			delete(boundaryTypes, f.Type.Name())
+			if hasBoundaryType {
+				return fmt.Errorf("declared duplicate query for boundary type %q", f.Type.Name())
+			}
+
+			boundaryTypes[f.Type.Name()] = true
 		}
 	}
 
-	if len(boundaryTypes) > 0 {
-		var missingBoundaryQueries []string
-		for k := range boundaryTypes {
+	var missingBoundaryQueries []string
+	for k, hasBoundaryType := range boundaryTypes {
+		if !hasBoundaryType {
 			missingBoundaryQueries = append(missingBoundaryQueries, k)
 		}
+	}
 
+	if len(missingBoundaryQueries) > 0 {
 		return fmt.Errorf("missing boundary queries for the following types: %v", missingBoundaryQueries)
 	}
 
@@ -403,8 +410,8 @@ func validateBoundaryQuery(f *ast.FieldDefinition) error {
 
 	if f.Arguments[0].Type.Elem != nil {
 		// array type check
-		if idsField := f.Arguments.ForName("ids"); idsField == nil || idsField.Type.String() != "[ID!]" {
-			return fmt.Errorf(`boundary query must have a single "id: ID!" argument`)
+		if idsField := f.Arguments.ForName("ids"); idsField == nil || idsField.Type.String() != "[ID!]!" {
+			return fmt.Errorf(`boundary query must have a single "id: ID!" or list "ids: [ID!]!" argument`)
 		}
 
 		if !f.Type.NonNull || f.Type.Elem == nil {

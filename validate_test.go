@@ -636,7 +636,7 @@ func TestSchemaValidateBoundaryFields(t *testing.T) {
 		type Query {
 			foo(ids: [ID!]): [Foo!] @boundary
 		}
-		`).assertInvalid(`invalid boundary query "foo": return type should be a non-null array of nullable elements`, validateBoundaryQueries)
+		`).assertInvalid(`invalid boundary query "foo": boundary query must have a single "id: ID!" or list "ids: [ID!]!" argument`, validateBoundaryQueries)
 	})
 
 	t.Run("non-nullable boundary query result", func(t *testing.T) {
@@ -655,6 +655,21 @@ func TestSchemaValidateBoundaryFields(t *testing.T) {
 			foo(id: ID!): Foo! @boundary
 		}
 		`).assertInvalid(`invalid boundary query "foo": return type of boundary query should be nullable`, validateBoundaryQueries)
+	})
+
+	t.Run("don't allow duplicated boundary getter", func(t *testing.T) {
+		withSchema(t, `
+		directive @boundary on OBJECT | FIELD_DEFINITION
+
+		type Foo @boundary {
+			id: ID!
+		}
+
+		type Query {
+			foo(id: ID!): Foo @boundary
+			severalFoos(ids: [ID!]!): [Foo]! @boundary
+		}
+		`).assertInvalid(`declared duplicate query for boundary type "Foo"`, validateBoundaryFields)
 	})
 }
 
