@@ -741,7 +741,7 @@ func (e *QueryExecution) executeChildStep(ctx context.Context, step *QueryPlanSt
 	result = prepareMapForInsertion(step.InsertionPoint, result).(map[string]interface{})
 	e.m.Unlock()
 
-	insertionPoints := buildInsertionSlice(step.InsertionPoint, result)
+	insertionPoints := buildInsertionMap(step.InsertionPoint, result)
 	if len(insertionPoints) == 0 {
 		return
 	}
@@ -759,13 +759,13 @@ func (e *QueryExecution) executeChildStep(ctx context.Context, step *QueryPlanSt
 	b.WriteString("{")
 	if boundaryQuery.Array {
 		var ids string
-		for _, ip := range insertionPoints {
-			ids += fmt.Sprintf("%q ", ip.ID)
+		for id := range insertionPoints {
+			ids += fmt.Sprintf("%q ", id)
 		}
 		b.WriteString(fmt.Sprintf("_result: %s(ids: [%s]) %s", boundaryQuery.Query, ids, selectionSet))
 	} else {
-		for i, ip := range insertionPoints {
-			b.WriteString(fmt.Sprintf("%s: %s(id: %q) { ... on %s %s } ", nodeAlias(i), boundaryQuery.Query, ip.ID, step.ParentType, selectionSet))
+		for i := range insertionPoints {
+			b.WriteString(fmt.Sprintf("%s: %s(id: %q) { ... on %s %s } ", nodeAlias(i), boundaryQuery.Query, i, step.ParentType, selectionSet))
 		}
 	}
 	b.WriteString("}")
@@ -785,22 +785,45 @@ func (e *QueryExecution) executeChildStep(ctx context.Context, step *QueryPlanSt
 			if err != nil {
 				e.addError(ctx, step, err)
 			}
-			if len(resp.Result) != len(insertionPoints) {
-				e.addError(ctx, step, fmt.Errorf("error while querying %s: service returned incorrect number of elements", step.ServiceURL))
-				return
-			}
 			e.m.Lock()
-			for i := range insertionPoints {
-				for k, v := range resp.Result[i] {
-					insertionPoints[i].Target[k] = v
+
+			for _, resMap := range resp.Result {
+				eid := ""
+				if rawId, ok := resMap["id"]; ok {
+					var id string
+					err := json.Unmarshal(rawId, &id)
+					if err != nil {
+						e.addError(ctx, step, fmt.Errorf("error while querying %s: unable to unmarshal _id as string", step.ServiceURL))
+						return
+					}
+
+					eid = id
+				}
+
+				if eid == "" {
+					e.addError(ctx, step, fmt.Errorf("error while querying %s: unable to get _id or id", step.ServiceURL))
+					return
+				}
+
+				ips, ok := insertionPoints[eid]
+				if !ok {
+					e.addError(ctx, step, fmt.Errorf("error while querying %s: no insertion point for id '%v' in response", step.ServiceURL, eid))
+					return
+				}
+
+				for _, ip := range ips {
+					for k, v := range resMap {
+						ip.Target[k] = v
+					}
 				}
 			}
+
 			e.m.Unlock()
 			return
 		}
 
 		resp := struct {
-			Result []map[string]interface{} `json:"_result"`
+			Result []map[string]json.RawMessage `json:"_result"`
 		}{}
 		promHTTPInFlightGauge.Inc()
 		req := NewRequest(query)
@@ -816,9 +839,35 @@ func (e *QueryExecution) executeChildStep(ctx context.Context, step *QueryPlanSt
 			return
 		}
 		e.m.Lock()
-		for i := range insertionPoints {
-			for k, v := range resp.Result[i] {
-				insertionPoints[i].Target[k] = v
+
+		for _, resMap := range resp.Result {
+			eid := ""
+			if rawId, ok := resMap["id"]; ok {
+				var id string
+				err := json.Unmarshal(rawId, &id)
+				if err != nil {
+					e.addError(ctx, step, fmt.Errorf("error while querying %s: unable to unmarshal id as string", step.ServiceURL))
+					return
+				}
+
+				eid = id
+			}
+
+			if eid == "" {
+				e.addError(ctx, step, fmt.Errorf("error while querying %s: unable to get _id or id", step.ServiceURL))
+				return
+			}
+
+			ips, ok := insertionPoints[eid]
+			if !ok {
+				e.addError(ctx, step, fmt.Errorf("error while querying %s: no insertion point for id '%v' in response", step.ServiceURL, eid))
+				return
+			}
+
+			for _, ip := range ips {
+				for k, v := range resMap {
+					ip.Target[k] = v
+				}
 			}
 		}
 		e.m.Unlock()
@@ -850,11 +899,23 @@ func (e *QueryExecution) executeChildStep(ctx context.Context, step *QueryPlanSt
 			return
 		}
 		e.m.Lock()
-		for i := range insertionPoints {
-			for k, v := range resp[nodeAlias(i)] {
-				insertionPoints[i].Target[k] = v
+
+		for k, resMap := range resp {
+			id := unNodeAlias(k)
+
+			ips, ok := insertionPoints[id]
+			if !ok {
+				e.addError(ctx, step, fmt.Errorf("error while querying %s: no insertion point for id '%v' in response", step.ServiceURL, id))
+				return
+			}
+
+			for _, ip := range ips {
+				for k, v := range resMap {
+					ip.Target[k] = v
+				}
 			}
 		}
+
 		e.m.Unlock()
 		return
 	}
@@ -874,9 +935,19 @@ func (e *QueryExecution) executeChildStep(ctx context.Context, step *QueryPlanSt
 		return
 	}
 	e.m.Lock()
-	for i := range insertionPoints {
-		for k, v := range resp[nodeAlias(i)] {
-			insertionPoints[i].Target[k] = v
+	for k, resMap := range resp {
+		id := unNodeAlias(k)
+
+		ips, ok := insertionPoints[id]
+		if !ok {
+			e.addError(ctx, step, fmt.Errorf("error while querying %s: no insertion point for id '%v' in response", step.ServiceURL, id))
+			return
+		}
+
+		for _, ip := range ips {
+			for k, v := range resMap {
+				ip.Target[k] = v
+			}
 		}
 	}
 	e.m.Unlock()
@@ -911,8 +982,12 @@ func buildTypenameResponseMap(ss ast.SelectionSet, currentType string) map[strin
 	return res
 }
 
-func nodeAlias(i int) string {
-	return fmt.Sprintf("_%d", i)
+func nodeAlias(i string) string {
+	return fmt.Sprintf("_%s", i)
+}
+
+func unNodeAlias(a string) string {
+	return strings.ReplaceAll(a, "_", "")
 }
 
 // mergeMaps merge dst into src, unmarshalling json.RawMessages when necessary
@@ -1071,6 +1146,21 @@ func buildInsertionSlice(insertionPoint []string, in interface{}) []insertionTar
 	default:
 		panic(fmt.Sprintf("unhandled insertion point type: %s", reflect.TypeOf(in).Name()))
 	}
+}
+
+func buildInsertionMap(insertionPoint []string, in interface{}) map[string][]insertionTarget {
+	insertionPoints := buildInsertionSlice(insertionPoint, in)
+
+	insertionMap := map[string][]insertionTarget{}
+	for _, point := range insertionPoints {
+		if _, ok := insertionMap[point.ID]; !ok {
+			insertionMap[point.ID] = make([]insertionTarget, 0)
+		}
+
+		insertionMap[point.ID] = append(insertionMap[point.ID], point)
+	}
+
+	return insertionMap
 }
 
 func (s *ExecutableSchema) evaluateSkipAndIncludeRec(vars map[string]interface{}, selectionSet ast.SelectionSet) ast.SelectionSet {
