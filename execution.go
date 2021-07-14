@@ -793,6 +793,19 @@ func (e *QueryExecution) executeChildStep(ctx context.Context, step *QueryPlanSt
 					var id string
 					err := json.Unmarshal(rawId, &id)
 					if err != nil {
+						e.m.Unlock()
+						e.addError(ctx, step, fmt.Errorf("error while querying %s: unable to unmarshal id as string", step.ServiceURL))
+						return
+					}
+
+					eid = id
+				}
+
+				if rawId, ok := resMap["_id"]; ok && eid == "" {
+					var id string
+					err := json.Unmarshal(rawId, &id)
+					if err != nil {
+						e.m.Unlock()
 						e.addError(ctx, step, fmt.Errorf("error while querying %s: unable to unmarshal _id as string", step.ServiceURL))
 						return
 					}
@@ -801,12 +814,14 @@ func (e *QueryExecution) executeChildStep(ctx context.Context, step *QueryPlanSt
 				}
 
 				if eid == "" {
-					e.addError(ctx, step, fmt.Errorf("error while querying %s: unable to get _id or id", step.ServiceURL))
+					e.m.Unlock()
+					e.addError(ctx, step, fmt.Errorf("error while querying %s: unable to get id", step.ServiceURL))
 					return
 				}
 
 				ips, ok := insertionPoints[eid]
 				if !ok {
+					e.m.Unlock()
 					e.addError(ctx, step, fmt.Errorf("error while querying %s: no insertion point for id '%v' in response", step.ServiceURL, eid))
 					return
 				}
@@ -846,6 +861,19 @@ func (e *QueryExecution) executeChildStep(ctx context.Context, step *QueryPlanSt
 				var id string
 				err := json.Unmarshal(rawId, &id)
 				if err != nil {
+					e.m.Unlock()
+					e.addError(ctx, step, fmt.Errorf("error while querying %s: unable to unmarshal id as string", step.ServiceURL))
+					return
+				}
+
+				eid = id
+			}
+
+			if rawId, ok := resMap["_id"]; ok && eid == "" {
+				var id string
+				err := json.Unmarshal(rawId, &id)
+				if err != nil {
+					e.m.Unlock()
 					e.addError(ctx, step, fmt.Errorf("error while querying %s: unable to unmarshal id as string", step.ServiceURL))
 					return
 				}
@@ -854,12 +882,14 @@ func (e *QueryExecution) executeChildStep(ctx context.Context, step *QueryPlanSt
 			}
 
 			if eid == "" {
-				e.addError(ctx, step, fmt.Errorf("error while querying %s: unable to get _id or id", step.ServiceURL))
+				e.m.Unlock()
+				e.addError(ctx, step, fmt.Errorf("error while querying %s: unable to get id", step.ServiceURL))
 				return
 			}
 
 			ips, ok := insertionPoints[eid]
 			if !ok {
+				e.m.Unlock()
 				e.addError(ctx, step, fmt.Errorf("error while querying %s: no insertion point for id '%v' in response", step.ServiceURL, eid))
 				return
 			}
@@ -905,6 +935,7 @@ func (e *QueryExecution) executeChildStep(ctx context.Context, step *QueryPlanSt
 
 			ips, ok := insertionPoints[id]
 			if !ok {
+				e.m.Unlock()
 				e.addError(ctx, step, fmt.Errorf("error while querying %s: no insertion point for id '%v' in response", step.ServiceURL, id))
 				return
 			}
@@ -940,6 +971,7 @@ func (e *QueryExecution) executeChildStep(ctx context.Context, step *QueryPlanSt
 
 		ips, ok := insertionPoints[id]
 		if !ok {
+			e.m.Unlock()
 			e.addError(ctx, step, fmt.Errorf("error while querying %s: no insertion point for id '%v' in response", step.ServiceURL, id))
 			return
 		}

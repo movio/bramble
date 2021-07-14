@@ -525,7 +525,7 @@ func TestQueryExecutionMultipleServices(t *testing.T) {
 				handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					w.Write([]byte(`{
 						"data": {
-							"_0": {
+							"_1": {
 								"id": "1",
 								"release": 2007
 							}
@@ -817,15 +817,15 @@ func TestQueryExecutionWithMultipleNodeQueries(t *testing.T) {
 					var q map[string]string
 					json.NewDecoder(r.Body).Decode(&q)
 					assertQueriesEqual(t, schema2, `{
-						_0: node(id: "1") { ... on Movie { _id: id release } }
-						_1: node(id: "2") { ... on Movie { _id: id release } }
-						_2: node(id: "3") { ... on Movie { _id: id release } }
+						_1: node(id: "1") { ... on Movie { _id: id release } }
+						_2: node(id: "2") { ... on Movie { _id: id release } }
+						_3: node(id: "3") { ... on Movie { _id: id release } }
 					}`, q["query"])
 					w.Write([]byte(`{
 						"data": {
-							"_0": { "id": "1", "release": 2007 },
-							"_1": { "id": "2", "release": 2008 },
-							"_2": { "id": "3", "release": 2009 }
+							"_1": { "id": "1", "release": 2007 },
+							"_2": { "id": "2", "release": 2008 },
+							"_3": { "id": "3", "release": 2009 }
 						}
 					}
 					`))
@@ -896,10 +896,10 @@ func TestQueryExecutionMultipleServicesWithArray(t *testing.T) {
 								res += ","
 							}
 							res += fmt.Sprintf(`
-								"_%d": {
+								"_%s": {
 									"id": "%s",
 									"title": "title %s"
-								}`, i, id, id)
+								}`, id, id, id)
 						}
 						w.Write([]byte(fmt.Sprintf(`{ "data": { %s } }`, res)))
 					} else {
@@ -929,7 +929,7 @@ func TestQueryExecutionMultipleServicesWithArray(t *testing.T) {
 				handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					w.Write([]byte(`{
 						"data": {
-							"_0": {
+							"_1": {
 								"id": "1",
 								"compTitles": [
 									{
@@ -1093,10 +1093,10 @@ func TestQueryExecutionMultipleServicesWithNestedArrays(t *testing.T) {
 							res += ","
 						}
 						res += fmt.Sprintf(`
-								"_%d": {
+								"_%s": {
 									"id": "%s",
 									"title": "title %s"
-								}`, i, id, id)
+								}`, id, id, id)
 					}
 					w.Write([]byte(fmt.Sprintf(`{ "data": { %s } }`, res)))
 				} else {
@@ -1126,7 +1126,7 @@ func TestQueryExecutionMultipleServicesWithNestedArrays(t *testing.T) {
 			handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.Write([]byte(`{
 					"data": {
-						"_0": {
+						"_1": {
 							"id": "1",
 							"compTitles": [[
 								{
@@ -1216,7 +1216,7 @@ func TestQueryExecutionEmptyNodeResponse(t *testing.T) {
 				handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					w.Write([]byte(`{
 						"data": {
-							"_0": null
+							"_1": null
 						}
 					}
 					`))
@@ -1411,7 +1411,7 @@ func TestQueryExecutionWithInputObject(t *testing.T) {
 				handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					w.Write([]byte(`{
 						"data": {
-							"_0": {
+							"_1": {
 								"id": "1",
 								"release": 2007
 							}
@@ -1499,7 +1499,7 @@ func TestQueryExecutionMultipleObjects(t *testing.T) {
 					} else {
 						w.Write([]byte(`{
 							"data": {
-								"_0": {
+								"_1": {
 									"id": "1",
 									"release": 2007
 								}
@@ -1644,7 +1644,7 @@ func TestQueryExecutionMultipleServicesWithSkipFalseDirectives(t *testing.T) {
 				handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					w.Write([]byte(`{
 						"data": {
-							"_0": {
+							"_1": {
 								"id": "1",
 								"title": "no soup for you",
 								"gizmo": {
@@ -1793,7 +1793,7 @@ func TestQueryExecutionMultipleServicesWithIncludeTrueDirectives(t *testing.T) {
 				handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					w.Write([]byte(`{
 						"data": {
-							"_0": {
+							"_1": {
 								"id": "1",
 								"title": "yada yada yada",
 								"gizmo": {
@@ -1881,7 +1881,7 @@ func TestMutationExecution(t *testing.T) {
 				handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					w.Write([]byte(`{
 						"data": {
-							"_0": {
+							"_2": {
 								"id": "2",
 								"release": 2007
 							}
@@ -1945,7 +1945,7 @@ func TestQueryExecutionWithUnions(t *testing.T) {
 					} else {
 						w.Write([]byte(`{
 							"data": {
-								"_0": {
+								"_2": {
 									"_id": "2",
 									"pet": {
 										"name": "felix",
@@ -2050,7 +2050,7 @@ func TestQueryExecutionWithNamespaces(t *testing.T) {
 					if strings.Contains(string(b), "node") {
 						w.Write([]byte(`{
 							"data": {
-								"_0": {
+								"_CA7": {
 									"name": "Felix"
 								}
 							}
@@ -2218,7 +2218,7 @@ func TestQueryWithBoundaryFields(t *testing.T) {
 				handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					w.Write([]byte(`{
 						"data": {
-							"_0": {
+							"_1": {
 								"id": "1",
 								"release": 2007
 							}
@@ -2380,9 +2380,9 @@ func TestQueryWithArrayBoundaryFieldsAndMultipleChildrenSteps(t *testing.T) {
 						w.Write([]byte(`{
 						"data": {
 							"_result": [
-								{ "id": 2, "title": "Movie 2" },
-								{ "id": 3, "title": "Movie 3" },
-								{ "id": 4, "title": "Movie 4" }
+								{ "id": "2", "title": "Movie 2" },
+								{ "id": "3", "title": "Movie 3" },
+								{ "id": "4", "title": "Movie 4" }
 							]
 						}
 					}
@@ -2436,9 +2436,9 @@ func TestQueryWithArrayBoundaryFieldsAndMultipleChildrenSteps(t *testing.T) {
 					"id": "1",
 					"title": "Movie 1",
 					"compTitles": [
-						{ "id": 2, "title": "Movie 2" },
-						{ "id": 3, "title": "Movie 3" },
-						{ "id": 4, "title": "Movie 4" }
+						{ "id": "2", "title": "Movie 2" },
+						{ "id": "3", "title": "Movie 3" },
+						{ "id": "4", "title": "Movie 4" }
 					]
 				}
 		}`,
