@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"reflect"
 	"runtime/debug"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -746,6 +747,15 @@ func (e *QueryExecution) executeChildStep(ctx context.Context, step *QueryPlanSt
 		return
 	}
 
+	requestOrder := make([]string, 0, len(insertionPoints))
+	for k := range insertionPoints {
+		requestOrder = append(requestOrder, k)
+	}
+
+	sort.Slice(requestOrder, func(i, j int) bool {
+		return requestOrder[i] < requestOrder[j]
+	})
+
 	atomic.AddInt64(&e.RequestCount, 1)
 
 	if e.RequestCount > e.maxRequest {
@@ -759,13 +769,13 @@ func (e *QueryExecution) executeChildStep(ctx context.Context, step *QueryPlanSt
 	b.WriteString("{")
 	if boundaryQuery.Array {
 		var ids string
-		for id := range insertionPoints {
+		for _, id := range requestOrder {
 			ids += fmt.Sprintf("%q ", id)
 		}
 		b.WriteString(fmt.Sprintf("_result: %s(ids: [%s]) %s", boundaryQuery.Query, ids, selectionSet))
 	} else {
-		for i := range insertionPoints {
-			b.WriteString(fmt.Sprintf("%s: %s(id: %q) { ... on %s %s } ", nodeAlias(i), boundaryQuery.Query, i, step.ParentType, selectionSet))
+		for _, id := range requestOrder {
+			b.WriteString(fmt.Sprintf("%s: %s(id: %q) { ... on %s %s } ", nodeAlias(id), boundaryQuery.Query, id, step.ParentType, selectionSet))
 		}
 	}
 	b.WriteString("}")
