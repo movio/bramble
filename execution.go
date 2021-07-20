@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"reflect"
 	"runtime/debug"
 	"strings"
 	"sync"
@@ -974,42 +973,26 @@ type insertionTarget struct {
 
 // prepareMapForInsertion recursively traverses the result map to the insertion
 // point and unmarshals any json.RawMessage it finds on the way
-func prepareMapForInsertion(insertionPoint []string, in interface{}) interface{} {
-	if len(insertionPoint) == 0 {
-		switch in := in.(type) {
-		case json.RawMessage:
-			var i interface{}
-			_ = json.Unmarshal([]byte(in), &i)
-			switch i := i.(type) {
-			case map[string]interface{}, []interface{}:
-				return i
-			case nil:
-				return nil
-			default:
-				panic("unknown type after unmarshalling")
-			}
-		default:
-			return in
+func prepareMapForInsertion(insertionPoint []string, input interface{}) interface{} {
+	var parsedInput interface{} = input
+	if rawMessage, ok := input.(json.RawMessage); ok {
+		if err := json.Unmarshal([]byte(rawMessage), &parsedInput); err != nil {
+			log.WithError(err).Panicf("prepareMapForInsertion: json.Unmarshal failed")
 		}
 	}
+	if len(insertionPoint) == 0 {
+		return parsedInput
+	}
 
-	switch in := in.(type) {
+	switch parsedInput := parsedInput.(type) {
 	case map[string]interface{}:
-		in[insertionPoint[0]] = prepareMapForInsertion(insertionPoint[1:], in[insertionPoint[0]])
-		return in
-	case json.RawMessage:
-		var m map[string]interface{}
-		_ = json.Unmarshal([]byte(in), &m)
-		if m == nil {
-			return nil
-		}
-		m[insertionPoint[0]] = prepareMapForInsertion(insertionPoint[1:], m[insertionPoint[0]])
-		return m
+		parsedInput[insertionPoint[0]] = prepareMapForInsertion(insertionPoint[1:], parsedInput[insertionPoint[0]])
+		return parsedInput
 	case []interface{}:
-		for i, e := range in {
-			in[i] = prepareMapForInsertion(insertionPoint, e)
+		for i, value := range parsedInput {
+			parsedInput[i] = prepareMapForInsertion(insertionPoint, value)
 		}
-		return in
+		return parsedInput
 	case nil:
 		return nil
 	default:

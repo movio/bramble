@@ -2503,6 +2503,247 @@ func TestQueryError(t *testing.T) {
 	f.run(t)
 }
 
+func TestQueryExecutionInsertionLeafIsArrayType(t *testing.T) {
+	f := &queryExecutionFixture{
+		services: []testService{
+			{
+				schema: `directive @boundary on OBJECT | FIELD_DEFINITION
+				type Service {
+				  name: String!
+				  version: String!
+				  schema: String!
+				}
+
+				enum Color {
+				  RED
+				  GREEN
+				  BLUE
+				  YELLOW
+				  PURPLE
+				}
+
+				type Gizmo @boundary {
+				  id: ID!
+				  name: String!
+				  color: Color!
+				}
+
+				type Query {
+				  service: Service!
+				  gizmos: [Gizmo!]!
+				  gizmo(id: ID!): Gizmo!
+				  getBoundaryGizmo(id: ID!): Gizmo @boundary
+				}
+				`,
+				handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.Write([]byte(`{
+						"data": {
+						  "_0": {
+							"_id": "1",
+							"color": "RED"
+						  },
+						  "_1": {
+							"_id": "2",
+							"color": "GREEN"
+						  },
+						  "_2": {
+							"_id": "3",
+							"color": "YELLOW"
+						  },
+						  "_3": {
+							"_id": "4",
+							"color": "BLUE"
+						  },
+						  "_4": {
+							"_id": "1",
+							"color": "RED"
+						  },
+						  "_5": {
+							"_id": "2",
+							"color": "GREEN"
+						  },
+						  "_6": {
+							"_id": "3",
+							"color": "YELLOW"
+						  },
+						  "_7": {
+							"_id": "4",
+							"color": "BLUE"
+						  },
+						  "_8": {
+							"_id": "6",
+							"color": "RED"
+						  },
+						  "_9": {
+							"_id": "7",
+							"color": "GREEN"
+						  }
+						}
+					  }`))
+				}),
+			},
+			{
+				schema: `directive @boundary on OBJECT | FIELD_DEFINITION
+
+				type Service {
+				  name: String!
+				  version: String!
+				  schema: String!
+				}
+
+				type Gizmo @boundary {
+				  id: ID!
+				  owners: [Owner!]
+				}
+
+				type Owner {
+				  id: ID!
+				  name: String!
+				  gizmos: [Gizmo!]
+				}
+
+				type Query {
+				  service: Service!
+				  gizmo(id: ID!): Gizmo @boundary
+				  owner(id: ID!): Owner!
+				  owners: [Owner!]!
+				}
+				`,
+				handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.Write([]byte(`{
+						"data": {
+							"owners": [
+								{
+									"id": "1",
+									"name": "Blanka",
+									"gizmos": [
+										{
+											"id": "1"
+										},
+										{
+											"id": "2"
+										},
+										{
+											"id": "3"
+										},
+										{
+											"id": "4"
+										}
+									]
+								},
+								{
+									"id": "2",
+									"name": "Zangief",
+									"gizmos": [
+										{
+											"id": "1"
+										},
+										{
+											"id": "2"
+										},
+										{
+											"id": "3"
+										},
+										{
+											"id": "4"
+										}
+									]
+								},
+								{
+									"id": "3",
+									"name": "Ryu",
+									"gizmos": [
+										{
+											"id": "6"
+										},
+										{
+											"id": "7"
+										}
+									]
+								}
+							]
+						}
+					}`))
+				}),
+			},
+		},
+		query: `{
+			owners {
+			  id
+			  name
+			  gizmos {
+				id
+				color
+			  }
+			}
+		}`,
+		expected: `{
+			"owners": [
+				{
+					"id": "1",
+					"name": "Blanka",
+					"gizmos": [
+						{
+							"id": "1",
+							"color": "RED"
+						},
+						{
+							"id": "2",
+							"color": "GREEN"
+						},
+						{
+							"id": "3",
+							"color": "YELLOW"
+						},
+						{
+							"id": "4",
+							"color": "BLUE"
+						}
+					]
+				},
+				{
+					"id": "2",
+					"name": "Zangief",
+					"gizmos": [
+						{
+							"id": "1",
+							"color": "RED"
+						},
+						{
+							"id": "2",
+							"color": "GREEN"
+						},
+						{
+							"id": "3",
+							"color": "YELLOW"
+						},
+						{
+							"id": "4",
+							"color": "BLUE"
+						}
+					]
+				},
+				{
+					"id": "3",
+					"name": "Ryu",
+					"gizmos": [
+						{
+							"id": "6",
+							"color": "RED"
+						},
+						{
+							"id": "7",
+							"color": "GREEN"
+						}
+					]
+				}
+			]
+		}`,
+	}
+
+	f.checkSuccess(t)
+}
+
 type testService struct {
 	schema  string
 	handler http.Handler
