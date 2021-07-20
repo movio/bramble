@@ -197,7 +197,9 @@ import (
 
 func PrintFilteredSchema(schema, permissionsJSON string) {
 	var perms OperationPermissions
-	_ = json.Unmarshal([]byte(permissionsJSON), &perms)
+	if err := json.Unmarshal([]byte(permissionsJSON), &perms); err != nil {
+		panic(err)
+	}
 	parsedSchema := gqlparser.MustLoadSchema(&ast.Source{Input: schema})
 
 	filteredSchema := perms.FilterSchema(parsedSchema)

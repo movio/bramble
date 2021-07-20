@@ -930,24 +930,28 @@ func mergeMaps(dst, src map[string]interface{}) {
 				// we want to unmarshal only what's necessary, so unmarshal only
 				// one level of the result
 				var m map[string]json.RawMessage
-				_ = json.Unmarshal([]byte(value), &m)
+				if err := json.Unmarshal([]byte(value), &m); err != nil {
+					log.WithError(err).Panicf("mergeMaps: json.Unmarshal failed (a)")
+				}
 				aValue = jsonMapToInterfaceMap(m)
 				dst[k] = aValue
 			case map[string]interface{}:
 				aValue = value
 			default:
-				panic("invalid merge")
+				log.Panicf("mergeMaps: invalid value (a) of type %T", value)
 			}
 
 			switch value := b.(type) {
 			case json.RawMessage:
 				var m map[string]json.RawMessage
-				_ = json.Unmarshal([]byte(value), &m)
+				if err := json.Unmarshal([]byte(value), &m); err != nil {
+					log.WithError(err).Panicf("mergeMaps: json.Unmarshal failed (b)")
+				}
 				bValue = jsonMapToInterfaceMap(m)
 			case map[string]interface{}:
 				bValue = value
 			default:
-				panic("invalid merge")
+				log.Panicf("mergeMaps: invalid value (b) of type %T", value)
 			}
 
 			mergeMaps(aValue, bValue)
@@ -1009,8 +1013,9 @@ func prepareMapForInsertion(insertionPoint []string, in interface{}) interface{}
 	case nil:
 		return nil
 	default:
-		panic(fmt.Sprintf("unhandled type: %s", reflect.TypeOf(in).Name()))
+		log.Panicf("unhandled type: %T", parsedInput)
 	}
+	return nil // unreachable
 }
 
 // buildInsertionSlice returns the list of maps where the data should be inserted
@@ -1048,12 +1053,14 @@ func buildInsertionSlice(insertionPoint []string, in interface{}) []insertionTar
 			return result
 		case json.RawMessage:
 			var m map[string]interface{}
-			_ = json.Unmarshal([]byte(in), &m)
+			if err := json.Unmarshal([]byte(in), &m); err != nil {
+				log.WithError(err).Panicf("buildInsertionSlice: json.Unmarshal failed")
+			}
 			return buildInsertionSlice(nil, m)
 		case nil:
 			return nil
 		default:
-			panic(fmt.Sprintf("unhandled insertion point type: %q", reflect.TypeOf(in).Name()))
+			log.Panicf("buildInsertionSlice: unhandled insertion point type at leaf node: %T", in)
 		}
 	}
 
@@ -1069,8 +1076,10 @@ func buildInsertionSlice(insertionPoint []string, in interface{}) []insertionTar
 	case nil:
 		return nil
 	default:
-		panic(fmt.Sprintf("unhandled insertion point type: %s", reflect.TypeOf(in).Name()))
+		log.Panicf("buildInsertionSlice: unhandled insertion point type: %T", in)
 	}
+
+	return nil // unreachable
 }
 
 func (s *ExecutableSchema) evaluateSkipAndIncludeRec(vars map[string]interface{}, selectionSet ast.SelectionSet) ast.SelectionSet {
@@ -1166,15 +1175,15 @@ func removeSkipAndInclude(directives ast.DirectiveList) ast.DirectiveList {
 func resolveIfArgument(d *ast.Directive, variables map[string]interface{}) bool {
 	arg := d.Arguments.ForName("if")
 	if arg == nil {
-		panic(fmt.Sprintf("%s: argument 'if' not defined", d.Name))
+		log.Panicf("resolveIfArgument: %s: argument 'if' not defined", d.Name)
 	}
 	value, err := arg.Value.Value(variables)
 	if err != nil {
-		panic(err)
+		log.Panicf("resolveIfArgument: invalid value")
 	}
 	result, ok := value.(bool)
 	if !ok {
-		panic(fmt.Sprintf("%s: argument 'if' is not a boolean", d.Name))
+		log.Panicf("resolveIfArgument: %s: argument 'if' is not a boolean", d.Name)
 	}
 	return result
 }
