@@ -244,7 +244,7 @@ func marshalResult(data interface{}, selectionSet ast.SelectionSet, schema *ast.
 		}
 
 		buf.WriteString("{")
-		fields := selectionSetToFieldsWithTypeCondition(selectionSet)
+		fields := selectionSetToFieldsWithTypeCondition(selectionSet, "")
 		for i, fieldWithOptionalTypeCondition := range fields {
 			field := fieldWithOptionalTypeCondition.field
 			if fieldWithOptionalTypeCondition.typeCondition != "" {
@@ -368,28 +368,17 @@ type fieldWithOptionalTypeCondition struct {
 
 // When walking through a fragment spread we need to preserve the TypeCondition as it contains the target
 // type of the spread.
-func selectionSetToFieldsWithTypeCondition(selectionSet ast.SelectionSet) []fieldWithOptionalTypeCondition {
+func selectionSetToFieldsWithTypeCondition(selectionSet ast.SelectionSet, currentTypeCondition string) []fieldWithOptionalTypeCondition {
 	var result []fieldWithOptionalTypeCondition
 	for _, selection := range selectionSet {
 		switch selection := selection.(type) {
 		case *ast.Field:
-			result = append(result, fieldWithOptionalTypeCondition{field: selection, typeCondition: ""})
+			result = append(result, fieldWithOptionalTypeCondition{field: selection, typeCondition: currentTypeCondition})
 		case *ast.FragmentSpread:
-			fragmentSpreadFields := selectionSetToFields(selection.Definition.SelectionSet)
-			for _, field := range fragmentSpreadFields {
-				result = append(result, fieldWithOptionalTypeCondition{
-					field:         field,
-					typeCondition: selection.Definition.TypeCondition,
-				})
-			}
+			definition := selection.Definition
+			result = append(result, selectionSetToFieldsWithTypeCondition(definition.SelectionSet, definition.TypeCondition)...)
 		case *ast.InlineFragment:
-			inlineFragmentFields := selectionSetToFields(selection.SelectionSet)
-			for _, field := range inlineFragmentFields {
-				result = append(result, fieldWithOptionalTypeCondition{
-					field:         field,
-					typeCondition: selection.TypeCondition,
-				})
-			}
+			result = append(result, selectionSetToFieldsWithTypeCondition(selection.SelectionSet, selection.TypeCondition)...)
 		}
 	}
 	return result
