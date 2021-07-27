@@ -247,8 +247,8 @@ func marshalResult(data interface{}, selectionSet ast.SelectionSet, schema *ast.
 			var fieldType *ast.Type
 			if f.Name == "__typename" {
 				fieldType = ast.NamedType("String", nil)
-			} else {
-				fieldType = def.Fields.ForName(f.Name).Type
+			} else if fieldDef := def.Fields.ForName(f.Name); fieldDef != nil {
+				fieldType = fieldDef.Type
 			}
 			if fieldType == nil {
 				return []byte("null"), fmt.Errorf("could not find field %q in %q", f.Name, currentType.String())
