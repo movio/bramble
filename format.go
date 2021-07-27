@@ -251,7 +251,8 @@ func marshalResult(data interface{}, selectionSet ast.SelectionSet, schema *ast.
 				typeCondition := fieldWithOptionalTypeCondition.typeCondition
 				def = schema.Types[typeCondition]
 				if def == nil {
-					return []byte("null"), fmt.Errorf("could not find typeCondition %q for fragment spread", typeCondition)
+					errMsg := fmt.Sprintf("could not find field %q in typeCondition %q in fragment spread", field.Name, typeCondition)
+					return []byte("null"), errors.New(errMsg)
 				}
 			}
 			var fieldType *ast.Type
