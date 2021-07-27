@@ -141,6 +141,38 @@ func TestFederatedQueryFragmentSpreads(t *testing.T) {
 		f.checkSuccess(t)
 	})
 
+	t.Run("with nested fragment spread", func(t *testing.T) {
+		f := &queryExecutionFixture{
+			services: []testService{serviceA, serviceB},
+			query: `
+              query Foo {
+                snapshot(id: "foo") {
+                  ... NamedFragment
+                }
+              }
+
+              fragment NamedFragment on Snapshot {
+                id
+                name
+                ... on SnapshotImplementation {
+                  gizmos {
+                    id
+                    name
+                  }
+                }
+              }`,
+			expected: `
+              {
+                "snapshot": {
+                  "id": "100",
+                  "name": "foo",
+                  "gizmos": [{ "id": "1", "name": "Gizmo #1" }]
+                }
+              }`,
+		}
+
+		f.checkSuccess(t)
+	})
 }
 
 func TestIntrospectionQuery(t *testing.T) {
