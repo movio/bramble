@@ -231,6 +231,8 @@ func marshalResult(data interface{}, selectionSet ast.SelectionSet, schema *ast.
 	}
 
 	switch data := data.(type) {
+	case json.RawMessage:
+		return data, nil
 	case map[string]interface{}:
 		if data == nil {
 			return []byte("null"), nil
