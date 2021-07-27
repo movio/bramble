@@ -242,34 +242,41 @@ func marshalResult(data interface{}, selectionSet ast.SelectionSet, schema *ast.
 		}
 
 		buf.WriteString("{")
-		fields := selectionSetToFields(selectionSet)
-		for i, f := range fields {
+		fields := selectionSetToFieldsWithTypeCondition(selectionSet)
+		for i, fieldWithOptionalTypeCondition := range fields {
+			field := fieldWithOptionalTypeCondition.field
+			if fieldWithOptionalTypeCondition.typeCondition != "" {
+				def = schema.Types[fieldWithOptionalTypeCondition.typeCondition]
+				if def == nil {
+					return []byte("null"), fmt.Errorf("could not find type %q in schema", currentType.String())
+				}
+			}
 			var fieldType *ast.Type
-			if f.Name == "__typename" {
+			if field.Name == "__typename" {
 				fieldType = ast.NamedType("String", nil)
-			} else if fieldDef := def.Fields.ForName(f.Name); fieldDef != nil {
+			} else if fieldDef := def.Fields.ForName(field.Name); fieldDef != nil {
 				fieldType = fieldDef.Type
 			}
 			if fieldType == nil {
-				return []byte("null"), fmt.Errorf("could not find field %q in %q", f.Name, currentType.String())
+				return []byte("null"), fmt.Errorf("could not find field %q in %q", field.Name, currentType.String())
 			}
 
-			key, fieldErr := json.Marshal(f.Alias)
+			key, fieldErr := json.Marshal(field.Alias)
 			if fieldErr != nil {
 				return nil, fieldErr
 			}
 			buf.Write(key)
 			buf.WriteString(`:`)
-			d, ok := data[f.Alias]
+			d, ok := data[field.Alias]
 			var value []byte
 			if !ok {
 				value = []byte("null")
 			} else {
-				value, fieldErr = marshalResult(d, f.SelectionSet, schema, fieldType)
+				value, fieldErr = marshalResult(d, field.SelectionSet, schema, fieldType)
 			}
 			if fieldType.NonNull && bytes.Equal(value, []byte("null")) {
 				if fieldErr == nil {
-					fieldErr = fmt.Errorf("got a null response for non-nullable field %q", f.Alias)
+					fieldErr = fmt.Errorf("got a null response for non-nullable field %q", field.Alias)
 				}
 				return []byte("null"), fieldErr
 			}
@@ -349,6 +356,40 @@ func marshalResult(data interface{}, selectionSet ast.SelectionSet, schema *ast.
 	}
 
 	return buf.Bytes(), err
+}
+
+type fieldWithOptionalTypeCondition struct {
+	field         *ast.Field
+	typeCondition string
+}
+
+// When walking through a fragment spread we need to preserve the TypeCondition as it contains the target
+// type of the spread.
+func selectionSetToFieldsWithTypeCondition(selectionSet ast.SelectionSet) []fieldWithOptionalTypeCondition {
+	var result []fieldWithOptionalTypeCondition
+	for _, selection := range selectionSet {
+		switch selection := selection.(type) {
+		case *ast.Field:
+			result = append(result, fieldWithOptionalTypeCondition{field: selection, typeCondition: ""})
+		case *ast.FragmentSpread:
+			fragmentSpreadFields := selectionSetToFields(selection.Definition.SelectionSet)
+			for _, field := range fragmentSpreadFields {
+				result = append(result, fieldWithOptionalTypeCondition{
+					field:         field,
+					typeCondition: selection.Definition.TypeCondition,
+				})
+			}
+		case *ast.InlineFragment:
+			inlineFragmentFields := selectionSetToFields(selection.SelectionSet)
+			for _, field := range inlineFragmentFields {
+				result = append(result, fieldWithOptionalTypeCondition{
+					field:         field,
+					typeCondition: selection.TypeCondition,
+				})
+			}
+		}
+	}
+	return result
 }
 
 func getInnerTypeName(t *ast.Type) string {
