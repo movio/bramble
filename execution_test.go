@@ -24,60 +24,60 @@ import (
 func TestFederatedQueryFragmentSpreads(t *testing.T) {
 	serviceA := testService{
 		schema: `
-          directive @boundary on OBJECT
-          interface Snapshot {
-            id: ID!
-            name: String!
-          }
+		directive @boundary on OBJECT
+		interface Snapshot {
+			id: ID!
+			name: String!
+		}
 
-          type Gizmo @boundary {
-            id: ID!
-          }
+		type Gizmo @boundary {
+			id: ID!
+		}
 
-          type SnapshotImplementation implements Snapshot {
-            id: ID!
-            name: String!
-            gizmos: [Gizmo!]!
-          }
+		type SnapshotImplementation implements Snapshot {
+			id: ID!
+			name: String!
+			gizmos: [Gizmo!]!
+		}
 
-          type Query {
-            snapshot(id: ID!): Snapshot!
-          }`,
+		type Query {
+			snapshot(id: ID!): Snapshot!
+		}`,
 		handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Write([]byte(`
-                    {
-                      "data": {
-                        "snapshot": {
-                          "id": "100",
-                          "name": "foo",
-                          "gizmos": [{ "id": "1" }]
-                        }
-                      }
-                    }`))
+			{
+				"data": {
+					"snapshot": {
+						"id": "100",
+						"name": "foo",
+						"gizmos": [{ "id": "1" }]
+					}
+				}
+			}`))
 		}),
 	}
 
 	serviceB := testService{
 		schema: `
-          directive @boundary on OBJECT
-          type Gizmo @boundary {
-            id: ID!
-            name: String!
-          }
+		directive @boundary on OBJECT
+		type Gizmo @boundary {
+			id: ID!
+			name: String!
+		}
 
-          type Query {
-            gizmo(id: ID!): Gizmo @boundary
-          }`,
+		type Query {
+			gizmo(id: ID!): Gizmo @boundary
+		}`,
 		handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Write([]byte(`
-                   {
-                     "data": {
-                       "_0": {
-                         "id": "1",
-                         "name": "Gizmo #1"
-                       }
-                     }
-                   }`))
+			{
+				"data": {
+					"_0": {
+						"id": "1",
+						"name": "Gizmo #1"
+					}
+				}
+			}`))
 		}),
 	}
 
@@ -85,26 +85,26 @@ func TestFederatedQueryFragmentSpreads(t *testing.T) {
 		f := &queryExecutionFixture{
 			services: []testService{serviceA, serviceB},
 			query: `
-              query Foo {
-                snapshot(id: "foo") {
-                  id
-                  name
-                  ... on SnapshotImplementation {
-                    gizmos {
-                      id
-                      name
-                    }
-                  }
-                }
-              }`,
+			query Foo {
+				snapshot(id: "foo") {
+					id
+					name
+					... on SnapshotImplementation {
+						gizmos {
+							id
+							name
+						}
+					}
+				}
+			}`,
 			expected: `
-              {
-                "snapshot": {
-                  "id": "100",
-                  "name": "foo",
-                  "gizmos": [{ "id": "1", "name": "Gizmo #1" }]
-                }
-              }`,
+			{
+				"snapshot": {
+					"id": "100",
+					"name": "foo",
+					"gizmos": [{ "id": "1", "name": "Gizmo #1" }]
+				}
+			}`,
 		}
 
 		f.checkSuccess(t)
@@ -114,28 +114,28 @@ func TestFederatedQueryFragmentSpreads(t *testing.T) {
 		f := &queryExecutionFixture{
 			services: []testService{serviceA, serviceB},
 			query: `
-              query Foo {
-                snapshot(id: "foo") {
-                  id
-                  name
-                  ... NamedFragment
-                }
-              }
+			query Foo {
+				snapshot(id: "foo") {
+					id
+					name
+					... NamedFragment
+				}
+			}
 
-              fragment NamedFragment on SnapshotImplementation {
-                gizmos {
-                  id
-                  name
-                }
-              }`,
+			fragment NamedFragment on SnapshotImplementation {
+				gizmos {
+					id
+					name
+				}
+			}`,
 			expected: `
-              {
-                "snapshot": {
-                  "id": "100",
-                  "name": "foo",
-                  "gizmos": [{ "id": "1", "name": "Gizmo #1" }]
-                }
-              }`,
+			{
+				"snapshot": {
+					"id": "100",
+					"name": "foo",
+					"gizmos": [{ "id": "1", "name": "Gizmo #1" }]
+				}
+			}`,
 		}
 
 		f.checkSuccess(t)
@@ -145,30 +145,30 @@ func TestFederatedQueryFragmentSpreads(t *testing.T) {
 		f := &queryExecutionFixture{
 			services: []testService{serviceA, serviceB},
 			query: `
-              query Foo {
-                snapshot(id: "foo") {
-                  ... NamedFragment
-                }
-              }
+			query Foo {
+				snapshot(id: "foo") {
+					... NamedFragment
+				}
+			}
 
-              fragment NamedFragment on Snapshot {
-                id
-                name
-                ... on SnapshotImplementation {
-                  gizmos {
-                    id
-                    name
-                  }
-                }
-              }`,
+			fragment NamedFragment on Snapshot {
+				id
+				name
+				... on SnapshotImplementation {
+					gizmos {
+						id
+						name
+				  	}
+				}
+			}`,
 			expected: `
-              {
-                "snapshot": {
-                  "id": "100",
-                  "name": "foo",
-                  "gizmos": [{ "id": "1", "name": "Gizmo #1" }]
-                }
-              }`,
+			{
+				"snapshot": {
+					"id": "100",
+					"name": "foo",
+					"gizmos": [{ "id": "1", "name": "Gizmo #1" }]
+				}
+			}`,
 		}
 
 		f.checkSuccess(t)
