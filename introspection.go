@@ -17,7 +17,7 @@ type Service struct {
 	Schema       *ast.Schema
 	Status       string
 
-	client *GraphQLClient
+	client GraphQLClient
 }
 
 // NewService returns a new Service.

@@ -20,7 +20,7 @@ import (
 	"github.com/vektah/gqlparser/v2/gqlerror"
 )
 
-func newExecutableSchema(plugins []Plugin, maxRequestsPerQuery int64, client *GraphQLClient, services ...*Service) *ExecutableSchema {
+func newExecutableSchema(plugins []Plugin, maxRequestsPerQuery int64, client GraphQLClient, services ...*Service) *ExecutableSchema {
 	serviceMap := make(map[string]*Service)
 
 	for _, s := range services {
@@ -47,7 +47,7 @@ type ExecutableSchema struct {
 	IsBoundary          map[string]bool
 	Services            map[string]*Service
 	BoundaryQueries     BoundaryQueriesMap
-	GraphqlClient       *GraphQLClient
+	GraphqlClient       GraphQLClient
 	Tracer              opentracing.Tracer
 	MaxRequestsPerQuery int64
 
@@ -568,11 +568,11 @@ type QueryExecution struct {
 	tracer          opentracing.Tracer
 	wg              sync.WaitGroup
 	m               sync.Mutex
-	graphqlClient   *GraphQLClient
+	graphqlClient   GraphQLClient
 	boundaryQueries BoundaryQueriesMap
 }
 
-func newQueryExecution(client *GraphQLClient, schema *ast.Schema, tracer opentracing.Tracer, maxRequest int64, boundaryQueries BoundaryQueriesMap) *QueryExecution {
+func newQueryExecution(client GraphQLClient, schema *ast.Schema, tracer opentracing.Tracer, maxRequest int64, boundaryQueries BoundaryQueriesMap) *QueryExecution {
 	return &QueryExecution{
 		Schema:          schema,
 		graphqlClient:   client,

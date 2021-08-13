@@ -47,7 +47,7 @@ func (p *OpenTracingPlugin) Configure(cfg *bramble.Config, pluginCfg json.RawMes
 
 func (p *OpenTracingPlugin) Init(s *bramble.ExecutableSchema) {
 	s.Tracer = p.tracer
-	s.GraphqlClient.Tracer = p.tracer
+	s.GraphqlClient.UseTracer(p.tracer)
 }
 
 func (p *OpenTracingPlugin) ApplyMiddlewarePublicMux(h http.Handler) http.Handler {

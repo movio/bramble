@@ -16,25 +16,46 @@ import (
 )
 
 // GraphQLClient is a GraphQL client.
-type GraphQLClient struct {
-	HTTPClient      *http.Client
-	MaxResponseSize int64
-	Tracer          opentracing.Tracer
-	UserAgent       string
+type GraphQLClient interface {
+	Request(ctx context.Context, url string, request *Request, out interface{}) error
+	UseMaxResponseSize(maxResponseSize int64)
+	UseUserAgent(userAgent string)
+	UseTracer(tracer opentracing.Tracer)
+	UseTimeout(timeout time.Duration)
 }
 
+// DefaultGraphQLClient is the default implementation of GraphQLClient
+type DefaultGraphQLClient struct {
+	HTTPClient      *http.Client
+	MaxResponseSize int64
+	UserAgent       string
+	Tracer          opentracing.Tracer
+}
 // ClientOpt is a function used to set a GraphQL client option
-type ClientOpt func(*GraphQLClient)
+type ClientOpt func(GraphQLClient)
 
-// NewClient creates a new GraphQLClient from the given options.
-func NewClient(opts ...ClientOpt) *GraphQLClient {
-	c := &GraphQLClient{
+type defaultClientFactory func() GraphQLClient
+
+
+func defaultNewClient() GraphQLClient {
+	return &DefaultGraphQLClient{
 		HTTPClient: &http.Client{
 			Timeout: 5 * time.Second,
 		},
 		MaxResponseSize: 1024 * 1024,
 	}
 
+}
+
+var newClient = defaultNewClient
+
+func OverrideDefaultNewClient(newClientFunc defaultClientFactory){
+	newClient = newClientFunc
+}
+
+// NewClient creates a new GraphQLClient from the given options.
+func NewClient(opts ...ClientOpt) GraphQLClient {
+	c := newClient()
 	for _, opt := range opts {
 		opt(c)
 	}
@@ -46,20 +67,20 @@ func NewClient(opts ...ClientOpt) *GraphQLClient {
 // read up to maxResponseSize and that size is exceeded an an error will be
 // returned.
 func WithMaxResponseSize(maxResponseSize int64) ClientOpt {
-	return func(s *GraphQLClient) {
-		s.MaxResponseSize = maxResponseSize
+	return func(s GraphQLClient) {
+		s.UseMaxResponseSize(maxResponseSize)
 	}
 }
 
 // WithUserAgent set the user agent used by the client.
 func WithUserAgent(userAgent string) ClientOpt {
-	return func(s *GraphQLClient) {
-		s.UserAgent = userAgent
+	return func(s GraphQLClient) {
+		s.UseUserAgent(userAgent)
 	}
 }
 
 // Request executes a GraphQL request.
-func (c *GraphQLClient) Request(ctx context.Context, url string, request *Request, out interface{}) error {
+func (c *DefaultGraphQLClient) Request(ctx context.Context, url string, request *Request, out interface{}) error {
 	var buf bytes.Buffer
 	err := json.NewEncoder(&buf).Encode(request)
 	if err != nil {
@@ -127,6 +148,23 @@ func (c *GraphQLClient) Request(ctx context.Context, url string, request *Reques
 	}
 
 	return nil
+}
+
+
+func (c *DefaultGraphQLClient) UseMaxResponseSize(maxResponseSize int64) {
+	c.MaxResponseSize = maxResponseSize
+}
+
+func (c *DefaultGraphQLClient) UseUserAgent(userAgent string) {
+	c.UserAgent = userAgent
+}
+
+func (c *DefaultGraphQLClient) UseTracer(tracer opentracing.Tracer) {
+	c.Tracer = tracer
+}
+
+func (c *DefaultGraphQLClient) UseTimeout(timeout time.Duration) {
+	c.HTTPClient.Timeout = timeout
 }
 
 // Request is a GraphQL request.
