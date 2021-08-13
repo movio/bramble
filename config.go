@@ -229,6 +229,10 @@ func (c *Config) ConfigurePlugins() []Plugin {
 	return enabledPlugins
 }
 
+func (c *Config) ExecutableSchema() *ExecutableSchema {
+	return c.executableSchema
+}
+
 // Init initializes the config and does an initial fetch of the services.
 func (c *Config) Init() error {
 	var err error
