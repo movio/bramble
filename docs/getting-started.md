@@ -39,7 +39,7 @@ For the full list of available options see [configuration](configuration.md).
 (requires Golang)
 
 ```
-go install https://github.com/movio/bramble/cmd/bramble@latest
+go install github.com/movio/bramble/cmd/bramble@latest
 ```
 
 ```
