@@ -90,11 +90,11 @@ func (c *Config) Load() error {
 		return fmt.Errorf("invalid poll interval: %w", err)
 	}
 
-	services, err := c.buildServiceList()
-	if err != nil {
-		return err
-	}
-	c.Services = services
+	//services, err := c.buildServiceList()
+	//if err != nil {
+	//	return err
+	//}
+	//c.Services = services
 
 	c.plugins = c.ConfigurePlugins()
 
