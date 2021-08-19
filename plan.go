@@ -61,6 +61,8 @@ func Plan(ctx *PlanningContext) (*QueryPlan, error) {
 		parentType = queryObjectName
 	case ast.Mutation:
 		parentType = mutationObjectName
+	case ast.Subscription:
+		parentType = subscriptionObjectName
 	default:
 		return nil, fmt.Errorf("not implemented")
 	}
