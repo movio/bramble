@@ -22,6 +22,9 @@ type PluginConfig struct {
 
 // Config contains the gateway configuration
 type Config struct {
+	GatewayInterface       string    `json:"gateway-interface"`
+	MetricsInterface       string    `json:"metrics-interface"`
+	PrivateInterface       string    `json:"private-interface"`
 	GatewayPort            int       `json:"gateway-port"`
 	MetricsPort            int       `json:"metrics-port"`
 	PrivatePort            int       `json:"private-port"`
@@ -44,17 +47,17 @@ type Config struct {
 
 // GatewayAddress returns the host:port string of the gateway
 func (c *Config) GatewayAddress() string {
-	return fmt.Sprintf(":%d", c.GatewayPort)
+	return fmt.Sprintf("%s:%d", c.GatewayInterface, c.GatewayPort)
 }
 
 // PrivateAddress returns the address for private port
 func (c *Config) PrivateAddress() string {
-	return fmt.Sprintf(":%d", c.PrivatePort)
+	return fmt.Sprintf("%s:%d", c.PrivateInterface, c.PrivatePort)
 }
 
 // MetricAddress returns the address for the metric port
 func (c *Config) MetricAddress() string {
-	return fmt.Sprintf(":%d", c.MetricsPort)
+	return fmt.Sprintf("%s:%d", c.MetricsInterface, c.MetricsPort)
 }
 
 // Load loads or reloads all the config files.
