@@ -50,7 +50,7 @@ type PlanningContext struct {
 	Schema     *ast.Schema
 	Locations  FieldURLMap
 	IsBoundary map[string]bool
-	Services   map[string]*Service
+	Services   map[string]Service
 }
 
 // Plan returns a query plan from the given planning context
@@ -90,7 +90,7 @@ func createSteps(ctx *PlanningContext, insertionPoint []string, parentType, pare
 		}
 		name := "unknown"
 		if service, ok := ctx.Services[location]; ok {
-			name = service.Name
+			name = service.Name()
 		}
 
 		// the insertionPoint slice can be modified later as we're appending
@@ -238,7 +238,7 @@ func routeSelectionSet(ctx *PlanningContext, parentType, parentLocation string, 
 	if parentLocation == "" {
 		// if we're at the root, we extract the selection set for each service
 		for _, svc := range ctx.Services {
-			loc := svc.ServiceURL
+			loc := svc.URL()
 			if parentLocation != "" && loc != parentLocation {
 				continue
 			}

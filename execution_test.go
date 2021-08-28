@@ -2680,7 +2680,7 @@ func (f *queryExecutionFixture) checkSuccess(t *testing.T) {
 }
 
 func (f *queryExecutionFixture) run(t *testing.T) {
-	var services []*Service
+	var services []Service
 	var schemas []*ast.Schema
 
 	for _, s := range f.services {
@@ -2688,9 +2688,9 @@ func (f *queryExecutionFixture) run(t *testing.T) {
 		defer serv.Close()
 
 		schema := gqlparser.MustLoadSchema(&ast.Source{Input: s.schema})
-		services = append(services, &Service{
-			ServiceURL: serv.URL,
-			Schema:     schema,
+		services = append(services, &serviceImplementation{
+			serviceURL: serv.URL,
+			schema:     schema,
 		})
 
 		schemas = append(schemas, schema)

@@ -2,35 +2,80 @@ package bramble
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/vektah/gqlparser/v2"
 	"github.com/vektah/gqlparser/v2/ast"
 )
 
-// Service is a federated service.
-type Service struct {
-	ServiceURL   string
-	Name         string
-	Version      string
-	SchemaSource string
-	Schema       *ast.Schema
-	Status       string
+type SchemaStatus int
 
-	client *GraphQLClient
+const (
+	SchemaStatusUnreachable SchemaStatus = iota
+	SchemaStatusError
+	SchemaStatusOK
+)
+
+type Service interface {
+	Name() string
+	Version() string
+	URL() string
+	SchemaSource() string
+	Schema() *ast.Schema
+	Status() SchemaStatus
+	Update() (updated bool, err error)
+	Err() error
 }
 
 // NewService returns a new Service.
-func NewService(serviceURL string) *Service {
-	s := &Service{
-		ServiceURL: serviceURL,
+func NewService(serviceURL string) Service {
+	s := &serviceImplementation{
+		serviceURL: serviceURL,
 		client:     NewClient(WithUserAgent(GenerateUserAgent("update"))),
 	}
 	return s
 }
 
-// Update queries the service's schema, name and version and updates its status.
-func (s *Service) Update() (bool, error) {
+type serviceImplementation struct {
+	serviceURL   string
+	name         string
+	version      string
+	schemaSource string
+	err          error
+	schema       *ast.Schema
+	status       SchemaStatus
+	client       *GraphQLClient
+}
+
+func (s *serviceImplementation) Name() string {
+	return s.name
+}
+
+func (s *serviceImplementation) Version() string {
+	return s.version
+}
+
+func (s *serviceImplementation) URL() string {
+	return s.serviceURL
+}
+
+func (s *serviceImplementation) SchemaSource() string {
+	return s.schemaSource
+}
+
+func (s *serviceImplementation) Schema() *ast.Schema {
+	return s.schema
+}
+
+func (s *serviceImplementation) Status() SchemaStatus {
+	return s.status
+}
+
+func (s *serviceImplementation) Err() error {
+	return s.err
+}
+
+func (s *serviceImplementation) Update() (bool, error) {
+	s.err = nil
 	req := NewRequest("{ service { name, version, schema} }")
 	response := struct {
 		Service struct {
@@ -39,30 +84,26 @@ func (s *Service) Update() (bool, error) {
 			Schema  string `json:"schema"`
 		} `json:"service"`
 	}{}
-
-	if err := s.client.Request(context.Background(), s.ServiceURL, req, &response); err != nil {
-		s.Status = "Unreachable"
+	if err := s.client.Request(context.Background(), s.serviceURL, req, &response); err != nil {
+		s.status = SchemaStatusUnreachable
 		return false, err
 	}
+	updated := response.Service.Schema != s.schemaSource
+	s.name = response.Service.Name
+	s.version = response.Service.Version
+	s.schemaSource = response.Service.Schema
 
-	updated := response.Service.Schema != s.SchemaSource
-
-	s.Name = response.Service.Name
-	s.Version = response.Service.Version
-	s.SchemaSource = response.Service.Schema
-
-	schema, err := gqlparser.LoadSchema(&ast.Source{Name: s.ServiceURL, Input: response.Service.Schema})
+	schema, err := gqlparser.LoadSchema(&ast.Source{Name: s.serviceURL, Input: response.Service.Schema})
 	if err != nil {
-		s.Status = "Schema error"
+		s.status = SchemaStatusError
 		return false, err
 	}
-	s.Schema = schema
+	s.schema = schema
 
-	if err := ValidateSchema(s.Schema); err != nil {
-		s.Status = fmt.Sprintf("Invalid (%s)", err)
+	if err := ValidateSchema(s.schema); err != nil {
+		s.status = SchemaStatusError
 		return updated, err
 	}
-
-	s.Status = "OK"
+	s.status = SchemaStatusOK
 	return updated, nil
 }

@@ -61,17 +61,17 @@ func (f MergeTestFixture) CheckError(t *testing.T) {
 
 func (f BuildFieldURLMapFixture) Check(t *testing.T) {
 	t.Helper()
-	var services []*Service
+	var services []Service
 	if f.Schema1 != "" {
 		services = append(
 			services,
-			&Service{ServiceURL: f.Location1, Schema: loadSchema(f.Schema1)},
+			&serviceImplementation{serviceURL: f.Location1, schema: loadSchema(f.Schema1)},
 		)
 	}
 	if f.Schema2 != "" {
 		services = append(
 			services,
-			&Service{ServiceURL: f.Location2, Schema: loadSchema(f.Schema2)},
+			&serviceImplementation{serviceURL: f.Location2, schema: loadSchema(f.Schema2)},
 		)
 	}
 	locations := buildFieldURLMap(services...)

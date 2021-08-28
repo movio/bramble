@@ -20,11 +20,11 @@ import (
 	"github.com/vektah/gqlparser/v2/gqlerror"
 )
 
-func newExecutableSchema(plugins []Plugin, maxRequestsPerQuery int64, client *GraphQLClient, services ...*Service) *ExecutableSchema {
-	serviceMap := make(map[string]*Service)
+func newExecutableSchema(plugins []Plugin, maxRequestsPerQuery int64, client *GraphQLClient, services ...Service) *ExecutableSchema {
+	serviceMap := make(map[string]Service)
 
 	for _, s := range services {
-		serviceMap[s.ServiceURL] = s
+		serviceMap[s.URL()] = s
 	}
 
 	if client == nil {
@@ -32,8 +32,7 @@ func newExecutableSchema(plugins []Plugin, maxRequestsPerQuery int64, client *Gr
 	}
 
 	return &ExecutableSchema{
-		Services: serviceMap,
-
+		Services:            serviceMap,
 		GraphqlClient:       client,
 		plugins:             plugins,
 		MaxRequestsPerQuery: maxRequestsPerQuery,
@@ -45,7 +44,7 @@ type ExecutableSchema struct {
 	MergedSchema        *ast.Schema
 	Locations           FieldURLMap
 	IsBoundary          map[string]bool
-	Services            map[string]*Service
+	Services            map[string]Service
 	BoundaryQueries     BoundaryQueriesMap
 	GraphqlClient       *GraphQLClient
 	Tracer              opentracing.Tracer
@@ -58,7 +57,7 @@ type ExecutableSchema struct {
 // UpdateServiceList replaces the list of services with the provided one and
 // update the schema.
 func (s *ExecutableSchema) UpdateServiceList(services []string) error {
-	newServices := make(map[string]*Service)
+	newServices := make(map[string]Service)
 	for _, svcURL := range services {
 		if svc, ok := s.Services[svcURL]; ok {
 			newServices[svcURL] = svc
@@ -74,7 +73,7 @@ func (s *ExecutableSchema) UpdateServiceList(services []string) error {
 // UpdateSchema updates the schema from every service and then update the merged
 // schema.
 func (s *ExecutableSchema) UpdateSchema(forceRebuild bool) error {
-	var services []*Service
+	var services []Service
 	var schemas []*ast.Schema
 	var updatedServices []string
 	var invalidschema float64 = 0
@@ -91,7 +90,7 @@ func (s *ExecutableSchema) UpdateSchema(forceRebuild bool) error {
 		})
 		updated, err := s.Update()
 		if err != nil {
-			promServiceUpdateError.WithLabelValues(s.ServiceURL).Inc()
+			promServiceUpdateError.WithLabelValues(s.URL()).Inc()
 			invalidschema = 1
 			logger.WithError(err).Error("unable to update service")
 			// Ignore this service in this update
@@ -100,11 +99,11 @@ func (s *ExecutableSchema) UpdateSchema(forceRebuild bool) error {
 
 		if updated {
 			logger.Info("service was upgraded")
-			updatedServices = append(updatedServices, s.Name)
+			updatedServices = append(updatedServices, s.Name())
 		}
 
 		services = append(services, s)
-		schemas = append(schemas, s.Schema)
+		schemas = append(schemas, s.Schema())
 	}
 
 	if len(updatedServices) > 0 || forceRebuild {

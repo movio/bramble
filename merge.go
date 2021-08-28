@@ -55,10 +55,11 @@ func MergeSchemas(schemas ...*ast.Schema) (*ast.Schema, error) {
 	return &merged, nil
 }
 
-func buildFieldURLMap(services ...*Service) FieldURLMap {
+func buildFieldURLMap(services ...Service) FieldURLMap {
 	result := FieldURLMap{}
 	for _, rs := range services {
-		for _, t := range rs.Schema.Types {
+		schema := rs.Schema()
+		for _, t := range schema.Types {
 			if t.Kind != ast.Object || isGraphQLBuiltinName(t.Name) || t.Name == serviceObjectName {
 				continue
 			}
@@ -68,7 +69,7 @@ func buildFieldURLMap(services ...*Service) FieldURLMap {
 				}
 
 				// namespace objects live only on the graph
-				fieldType := rs.Schema.Types[f.Type.Name()]
+				fieldType := schema.Types[f.Type.Name()]
 				if isNamespaceObject(fieldType) {
 					continue
 				}
@@ -77,17 +78,18 @@ func buildFieldURLMap(services ...*Service) FieldURLMap {
 					continue
 				}
 
-				result.RegisterURL(t.Name, f.Name, rs.ServiceURL)
+				result.RegisterURL(t.Name, f.Name, rs.URL())
 			}
 		}
 	}
 	return result
 }
 
-func buildIsBoundaryMap(services ...*Service) map[string]bool {
+func buildIsBoundaryMap(services ...Service) map[string]bool {
 	result := map[string]bool{}
 	for _, rs := range services {
-		for _, t := range rs.Schema.Types {
+		schema := rs.Schema()
+		for _, t := range schema.Types {
 			if t.Kind != ast.Object || isGraphQLBuiltinName(t.Name) || t.Name == serviceObjectName {
 				continue
 			}
@@ -97,10 +99,11 @@ func buildIsBoundaryMap(services ...*Service) map[string]bool {
 	return result
 }
 
-func buildBoundaryQueriesMap(services ...*Service) BoundaryQueriesMap {
+func buildBoundaryQueriesMap(services ...Service) BoundaryQueriesMap {
 	result := make(BoundaryQueriesMap)
 	for _, rs := range services {
-		for _, f := range rs.Schema.Query.Fields {
+		schema := rs.Schema()
+		for _, f := range schema.Query.Fields {
 			if isBoundaryField(f) {
 				queryType := f.Type.Name()
 				array := false
@@ -109,7 +112,7 @@ func buildBoundaryQueriesMap(services ...*Service) BoundaryQueriesMap {
 					array = true
 				}
 
-				result.RegisterQuery(rs.ServiceURL, queryType, f.Name, array)
+				result.RegisterQuery(rs.URL(), queryType, f.Name, array)
 			}
 		}
 	}

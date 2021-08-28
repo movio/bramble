@@ -225,10 +225,10 @@ func (f *PlanTestFixture) Check(t *testing.T, query, expectedJSON string) {
 	schema := gqlparser.MustLoadSchema(&ast.Source{Name: "fixture", Input: f.Schema})
 	operation := gqlparser.MustLoadQuery(schema, query)
 	require.Len(t, operation.Operations, 1, "bad test: query must be a single operation")
-	actual, err := Plan(&PlanningContext{operation.Operations[0], schema, f.Locations, f.IsBoundary, map[string]*Service{
-		"A": {Name: "A", ServiceURL: "A"},
-		"B": {Name: "B", ServiceURL: "B"},
-		"C": {Name: "C", ServiceURL: "C"},
+	actual, err := Plan(&PlanningContext{operation.Operations[0], schema, f.Locations, f.IsBoundary, map[string]Service{
+		"A": &serviceImplementation{name: "A", serviceURL: "A"},
+		"B": &serviceImplementation{name: "B", serviceURL: "B"},
+		"C": &serviceImplementation{name: "C", serviceURL: "C"},
 	}})
 	require.NoError(t, err)
 	actual.SortSteps()

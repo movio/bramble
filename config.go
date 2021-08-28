@@ -237,7 +237,7 @@ func (c *Config) Init() error {
 		return fmt.Errorf("error building service list: %w", err)
 	}
 
-	var services []*Service
+	var services []Service
 	for _, s := range c.Services {
 		services = append(services, NewService(s))
 	}
