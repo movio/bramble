@@ -57,8 +57,8 @@ A role is a named set of permissions (as described in [access
 control](access-control.md)).
 When receiving a query with a valid JWT the permissions associated with the role will be added to the query.
 
-!> **If a JWT is not present in the request, the request will proceed with the `public` role.**
-So be sure to leave the `public` role empty is you do not want any unauthenticated access.
+!> **If a JWT is not present in the request, the request will proceed with the `public_role` role.**
+So be sure to leave the `public_role` role empty is you do not want any unauthenticated access.
 
 #### Configuration
 
@@ -72,7 +72,7 @@ So be sure to leave the `public` role empty is you do not want any unauthenticat
     },
     "roles": {
       // example public role, allow only login mutation
-      "public": {
+      "public_role": {
         "mutation": {
           "auth": ["login"]
         }
