@@ -571,7 +571,7 @@ func TestSchemaValidateBoundaryFields(t *testing.T) {
 		type Query {
 			foo(id: ID!): Foo @boundary
 		}
-		`).assertInvalid("missing boundary queries for the following types: [Bar]", validateBoundaryFields)
+		`).assertInvalid("missing boundary fields for the following types: [Bar]", validateBoundaryFields)
 	})
 
 	t.Run("boundary field for non-boundary type", func(t *testing.T) {

@@ -366,7 +366,7 @@ func validateBoundaryFields(schema *ast.Schema) error {
 	}
 
 	if len(missingBoundaryQueries) > 0 {
-		return fmt.Errorf("missing boundary queries for the following types: %v", missingBoundaryQueries)
+		return fmt.Errorf("missing boundary fields for the following types: %v", missingBoundaryQueries)
 	}
 
 	return nil
