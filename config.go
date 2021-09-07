@@ -22,9 +22,9 @@ type PluginConfig struct {
 
 // Config contains the gateway configuration
 type Config struct {
-	GatewayInterface       string    `json:"gateway-interface"`
-	MetricsInterface       string    `json:"metrics-interface"`
-	PrivateInterface       string    `json:"private-interface"`
+	GatewayListenAddress   string    `json:"gateway-address"`
+	MetricsListenAddress   string    `json:"metrics-address"`
+	PrivateListenAddress   string    `json:"private-address"`
 	GatewayPort            int       `json:"gateway-port"`
 	MetricsPort            int       `json:"metrics-port"`
 	PrivatePort            int       `json:"private-port"`
@@ -45,19 +45,33 @@ type Config struct {
 	linkedFiles      []string
 }
 
+func (c *Config) addrOrPort(addr string, port int) string {
+	if addr != "" {
+		return addr
+	}
+	return fmt.Sprintf(":%d", port)
+}
+
 // GatewayAddress returns the host:port string of the gateway
 func (c *Config) GatewayAddress() string {
-	return fmt.Sprintf("%s:%d", c.GatewayInterface, c.GatewayPort)
+	return c.addrOrPort(c.GatewayListenAddress, c.GatewayPort)
 }
 
 // PrivateAddress returns the address for private port
 func (c *Config) PrivateAddress() string {
-	return fmt.Sprintf("%s:%d", c.PrivateInterface, c.PrivatePort)
+	return c.addrOrPort(c.PrivateListenAddress, c.PrivatePort)
+}
+
+func (c *Config) PrivateHttpAddress(path string) string {
+	if c.PrivateListenAddress == "" {
+		return fmt.Sprintf("http://localhost:%d/%s", c.PrivatePort, path)
+	}
+	return fmt.Sprintf("http://%s/%s", c.PrivateListenAddress, path)
 }
 
 // MetricAddress returns the address for the metric port
 func (c *Config) MetricAddress() string {
-	return fmt.Sprintf("%s:%d", c.MetricsInterface, c.MetricsPort)
+	return c.addrOrPort(c.MetricsListenAddress, c.MetricsPort)
 }
 
 // Load loads or reloads all the config files.
@@ -115,7 +129,7 @@ func (c *Config) buildServiceList() ([]string, error) {
 	for _, plugin := range c.plugins {
 		ok, path := plugin.GraphqlQueryPath()
 		if ok {
-			service := fmt.Sprintf("http://localhost:%d/%s", c.PrivatePort, path)
+			service := c.PrivateHttpAddress(path)
 			serviceSet[service] = true
 		}
 	}

@@ -19,19 +19,26 @@ func TestConfig(t *testing.T) {
 		mAddress := cfg.MetricAddress()
 		require.Equal(t, ":8084", mAddress)
 	})
-	t.Run("network interface provided", func(t *testing.T) {
+	t.Run("network address provided", func(t *testing.T) {
 		cfg := new(Config)
-		cfg.GatewayInterface = "0.0.0.0"
-		cfg.GatewayPort = 8082
-		cfg.PrivateInterface = "127.0.0.1"
+		cfg.GatewayListenAddress = "0.0.0.0:8082"
+		cfg.GatewayPort = 0
+		cfg.PrivateListenAddress = "127.0.0.1:8084"
 		cfg.PrivatePort = 8083
-		cfg.MetricsInterface = "192.0.0.1"
+		cfg.MetricsListenAddress = ""
 		cfg.MetricsPort = 8084
 		gAddress := cfg.GatewayAddress()
 		require.Equal(t, "0.0.0.0:8082", gAddress)
 		pAddress := cfg.PrivateAddress()
-		require.Equal(t, "127.0.0.1:8083", pAddress)
+		require.Equal(t, "127.0.0.1:8084", pAddress)
 		mAddress := cfg.MetricAddress()
-		require.Equal(t, "192.0.0.1:8084", mAddress)
+		require.Equal(t, ":8084", mAddress)
+	})
+	t.Run("private http address for plugin services", func(t *testing.T) {
+		cfg := new(Config)
+		cfg.PrivatePort = 8083
+		require.Equal(t, "http://localhost:8083/plugin", cfg.PrivateHttpAddress("plugin"))
+		cfg.PrivateListenAddress = "127.0.0.1:8084"
+		require.Equal(t, "http://127.0.0.1:8084/plugin", cfg.PrivateHttpAddress("plugin"))
 	})
 }
