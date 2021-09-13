@@ -8,8 +8,8 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/dgrijalva/jwt-go"
-	"github.com/dgrijalva/jwt-go/request"
+	"github.com/golang-jwt/jwt/v4"
+	"github.com/golang-jwt/jwt/v4/request"
 	"github.com/movio/bramble"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/square/go-jose.v2"
