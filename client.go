@@ -13,6 +13,7 @@ import (
 	"time"
 
 	opentracing "github.com/opentracing/opentracing-go"
+	"github.com/vektah/gqlparser/v2/ast"
 )
 
 // GraphQLClient is a GraphQL client.
@@ -144,6 +145,11 @@ func NewRequest(body string) *Request {
 	}
 }
 
+func (r *Request) WithHeaders(headers http.Header) *Request {
+	r.Headers = headers
+	return r
+}
+
 // Response is a GraphQL response
 type Response struct {
 	Errors GraphqlErrors `json:"errors"`
@@ -157,6 +163,7 @@ type GraphqlErrors []GraphqlError
 // GraphqlError is a single GraphQL error
 type GraphqlError struct {
 	Message    string                 `json:"message"`
+	Path       ast.Path               `json:"path,omitempty"`
 	Extensions map[string]interface{} `json:"extensions"`
 }
 

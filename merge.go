@@ -97,19 +97,19 @@ func buildIsBoundaryMap(services ...*Service) map[string]bool {
 	return result
 }
 
-func buildBoundaryQueriesMap(services ...*Service) BoundaryQueriesMap {
-	result := make(BoundaryQueriesMap)
+func buildBoundaryFieldsMap(services ...*Service) BoundaryFieldsMap {
+	result := make(BoundaryFieldsMap)
 	for _, rs := range services {
 		for _, f := range rs.Schema.Query.Fields {
 			if isBoundaryField(f) {
-				queryType := f.Type.Name()
+				typeName := f.Type.Name()
 				array := false
 				if f.Type.Elem != nil {
-					queryType = f.Type.Elem.Name()
+					typeName = f.Type.Elem.Name()
 					array = true
 				}
 
-				result.RegisterQuery(rs.ServiceURL, queryType, f.Name, array)
+				result.RegisterField(rs.ServiceURL, typeName, f.Name, array)
 			}
 		}
 	}
