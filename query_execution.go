@@ -630,8 +630,8 @@ func bubbleUpNullValuesInPlace(schema *ast.Schema, selectionSet ast.SelectionSet
 func bubbleUpNullValuesInPlaceRec(schema *ast.Schema, currentType *ast.Type, selectionSet ast.SelectionSet, result interface{}, path ast.Path) (errs []*gqlerror.Error, bubbleUp bool, err error) {
 	switch result := result.(type) {
 	case map[string]interface{}:
-		typename, _ := result["__typename"].(string)
-		filteredSelectionSet, unionErr := unionAndTrimSelectionSet(typename, schema, selectionSet)
+		objectTypename := extractAndCastTypenameField(result)
+		filteredSelectionSet, unionErr := unionAndTrimSelectionSet(objectTypename, schema, selectionSet)
 		if err != nil {
 			err = unionErr
 			return
@@ -753,7 +753,7 @@ func formatResponseDataRec(schema *ast.Schema, selectionSet ast.SelectionSet, re
 			buf.WriteString("{")
 		}
 
-		objectTypename, _ := result["__typename"].(string)
+		objectTypename := extractAndCastTypenameField(result)
 		filteredSelectionSet, err := unionAndTrimSelectionSet(objectTypename, schema, selectionSet)
 		if err != nil {
 			return []byte{}, err
@@ -885,6 +885,15 @@ func unionAndTrimSelectionSetRec(objectTypename string, schema *ast.Schema, sele
 	}
 
 	return filteredSelectionSet, nil
+}
+
+func extractAndCastTypenameField(result map[string]interface{}) string {
+	typeNameInterface, ok := result["__typename"]
+	if !ok {
+		return ""
+	}
+
+	return typeNameInterface.(string)
 }
 
 func objectTypenameMatchesDifferentFragment(typename string, fragment *ast.InlineFragment) bool {
