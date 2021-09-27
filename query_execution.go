@@ -630,7 +630,14 @@ func bubbleUpNullValuesInPlace(schema *ast.Schema, selectionSet ast.SelectionSet
 func bubbleUpNullValuesInPlaceRec(schema *ast.Schema, currentType *ast.Type, selectionSet ast.SelectionSet, result interface{}, path ast.Path) (errs []*gqlerror.Error, bubbleUp bool, err error) {
 	switch result := result.(type) {
 	case map[string]interface{}:
-		for _, selection := range selectionSet {
+		typename, _ := result["__typename"].(string)
+		filteredSelectionSet, unionErr := unionAndTrimSelectionSet(typename, schema, selectionSet)
+		if err != nil {
+			err = unionErr
+			return
+		}
+
+		for _, selection := range filteredSelectionSet {
 			switch selection := selection.(type) {
 			case *ast.Field:
 				field := selection
@@ -665,13 +672,6 @@ func bubbleUpNullValuesInPlaceRec(schema *ast.Schema, currentType *ast.Type, sel
 				}
 			case *ast.FragmentSpread:
 				fragment := selection
-				typename, ok := result["__typename"].(string)
-				if !ok {
-					return nil, false, errors.New("missing expected __typename")
-				}
-				if typename != fragment.Definition.TypeCondition && !fragmentImplementsAbstractType(schema, typename, fragment.Definition.TypeCondition) {
-					continue
-				}
 				lowerErrs, lowerBubbleUp, lowerErr := bubbleUpNullValuesInPlaceRec(schema, nil, fragment.Definition.SelectionSet, result, path)
 				if lowerErr != nil {
 					return nil, false, lowerErr
@@ -680,13 +680,6 @@ func bubbleUpNullValuesInPlaceRec(schema *ast.Schema, currentType *ast.Type, sel
 				errs = append(errs, lowerErrs...)
 			case *ast.InlineFragment:
 				fragment := selection
-				typename, ok := result["__typename"].(string)
-				if !ok {
-					return nil, false, errors.New("missing expected __typename")
-				}
-				if typename != fragment.TypeCondition && !fragmentImplementsAbstractType(schema, typename, fragment.TypeCondition) {
-					continue
-				}
 				lowerErrs, lowerBubbleUp, lowerErr := bubbleUpNullValuesInPlaceRec(schema, nil, fragment.SelectionSet, result, path)
 				if lowerErr != nil {
 					return nil, false, lowerErr
