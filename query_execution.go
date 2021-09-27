@@ -390,16 +390,8 @@ func extractBoundaryIDs(data interface{}, insertionPoint []string) ([]string, er
 	if len(insertionPoint) == 0 {
 		switch ptr := ptr.(type) {
 		case map[string]interface{}:
-			var id string
-			var ok bool
-			id, ok = ptr["_id"].(string)
-			if !ok {
-				id, ok = ptr["id"].(string)
-			}
-			if !ok {
-				return nil, errors.New("extractBoundaryIDs: unexpected missing '_id' or 'id' in map")
-			}
-			return []string{id}, nil
+			id, err := boundaryIDFromMap(ptr)
+			return []string{id}, err
 		case []interface{}:
 			result := []string{}
 			for _, innerPtr := range ptr {
