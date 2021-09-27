@@ -408,11 +408,7 @@ func extractBoundaryIDs(data interface{}, insertionPoint []string) ([]string, er
 	}
 	switch ptr := ptr.(type) {
 	case map[string]interface{}:
-		if len(insertionPoint) == 1 {
-			return extractBoundaryIDs(ptr[insertionPoint[0]], nil)
-		} else {
-			return extractBoundaryIDs(ptr[insertionPoint[0]], insertionPoint[1:])
-		}
+		return extractBoundaryIDs(ptr[insertionPoint[0]], insertionPoint[1:])
 	case []interface{}:
 		result := []string{}
 		for _, innerPtr := range ptr {
