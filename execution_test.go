@@ -3027,7 +3027,7 @@ func TestFormatResponseBody(t *testing.T) {
 		document := gqlparser.MustLoadQuery(schema, query)
 		bodyJSON, err := formatResponseData(schema, document.Operations[0].SelectionSet, result)
 		require.NoError(t, err)
-		require.JSONEq(t, expectedJSON, bodyJSON)
+		require.JSONEq(t, expectedJSON, string(bodyJSON))
 	})
 
 	t.Run("null data", func(t *testing.T) {
@@ -3084,7 +3084,7 @@ func TestFormatResponseBody(t *testing.T) {
 		document := gqlparser.MustLoadQuery(schema, query)
 		bodyJSON, err := formatResponseData(schema, document.Operations[0].SelectionSet, result)
 		require.NoError(t, err)
-		require.JSONEq(t, expectedJSON, bodyJSON)
+		require.JSONEq(t, expectedJSON, string(bodyJSON))
 	})
 
 	t.Run("simple response with errors", func(t *testing.T) {
@@ -3140,7 +3140,7 @@ func TestFormatResponseBody(t *testing.T) {
 		document := gqlparser.MustLoadQuery(schema, query)
 		bodyJSON, err := formatResponseData(schema, document.Operations[0].SelectionSet, result)
 		require.NoError(t, err)
-		require.JSONEq(t, expectedJSON, bodyJSON)
+		require.JSONEq(t, expectedJSON, string(bodyJSON))
 	})
 
 	t.Run("field selection overlaps with fragment selection", func(t *testing.T) {
@@ -3218,7 +3218,7 @@ func TestFormatResponseBody(t *testing.T) {
 		document := gqlparser.MustLoadQuery(schema, query)
 		bodyJSON, err := formatResponseData(schema, document.Operations[0].SelectionSet, result)
 		require.NoError(t, err)
-		require.JSONEq(t, expectedJSON, bodyJSON)
+		require.JSONEq(t, expectedJSON, string(bodyJSON))
 	})
 
 	t.Run("field selection entirely overlaps with fragment selection", func(t *testing.T) {
@@ -3284,7 +3284,7 @@ func TestFormatResponseBody(t *testing.T) {
 		document := gqlparser.MustLoadQuery(schema, query)
 		bodyJSON, err := formatResponseData(schema, document.Operations[0].SelectionSet, result)
 		require.NoError(t, err)
-		require.JSONEq(t, expectedJSON, bodyJSON)
+		require.JSONEq(t, expectedJSON, string(bodyJSON))
 	})
 
 	t.Run("multiple implementation fragment spreads", func(t *testing.T) {
@@ -3359,7 +3359,7 @@ func TestFormatResponseBody(t *testing.T) {
 		document := gqlparser.MustLoadQuery(schema, query)
 		bodyJSON, err := formatResponseData(schema, document.Operations[0].SelectionSet, result)
 		require.NoError(t, err)
-		require.JSONEq(t, expectedJSON, bodyJSON)
+		require.JSONEq(t, expectedJSON, string(bodyJSON))
 	})
 
 	t.Run("multiple implementation fragment spreads (bottom fragment matches)", func(t *testing.T) {
@@ -3436,7 +3436,7 @@ func TestFormatResponseBody(t *testing.T) {
 		document := gqlparser.MustLoadQuery(schema, query)
 		bodyJSON, err := formatResponseData(schema, document.Operations[0].SelectionSet, result)
 		require.NoError(t, err)
-		require.JSONEq(t, expectedJSON, bodyJSON)
+		require.JSONEq(t, expectedJSON, string(bodyJSON))
 	})
 }
 

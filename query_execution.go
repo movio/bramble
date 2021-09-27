@@ -1,6 +1,7 @@
 package bramble
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -741,28 +742,28 @@ func appendPathIndex(path []ast.PathElement, index int) []ast.PathElement {
 	return append(pathCopy, ast.PathIndex(index))
 }
 
-func formatResponseData(schema *ast.Schema, selectionSet ast.SelectionSet, result map[string]interface{}) (string, error) {
+func formatResponseData(schema *ast.Schema, selectionSet ast.SelectionSet, result map[string]interface{}) ([]byte, error) {
 	return formatResponseDataRec(schema, selectionSet, result, false)
 }
 
-func formatResponseDataRec(schema *ast.Schema, selectionSet ast.SelectionSet, result interface{}, insideFragment bool) (string, error) {
-	var builder strings.Builder
+func formatResponseDataRec(schema *ast.Schema, selectionSet ast.SelectionSet, result interface{}, insideFragment bool) ([]byte, error) {
+	var buf bytes.Buffer
 	if result == nil {
-		return "null", nil
+		return []byte("null"), nil
 	}
 	switch result := result.(type) {
 	case map[string]interface{}:
 		if len(result) == 0 {
-			return "null", nil
+			return []byte("null"), nil
 		}
 		if !insideFragment {
-			builder.WriteString("{")
+			buf.WriteString("{")
 		}
 
 		objectTypename, _ := result["__typename"].(string)
 		filteredSelectionSet, err := unionAndTrimSelectionSet(objectTypename, schema, selectionSet)
 		if err != nil {
-			return "", err
+			return []byte{}, err
 		}
 
 		for i, selection := range filteredSelectionSet {
@@ -770,80 +771,80 @@ func formatResponseDataRec(schema *ast.Schema, selectionSet ast.SelectionSet, re
 			case *ast.InlineFragment:
 				innerBody, err := formatResponseDataRec(schema, selection.SelectionSet, result, true)
 				if err != nil {
-					return "", err
+					return []byte{}, err
 				}
-				builder.WriteString(innerBody)
+				buf.Write(innerBody)
 
 			case *ast.FragmentSpread:
 				innerBody, err := formatResponseDataRec(schema, selection.Definition.SelectionSet, result, true)
 				if err != nil {
-					return "", err
+					return []byte{}, err
 				}
-				builder.WriteString(innerBody)
+				buf.Write(innerBody)
 			case *ast.Field:
 				field := selection
 				fieldData, ok := result[field.Alias]
-				builder.WriteString(fmt.Sprintf(`"%s":`, field.Alias))
+				buf.WriteString(fmt.Sprintf(`"%s":`, field.Alias))
 				if !ok {
-					builder.WriteString("null")
+					buf.WriteString("null")
 					if i < len(filteredSelectionSet)-1 {
-						builder.WriteString(",")
+						buf.WriteString(",")
 					}
 					continue
 				}
 				if field.SelectionSet != nil && len(field.SelectionSet) > 0 {
 					innerBody, err := formatResponseDataRec(schema, field.SelectionSet, fieldData, false)
 					if err != nil {
-						return "", err
+						return []byte{}, err
 					}
-					builder.WriteString(innerBody)
+					buf.Write(innerBody)
 				} else {
 					fieldJSON, err := json.Marshal(&fieldData)
 					if err != nil {
-						return "", err
+						return []byte{}, err
 					}
 
-					builder.Write(fieldJSON)
+					buf.Write(fieldJSON)
 				}
 			}
 			if i < len(filteredSelectionSet)-1 {
-				builder.WriteString(",")
+				buf.WriteString(",")
 			}
 		}
 		if !insideFragment {
-			builder.WriteString("}")
+			buf.WriteString("}")
 		}
 	case []interface{}:
-		builder.WriteString("[")
+		buf.WriteString("[")
 		for i, v := range result {
 			innerBody, err := formatResponseDataRec(schema, selectionSet, v, false)
 			if err != nil {
-				return "", err
+				return []byte{}, err
 			}
-			builder.WriteString(innerBody)
+			buf.Write(innerBody)
 
 			if i < len(result)-1 {
-				builder.WriteString(",")
+				buf.WriteString(",")
 			}
 		}
-		builder.WriteString("]")
+		buf.WriteString("]")
 	case []map[string]interface{}:
-		builder.WriteString("[")
+		buf.WriteString("[")
 		for i, v := range result {
 			innerBody, err := formatResponseDataRec(schema, selectionSet, v, false)
 			if err != nil {
-				return "", err
+				return []byte{}, err
 			}
-			builder.WriteString(innerBody)
+			buf.Write(innerBody)
 
 			if i < len(result)-1 {
-				builder.WriteString(",")
+				buf.WriteString(",")
 			}
 		}
-		builder.WriteString("]")
+		buf.WriteString("]")
 	}
 
-	return builder.String(), nil
+	return buf.Bytes(), nil
 }
 
 // When formatting the response data, the shape of the selection set has to potentially be modified to more closely resemble the shape

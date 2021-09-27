@@ -271,7 +271,7 @@ func (s *ExecutableSchema) ExecuteQuery(ctx context.Context) *graphql.Response {
 	}
 
 	return &graphql.Response{
-		Data:   []byte(formattedResponse),
+		Data:   formattedResponse,
 		Errors: errs,
 	}
 }
