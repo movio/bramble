@@ -2,6 +2,8 @@ package bramble
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestQueryPlanA(t *testing.T) {
@@ -743,6 +745,15 @@ func TestQueryPlanWithNestedNamespaces(t *testing.T) {
 		]
 	  }
 	`)
+}
+
+func TestPrefersArrayBasedBoundaryLookups(t *testing.T) {
+	boundaryFieldMap := make(BoundaryFieldsMap)
+	boundaryFieldMap.RegisterField("service-a", "movie", "_movie", true)
+	boundaryFieldMap.RegisterField("service-a", "movie", "_movies", false)
+
+	boundaryField := boundaryFieldMap.Field("service-a", "movie")
+	require.True(t, boundaryField.Array)
 }
 
 func TestQueryPlanNoUnnessecaryID(t *testing.T) {

@@ -385,6 +385,12 @@ func (m BoundaryFieldsMap) RegisterField(serviceURL, typeName, field string, arr
 		m[serviceURL] = make(map[string]BoundaryField)
 	}
 
+	// We prefer to use the array based boundary lookup
+	_, exists := m[serviceURL][typeName]
+	if exists && !array {
+		return
+	}
+
 	m[serviceURL][typeName] = BoundaryField{Field: field, Array: array}
 }
 
