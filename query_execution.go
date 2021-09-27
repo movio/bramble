@@ -102,11 +102,11 @@ func (q *queryExecution) Execute(queryPlan *QueryPlan) ([]executionResult, gqler
 
 func (q *queryExecution) executeRootStep(step *QueryPlanStep) error {
 	var document string
-	if step.ParentType == "Query" {
-		document = "query " + formatSelectionSet(q.ctx, q.schema, step.SelectionSet)
-	} else if step.ParentType == "Mutation" {
-		document = "mutation " + formatSelectionSet(q.ctx, q.schema, step.SelectionSet)
-	} else {
+
+	switch operationType := step.ParentType; operationType {
+	case queryObjectName, mutationObjectName:
+		document = strings.ToLower(operationType) + formatSelectionSet(q.ctx, q.schema, step.SelectionSet)
+	default:
 		return errors.New("expected mutation or query root step")
 	}
 
