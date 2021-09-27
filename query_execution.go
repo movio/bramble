@@ -107,7 +107,7 @@ func (q *queryExecution) executeRootStep(step *QueryPlanStep) error {
 	} else if step.ParentType == "Mutation" {
 		document = "mutation " + formatSelectionSet(q.ctx, q.schema, step.SelectionSet)
 	} else {
-		return errors.New("non mutation or query root step")
+		return errors.New("expected mutation or query root step")
 	}
 
 	var data map[string]interface{}
@@ -337,7 +337,7 @@ func buildTypenameResponseMap(selectionSet ast.SelectionSet, parentTypeName stri
 	for _, field := range selectionSetToFields(selectionSet) {
 		if field.SelectionSet != nil {
 			if field.Definition.Type.NamedType == "" {
-				return nil, fmt.Errorf("expected named type")
+				return nil, fmt.Errorf("buildTypenameResponseMap: expected named type")
 			}
 
 			var err error
@@ -347,7 +347,7 @@ func buildTypenameResponseMap(selectionSet ast.SelectionSet, parentTypeName stri
 			}
 		} else {
 			if field.Name != "__typename" {
-				return nil, fmt.Errorf("expected __typename")
+				return nil, fmt.Errorf("buildTypenameResponseMap: expected __typename")
 			}
 			result[field.Alias] = parentTypeName
 		}
@@ -869,7 +869,7 @@ func unionAndTrimSelectionSetRec(objectTypename string, schema *ast.Schema, sele
 		case *ast.InlineFragment:
 			fragment := selection
 			if objectTypename == "" {
-				return nil, errors.New("__typename must have been injected when dealing with fragments, check the planner is doing the right thing")
+				return nil, errors.New("unionAndTrimSelectionSetRec: expected __typename")
 			}
 
 			if fragment.ObjectDefinition.IsAbstractType() &&
