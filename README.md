@@ -19,7 +19,7 @@ Bramble supports:
 - Namespaces
 - Field-level permissions
 - Plugins:
-  - JWT, Open tracing, CORS, ...
+  - JWT, CORS, ...
   - Or add your own
 - Hot reloading of configuration
 

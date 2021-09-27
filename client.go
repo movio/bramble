@@ -12,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/vektah/gqlparser/v2/ast"
 )
 
@@ -20,7 +19,6 @@ import (
 type GraphQLClient struct {
 	HTTPClient      *http.Client
 	MaxResponseSize int64
-	Tracer          opentracing.Tracer
 	UserAgent       string
 }
 
@@ -81,16 +79,6 @@ func (c *GraphQLClient) Request(ctx context.Context, url string, request *Reques
 
 	if c.UserAgent != "" {
 		httpReq.Header.Set("User-Agent", c.UserAgent)
-	}
-
-	if c.Tracer != nil {
-		span := opentracing.SpanFromContext(ctx)
-		if span != nil {
-			c.Tracer.Inject(
-				span.Context(),
-				opentracing.HTTPHeaders,
-				opentracing.HTTPHeadersCarrier(httpReq.Header))
-		}
 	}
 
 	res, err := c.HTTPClient.Do(httpReq)

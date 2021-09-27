@@ -8,9 +8,7 @@ import (
 	"time"
 
 	"github.com/99designs/gqlgen/graphql"
-	"github.com/opentracing/opentracing-go"
 	log "github.com/sirupsen/logrus"
-	"github.com/uber/jaeger-client-go"
 	"github.com/vektah/gqlparser/v2/ast"
 	"github.com/vektah/gqlparser/v2/gqlerror"
 )
@@ -43,7 +41,6 @@ type ExecutableSchema struct {
 	Services            map[string]*Service
 	BoundaryQueries     BoundaryFieldsMap
 	GraphqlClient       *GraphQLClient
-	Tracer              opentracing.Tracer
 	MaxRequestsPerQuery int64
 
 	mutex   sync.RWMutex
@@ -274,20 +271,6 @@ func (s *ExecutableSchema) ExecuteQuery(ctx context.Context) *graphql.Response {
 		Data:   formattedResponse,
 		Errors: errs,
 	}
-}
-
-// TraceIDFromContext retrieves the trace ID from the context if it exists.
-// Returns an empty string otherwise.
-func TraceIDFromContext(ctx context.Context) string {
-	span := opentracing.SpanFromContext(ctx)
-	if span == nil {
-		return ""
-	}
-	jaegerContext, ok := span.Context().(jaeger.SpanContext)
-	if !ok {
-		return ""
-	}
-	return jaegerContext.TraceID().String()
 }
 
 // Schema returns the merged schema
