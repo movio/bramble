@@ -395,16 +395,16 @@ func (m BoundaryFieldsMap) RegisterField(serviceURL, typeName, field string, arr
 }
 
 // Query returns the boundary field for the given service and type
-func (m BoundaryFieldsMap) Field(serviceURL, typeName string) BoundaryField {
+func (m BoundaryFieldsMap) Field(serviceURL, typeName string) (BoundaryField, error) {
 	serviceMap, ok := m[serviceURL]
 	if !ok {
-		return BoundaryField{Field: "node"}
+		return BoundaryField{}, fmt.Errorf("could not find BoundaryFieldsMap entry for service %s", serviceURL)
 	}
 
-	query, ok := serviceMap[typeName]
+	field, ok := serviceMap[typeName]
 	if !ok {
-		return BoundaryField{Field: "node"}
+		return BoundaryField{}, fmt.Errorf("could not find BoundaryFieldsMap entry for typeName %s", typeName)
 	}
 
-	return query
+	return field, nil
 }

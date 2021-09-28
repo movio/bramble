@@ -752,7 +752,8 @@ func TestPrefersArrayBasedBoundaryLookups(t *testing.T) {
 	boundaryFieldMap.RegisterField("service-a", "movie", "_movie", true)
 	boundaryFieldMap.RegisterField("service-a", "movie", "_movies", false)
 
-	boundaryField := boundaryFieldMap.Field("service-a", "movie")
+	boundaryField, err := boundaryFieldMap.Field("service-a", "movie")
+	require.NoError(t, err)
 	require.True(t, boundaryField.Array)
 }
 

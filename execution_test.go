@@ -4639,7 +4639,8 @@ func TestQueryExecutionWithUnions(t *testing.T) {
 				}
 
 				type Query {
-					animal(id: ID!): Animal @boundary
+					animal(id: ID!): Animal
+					person(id: ID!): Person @boundary
 					animals: [Animal]!
 				}`,
 				handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -4673,7 +4674,7 @@ func TestQueryExecutionWithUnions(t *testing.T) {
 				}),
 			},
 			{
-				schema: `directive @boundary on OBJECT
+				schema: `directive @boundary on OBJECT | FIELD_DEFINITION
 
 				type Person @boundary {
 					id: ID!

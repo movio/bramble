@@ -53,16 +53,8 @@ func newQueryExecution(ctx context.Context, client *GraphQLClient, schema *ast.S
 }
 
 func (q *queryExecution) Execute(queryPlan *QueryPlan) ([]executionResult, gqlerror.List) {
-	readWg := &sync.WaitGroup{}
+	wg := &sync.WaitGroup{}
 	results := []executionResult{}
-
-	if len(queryPlan.RootSteps) > int(q.maxRequest) {
-		return nil, gqlerror.List{
-			&gqlerror.Error{
-				Message: fmt.Sprintf("exceeded max requests of %v", q.maxRequest),
-			},
-		}
-	}
 
 	for _, step := range queryPlan.RootSteps {
 		if step.ServiceURL == internalServiceName {
@@ -80,12 +72,12 @@ func (q *queryExecution) Execute(queryPlan *QueryPlan) ([]executionResult, gqler
 		})
 	}
 
-	readWg.Add(1)
+	wg.Add(1)
 	go func() {
 		for result := range q.results {
 			results = append(results, result)
 		}
-		readWg.Done()
+		wg.Done()
 	}()
 
 	if err := q.group.Wait(); err != nil {
@@ -96,7 +88,7 @@ func (q *queryExecution) Execute(queryPlan *QueryPlan) ([]executionResult, gqler
 		}
 	}
 	close(q.results)
-	readWg.Wait()
+	wg.Wait()
 	return results, nil
 }
 
@@ -162,7 +154,10 @@ func (q *queryExecution) executeChildStep(step *QueryPlanStep, boundaryIDs []str
 		return fmt.Errorf("exceeded max requests of %v", q.maxRequest)
 	}
 
-	boundaryField := q.boundaryFields.Field(step.ServiceURL, step.ParentType)
+	boundaryField, err := q.boundaryFields.Field(step.ServiceURL, step.ParentType)
+	if err != nil {
+		return err
+	}
 
 	documents, err := buildBoundaryQueryDocuments(q.ctx, q.schema, step, boundaryIDs, boundaryField, 50)
 	if err != nil {
@@ -242,7 +237,7 @@ func (q *queryExecution) createGQLErrors(step *QueryPlanStep, err error) gqlerro
 		}
 		locs = append(locs, gqlerror.Location{Line: pos.Line, Column: pos.Column})
 
-		// if the field has a subset it's part of the path
+		// if the field has a selection set it's part of the path
 		if len(f.SelectionSet) > 0 {
 			path = append(path, ast.PathName(f.Alias))
 		}
@@ -284,7 +279,7 @@ func (q *queryExecution) createGQLErrors(step *QueryPlanStep, err error) gqlerro
 
 // The insertionPoint represents the level a piece of data should be inserted at, relative to the root of the root step's data.
 // However results from a boundary query only contain a portion of that tree. For example, you could
-// have insertionPoint: ["foo", "bar", "movies". "movie", "compTitles"], with the below example as the boundary result we're
+// have insertionPoint: ["foo", "bar", "movies", "movie", "compTitles"], with the below example as the boundary result we're
 // crawling for ids:
 // [
 // 	 {
@@ -355,9 +350,9 @@ func buildTypenameResponseMap(selectionSet ast.SelectionSet, parentTypeName stri
 	return result, nil
 }
 
-func fragmentImplementsAbstractType(schema *ast.Schema, objectType, interfaceType string) bool {
-	for _, def := range schema.Implements[objectType] {
-		if def.Name == interfaceType {
+func fragmentImplementsAbstractType(schema *ast.Schema, fragmentTypeDefinition, abstractObjectTypename string) bool {
+	for _, def := range schema.Implements[fragmentTypeDefinition] {
+		if def.Name == abstractObjectTypename {
 			return true
 		}
 	}
@@ -442,7 +437,7 @@ func buildBoundaryQueryDocuments(ctx context.Context, schema *ast.Schema, step *
 	for _, batch := range batchBy(ids, batchSize) {
 		var selections []string
 		for _, id := range batch {
-			selection := fmt.Sprintf("%s: %s(id: %q) %s", nodeAlias(selectionIndex), parentTypeBoundaryField.Field, id, selectionSetQL)
+			selection := fmt.Sprintf("%s: %s(id: %q) %s", fmt.Sprintf("_%d", selectionIndex), parentTypeBoundaryField.Field, id, selectionSetQL)
 			selections = append(selections, selection)
 			selectionIndex++
 		}

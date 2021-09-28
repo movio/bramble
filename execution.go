@@ -596,10 +596,6 @@ func jsonMapToInterfaceMap(m map[string]json.RawMessage) map[string]interface{} 
 	return res
 }
 
-func nodeAlias(i int) string {
-	return fmt.Sprintf("_%d", i)
-}
-
 // mergeMaps merge dst into src, unmarshalling json.RawMessages when necessary
 func mergeMaps(dst, src map[string]interface{}) {
 	for k, v := range dst {
