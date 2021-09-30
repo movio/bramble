@@ -741,6 +741,28 @@ func TestFederatedQueryFragmentSpreads(t *testing.T) {
 		f.checkSuccess(t)
 	})
 
+	t.Run("with non abstract fragment", func(t *testing.T) {
+		f := &queryExecutionFixture{
+			services: []testService{serviceA, serviceB},
+			query: `
+			query Foo {
+				snapshot(id: "GIZMO1") {
+					... on Snapshot {
+						name
+					}
+				}
+			}`,
+			expected: `
+			{
+				"snapshot": {
+					"name": "foo"
+				}
+			}`,
+		}
+
+		f.checkSuccess(t)
+	})
+
 	t.Run("with named fragment spread", func(t *testing.T) {
 		f := &queryExecutionFixture{
 			services: []testService{serviceA, serviceB},
@@ -1029,7 +1051,7 @@ func TestQueryExecutionNamespaceAndFragmentSpread(t *testing.T) {
 									"movies": [
 										{"title": "The Big Blue"}
 									],
-									"__typename": "Person"
+									"__typename": "Director"
 								}
 							}
 						}

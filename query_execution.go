@@ -350,7 +350,7 @@ func buildTypenameResponseMap(selectionSet ast.SelectionSet, parentTypeName stri
 	return result, nil
 }
 
-func fragmentImplementsAbstractType(schema *ast.Schema, fragmentTypeDefinition, abstractObjectTypename string) bool {
+func fragmentImplementsAbstractType(schema *ast.Schema, abstractObjectTypename, fragmentTypeDefinition string) bool {
 	for _, def := range schema.Implements[fragmentTypeDefinition] {
 		if def.Name == abstractObjectTypename {
 			return true
@@ -849,7 +849,7 @@ func unionAndTrimSelectionSetRec(objectTypename string, schema *ast.Schema, sele
 			}
 
 			if fragment.ObjectDefinition.IsAbstractType() &&
-				fragmentImplementsAbstractType(schema, objectTypename, fragment.ObjectDefinition.Name) &&
+				fragmentImplementsAbstractType(schema, fragment.ObjectDefinition.Name, fragment.TypeCondition) &&
 				objectTypenameMatchesDifferentFragment(objectTypename, fragment) {
 				continue
 			}
