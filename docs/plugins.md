@@ -181,11 +181,3 @@ Exposes the GraphQL playground on `/playground`.
 ```
 
 You access the GraphQL playground by visiting `http://localhost:<gateway-port>/playground` in your browser.
-
-## Open Tracing (Jaeger)
-
-The Jaeger plugin captures and sends traces to a Jaeger server.
-
-Configuration is done through environment variables, see the [Jaeger
-documentation](https://github.com/jaegertracing/jaeger-client-go#environment-variables)
-for more information.

@@ -2,6 +2,8 @@ package bramble
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestQueryPlanA(t *testing.T) {
@@ -262,7 +264,31 @@ func TestQueryPlanInlineFragment(t *testing.T) {
 			{
 				"ServiceURL": "A",
 				"ParentType": "Query",
-				"SelectionSet": "{ movies { ... on Movie { id title(language: French) } } }",
+				"SelectionSet": "{ movies { ... on Movie { id title(language: French) __typename } } }",
+				"InsertionPoint": null,
+				"Then": null
+			}
+		]
+	}`
+	PlanTestFixture1.Check(t, query, plan)
+}
+
+func TestQueryPlanInlineFragmentDoesNotDuplicateTypename(t *testing.T) {
+	query := `{
+		movies {
+			... on Movie {
+				__typename
+				id
+				title(language: French)
+			}
+		}
+	}`
+	plan := `{
+		"RootSteps": [
+			{
+				"ServiceURL": "A",
+				"ParentType": "Query",
+				"SelectionSet": "{ movies { ... on Movie { __typename id title(language: French) } } }",
 				"InsertionPoint": null,
 				"Then": null
 			}
@@ -288,7 +314,7 @@ func TestQueryPlanInlineFragmentPlan(t *testing.T) {
 			{
 				"ServiceURL": "A",
 				"ParentType": "Query",
-				"SelectionSet": "{ movies { _id: id ... on Movie { id title(language: French) } } }",
+				"SelectionSet": "{ movies { _id: id ... on Movie { id title(language: French) __typename } } }",
 				"InsertionPoint": null,
 				"Then": [
 					{
@@ -321,7 +347,34 @@ func TestQueryPlanFragmentSpread1(t *testing.T) {
 			{
 				"ServiceURL": "A",
 				"ParentType": "Query",
-				"SelectionSet": "{ movies { ... on Movie { id title(language: French) } } }",
+				"SelectionSet": "{ movies { ... on Movie { id title(language: French) __typename } } }",
+				"InsertionPoint": null,
+				"Then": null
+			}
+		]
+	}`
+
+	PlanTestFixture1.Check(t, query, plan)
+}
+
+func TestQueryPlanFragmentSpread1DontDuplicateTypename(t *testing.T) {
+	query := `
+	fragment Frag on Movie {
+		id
+		__typename
+		title(language: French)
+	}
+	{
+		movies {
+			...Frag
+		}
+	}`
+	plan := `{
+		"RootSteps": [
+			{
+				"ServiceURL": "A",
+				"ParentType": "Query",
+				"SelectionSet": "{ movies { ... on Movie { id __typename title(language: French) } } }",
 				"InsertionPoint": null,
 				"Then": null
 			}
@@ -356,7 +409,6 @@ func TestQueryPlanFragmentSpread2(t *testing.T) {
 }
 
 func TestQueryPlanInlineFragmentSpreadOfInterface(t *testing.T) {
-	t.Skip("not supported at this time")
 	query := `
 	{
 		animals {
@@ -374,16 +426,9 @@ func TestQueryPlanInlineFragmentSpreadOfInterface(t *testing.T) {
 			{
 				"ServiceURL": "A",
 				"ParentType": "Query",
-				"SelectionSet": "{ animals { id name __typename }",
+				"SelectionSet": "{ animals { name ... on Lion { maneColor __typename } ... on Snake { _id: id __typename } } }",
 				"InsertionPoint": null,
 				"Then": [
-					{
-						"ServiceURL": "A",
-						"ParentType": "Lion",
-						"SelectionSet": "{ _id: id maneColor }",
-						"InsertionPoint": ["animals"],
-						"Then": null
-					},
 					{
 						"ServiceURL": "B",
 						"ParentType": "Snake",
@@ -513,7 +558,7 @@ func TestQueryPlanSupportsUnions(t *testing.T) {
         {
           "ServiceURL": "A",
           "ParentType": "Query",
-          "SelectionSet": "{ animals { ... on Dog { name } ... on Cat { name } ... on Snake { name } } }",
+          "SelectionSet": "{ animals { ... on Dog { name __typename } ... on Cat { name __typename } ... on Snake { name __typename } } }",
           "InsertionPoint": null,
           "Then": null
         }
@@ -700,6 +745,16 @@ func TestQueryPlanWithNestedNamespaces(t *testing.T) {
 		]
 	  }
 	`)
+}
+
+func TestPrefersArrayBasedBoundaryLookups(t *testing.T) {
+	boundaryFieldMap := make(BoundaryFieldsMap)
+	boundaryFieldMap.RegisterField("service-a", "movie", "_movie", true)
+	boundaryFieldMap.RegisterField("service-a", "movie", "_movies", false)
+
+	boundaryField, err := boundaryFieldMap.Field("service-a", "movie")
+	require.NoError(t, err)
+	require.True(t, boundaryField.Array)
 }
 
 func TestQueryPlanNoUnnessecaryID(t *testing.T) {

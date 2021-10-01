@@ -21,160 +21,6 @@ import (
 	"github.com/vektah/gqlparser/v2/gqlerror"
 )
 
-func TestFederatedQueryFragmentSpreads(t *testing.T) {
-	serviceA := testService{
-		schema: `
-		directive @boundary on OBJECT
-		interface Snapshot {
-			id: ID!
-			name: String!
-		}
-
-		type Gizmo @boundary {
-			id: ID!
-		}
-
-		type SnapshotImplementation implements Snapshot {
-			id: ID!
-			name: String!
-			gizmos: [Gizmo!]!
-		}
-
-		type Query {
-			snapshot(id: ID!): Snapshot!
-		}`,
-		handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Write([]byte(`
-			{
-				"data": {
-					"snapshot": {
-						"id": "100",
-						"name": "foo",
-						"gizmos": [{ "id": "1" }]
-					}
-				}
-			}`))
-		}),
-	}
-
-	serviceB := testService{
-		schema: `
-		directive @boundary on OBJECT
-		type Gizmo @boundary {
-			id: ID!
-			name: String!
-		}
-
-		type Query {
-			gizmo(id: ID!): Gizmo @boundary
-		}`,
-		handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Write([]byte(`
-			{
-				"data": {
-					"_0": {
-						"id": "1",
-						"name": "Gizmo #1"
-					}
-				}
-			}`))
-		}),
-	}
-
-	t.Run("with inline fragment spread", func(t *testing.T) {
-		f := &queryExecutionFixture{
-			services: []testService{serviceA, serviceB},
-			query: `
-			query Foo {
-				snapshot(id: "foo") {
-					id
-					name
-					... on SnapshotImplementation {
-						gizmos {
-							id
-							name
-						}
-					}
-				}
-			}`,
-			expected: `
-			{
-				"snapshot": {
-					"id": "100",
-					"name": "foo",
-					"gizmos": [{ "id": "1", "name": "Gizmo #1" }]
-				}
-			}`,
-		}
-
-		f.checkSuccess(t)
-	})
-
-	t.Run("with named fragment spread", func(t *testing.T) {
-		f := &queryExecutionFixture{
-			services: []testService{serviceA, serviceB},
-			query: `
-			query Foo {
-				snapshot(id: "foo") {
-					id
-					name
-					... NamedFragment
-				}
-			}
-
-			fragment NamedFragment on SnapshotImplementation {
-				gizmos {
-					id
-					name
-				}
-			}`,
-			expected: `
-			{
-				"snapshot": {
-					"id": "100",
-					"name": "foo",
-					"gizmos": [{ "id": "1", "name": "Gizmo #1" }]
-				}
-			}`,
-		}
-
-		f.checkSuccess(t)
-	})
-
-	t.Run("with nested fragment spread", func(t *testing.T) {
-		f := &queryExecutionFixture{
-			services: []testService{serviceA, serviceB},
-			query: `
-			query Foo {
-				snapshot(id: "foo") {
-					... NamedFragment
-				}
-			}
-
-			fragment NamedFragment on Snapshot {
-				id
-				name
-				... on SnapshotImplementation {
-					gizmos {
-						id
-						name
-				  	}
-				}
-			}`,
-			expected: `
-			{
-				"snapshot": {
-					"id": "100",
-					"name": "foo",
-					"gizmos": [{ "id": "1", "name": "Gizmo #1" }]
-				}
-			}`,
-		}
-
-		f.checkSuccess(t)
-	})
-}
-
 func TestIntrospectionQuery(t *testing.T) {
 	schema := `
 	union MovieOrCinema = Movie | Cinema
@@ -234,7 +80,7 @@ func TestIntrospectionQuery(t *testing.T) {
 		ctx := testContextWithoutVariables(query.Operations[0])
 		resp := es.ExecuteQuery(ctx)
 
-		assert.JSONEq(t, `
+		require.JSONEq(t, `
 		{
 			"__type": {
 				"description": "A bit like a film",
@@ -256,7 +102,7 @@ func TestIntrospectionQuery(t *testing.T) {
 		ctx := testContextWithoutVariables(query.Operations[0])
 		resp := es.ExecuteQuery(ctx)
 
-		assert.JSONEq(t, `
+		require.JSONEq(t, `
 		{
 			"movie": {
 				"desc": "A bit like a film",
@@ -294,7 +140,7 @@ func TestIntrospectionQuery(t *testing.T) {
 	}`)
 		ctx := testContextWithoutVariables(query.Operations[0])
 		resp := es.ExecuteQuery(ctx)
-		assert.JSONEq(t, `
+		require.JSONEq(t, `
 		{
 			"__type": {
 				"fields": [
@@ -357,14 +203,17 @@ func TestIntrospectionQuery(t *testing.T) {
 		}
 
 		fragment TypeInfo on __Type {
-				description
-				kind
-				name
+			description
+			kind
+			name
 		}
 		`)
 		ctx := testContextWithoutVariables(query.Operations[0])
 		resp := es.ExecuteQuery(ctx)
-		assert.JSONEq(t, `
+		errsJSON, err := json.Marshal(resp.Errors)
+		require.NoError(t, err)
+		require.Nil(t, resp.Errors, fmt.Sprintf("errors: %s", errsJSON))
+		require.JSONEq(t, `
 		{
 			"__type": {
 				"description": "A bit like a film",
@@ -389,7 +238,7 @@ func TestIntrospectionQuery(t *testing.T) {
 		`)
 		ctx := testContextWithoutVariables(query.Operations[0])
 		resp := es.ExecuteQuery(ctx)
-		assert.JSONEq(t, `
+		require.JSONEq(t, `
 		{
 			"__type": {
 				"enumValues": [
@@ -446,7 +295,7 @@ func TestIntrospectionQuery(t *testing.T) {
 		`)
 		ctx := testContextWithoutVariables(query.Operations[0])
 		resp := es.ExecuteQuery(ctx)
-		assert.JSONEq(t, `
+		require.JSONEq(t, `
 		{
 			"__type": {
 				"possibleTypes": [
@@ -472,7 +321,7 @@ func TestIntrospectionQuery(t *testing.T) {
 		ctx := testContextWithoutVariables(query.Operations[0])
 		resp := es.ExecuteQuery(ctx)
 
-		assert.JSONEq(t, `
+		require.JSONEq(t, `
 		{
 			"__type": {
 				"kind": "OBJECT",
@@ -562,7 +411,7 @@ func TestIntrospectionQuery(t *testing.T) {
 		  }
 		`), &expected)
 		require.NoError(t, err)
-		assert.ElementsMatch(t, expected.Schema.Directives, actual.Schema.Directives)
+		require.ElementsMatch(t, expected.Schema.Directives, actual.Schema.Directives)
 	})
 
 	t.Run("__schema", func(t *testing.T) {
@@ -583,7 +432,7 @@ func TestIntrospectionQuery(t *testing.T) {
 		`)
 		ctx := testContextWithoutVariables(query.Operations[0])
 		resp := es.ExecuteQuery(ctx)
-		assert.JSONEq(t, `
+		require.JSONEq(t, `
 		{
 			"__schema": {
 				"queryType": {
@@ -597,7 +446,64 @@ func TestIntrospectionQuery(t *testing.T) {
 	})
 }
 
-func TestQueryExecutionWithSingleService(t *testing.T) {
+func TestQueryWithNamespace(t *testing.T) {
+	f := &queryExecutionFixture{
+		services: []testService{
+			{
+				schema: `
+				directive @namespace on OBJECT
+
+				type NamespacedMovie {
+					id: ID!
+					title: String
+				}
+
+				type NamespaceQuery @namespace {
+					movie(id: ID!): NamespacedMovie!
+				}
+
+				type Query {
+					namespace: NamespaceQuery!
+				}
+				`,
+				handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.Write([]byte(`{
+						"data": {
+							"namespace": {
+								"movie": {
+									"id": "1",
+									"title": "Test title"
+								}
+							}
+						}
+					}`))
+				}),
+			},
+		},
+		query: `{
+			namespace {
+				movie(id: "1") {
+					id
+					title
+				}
+				__typename
+			}
+		}`,
+		expected: `{
+			"namespace": {
+				"movie": {
+					"id": "1",
+					"title": "Test title"
+				},
+				"__typename": "NamespaceQuery"
+			}
+		}`,
+	}
+
+	f.checkSuccess(t)
+}
+
+func TestQueryError(t *testing.T) {
 	f := &queryExecutionFixture{
 		services: []testService{
 			{
@@ -612,12 +518,15 @@ func TestQueryExecutionWithSingleService(t *testing.T) {
 				`,
 				handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					w.Write([]byte(`{
-						"data": {
-							"movie": {
-								"id": "1",
-								"title": "Test title"
+						"errors": [
+							{
+								"message": "Movie does not exist",
+								"path": ["movie"],
+								"extensions": {
+									"code": "NOT_FOUND"
+								}
 							}
-						}
+						]
 					}`))
 				}),
 			},
@@ -628,15 +537,390 @@ func TestQueryExecutionWithSingleService(t *testing.T) {
 				title
 			}
 		}`,
-		expected: `{
-			"movie": {
-				"id": "1",
-				"title": "Test title"
-			}
-		}`,
+		errors: gqlerror.List{
+			&gqlerror.Error{
+				Message: "Movie does not exist",
+				Path:    ast.Path{ast.PathName("movie")},
+				Locations: []gqlerror.Location{
+					{Line: 2, Column: 4},
+				},
+				Extensions: map[string]interface{}{
+					"code":         "NOT_FOUND",
+					"selectionSet": `{ movie(id: "1") { id title } }`,
+					"serviceName":  "",
+				},
+			},
+			&gqlerror.Error{
+				Message: `got a null response for non-nullable field "movie"`,
+				Path:    ast.Path{ast.PathName("movie")},
+			},
+		},
 	}
 
-	f.checkSuccess(t)
+	f.run(t)
+}
+
+func TestFederatedQueryFragmentSpreads(t *testing.T) {
+	serviceA := testService{
+		schema: `
+		directive @boundary on OBJECT
+		interface Snapshot {
+			id: ID!
+			name: String!
+		}
+
+		type Gizmo @boundary {
+			id: ID!
+		}
+
+		type Gadget @boundary {
+			id: ID!
+		}
+
+		type GizmoImplementation implements Snapshot {
+			id: ID!
+			name: String!
+			gizmos: [Gizmo!]!
+		}
+
+		type GadgetImplementation implements Snapshot {
+			id: ID!
+			name: String!
+			gadgets: [Gadget!]!
+		}
+
+		type Query {
+			snapshot(id: ID!): Snapshot!
+		}`,
+		handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			body, _ := io.ReadAll(r.Body)
+			if strings.Contains(string(body), "GIZMO1") {
+				w.Write([]byte(`
+				{
+					"data": {
+						"snapshot": {
+							"id": "100",
+							"name": "foo",
+							"gizmos": [{ "id": "GIZMO1" }],
+							"__typename": "GizmoImplementation"
+						}
+					}
+				}`))
+			} else {
+				w.Write([]byte(`
+				{
+					"data": {
+						"snapshot": {
+							"id": "100",
+							"name": "foo",
+							"gadgets": [{ "id": "GADGET1" }],
+							"__typename": "GadgetImplementation"
+						}
+					}
+				}`))
+
+			}
+		}),
+	}
+
+	serviceB := testService{
+		schema: `
+		directive @boundary on OBJECT | FIELD_DEFINITION
+		type Gizmo @boundary {
+			id: ID!
+			name: String!
+		}
+
+		type Agent {
+			name: String!
+			country: String!
+		}
+
+		type Gadget @boundary {
+			id: ID!
+			name: String!
+			agents: [Agent!]!
+		}
+
+		type Query {
+			gizmo(id: ID!): Gizmo @boundary
+			gadgets(id: [ID!]!): [Gadget!]! @boundary
+		}`,
+		handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			body, _ := io.ReadAll(r.Body)
+			if strings.Contains(string(body), "GIZMO1") {
+				w.Write([]byte(`
+				{
+					"data": {
+						"_0": {
+							"id": "GIZMO1",
+							"name": "Gizmo #1"
+						}
+					}
+				}`))
+			} else {
+				w.Write([]byte(`
+				{
+					"data": {
+						"_result": [
+							{
+								"id": "GADGET1",
+								"name": "Gadget #1",
+								"agents": [
+									{
+										"name": "James Bond",
+										"country": "UK",
+										"__typename": "Agent"
+									}
+								]
+							}
+						]
+					}
+				}`))
+			}
+		}),
+	}
+
+	t.Run("with inline fragment spread", func(t *testing.T) {
+		f := &queryExecutionFixture{
+			services: []testService{serviceA, serviceB},
+			query: `
+			query Foo {
+				snapshot(id: "GIZMO1") {
+					id
+					name
+					... on GizmoImplementation {
+						gizmos {
+							id
+							name
+						}
+					}
+				}
+			}`,
+			expected: `
+			{
+				"snapshot": {
+					"id": "100",
+					"name": "foo",
+					"gizmos": [{ "id": "GIZMO1", "name": "Gizmo #1" }]
+				}
+			}`,
+		}
+
+		f.checkSuccess(t)
+	})
+
+	t.Run("with overlap in field and fragment selection", func(t *testing.T) {
+		f := &queryExecutionFixture{
+			services: []testService{serviceA, serviceB},
+			query: `
+			query Foo {
+				snapshot(id: "GIZMO1") {
+					id
+					name
+					... on GizmoImplementation {
+						id
+						name
+						gizmos {
+							id
+							name
+						}
+					}
+				}
+			}`,
+			expected: `
+			{
+				"snapshot": {
+					"id": "100",
+					"name": "foo",
+					"gizmos": [{ "id": "GIZMO1", "name": "Gizmo #1" }]
+				}
+			}`,
+		}
+
+		f.checkSuccess(t)
+	})
+
+	t.Run("with non abstract fragment", func(t *testing.T) {
+		f := &queryExecutionFixture{
+			services: []testService{serviceA, serviceB},
+			query: `
+			query Foo {
+				snapshot(id: "GIZMO1") {
+					... on Snapshot {
+						name
+					}
+				}
+			}`,
+			expected: `
+			{
+				"snapshot": {
+					"name": "foo"
+				}
+			}`,
+		}
+
+		f.checkSuccess(t)
+	})
+
+	t.Run("with named fragment spread", func(t *testing.T) {
+		f := &queryExecutionFixture{
+			services: []testService{serviceA, serviceB},
+			query: `
+			query Foo {
+				snapshot(id: "GIZMO1") {
+					id
+					name
+					... NamedFragment
+				}
+			}
+
+			fragment NamedFragment on GizmoImplementation {
+				gizmos {
+					id
+					name
+				}
+			}`,
+			expected: `
+			{
+				"snapshot": {
+					"id": "100",
+					"name": "foo",
+					"gizmos": [{ "id": "GIZMO1", "name": "Gizmo #1" }]
+				}
+			}`,
+		}
+
+		f.checkSuccess(t)
+	})
+
+	t.Run("with nested fragment spread", func(t *testing.T) {
+		f := &queryExecutionFixture{
+			services: []testService{serviceA, serviceB},
+			query: `
+			query Foo {
+				snapshot(id: "GIZMO1") {
+					... NamedFragment
+				}
+			}
+
+			fragment NamedFragment on Snapshot {
+				id
+				name
+				... on GizmoImplementation {
+					gizmos {
+						id
+						name
+				  	}
+				}
+			}`,
+			expected: `
+			{
+				"snapshot": {
+					"id": "100",
+					"name": "foo",
+					"gizmos": [{ "id": "GIZMO1", "name": "Gizmo #1" }]
+				}
+			}`,
+		}
+
+		f.checkSuccess(t)
+	})
+
+	t.Run("with multiple implementation fragment spreads (gizmo implementation)", func(t *testing.T) {
+		f := &queryExecutionFixture{
+			services: []testService{serviceA, serviceB},
+			query: `
+			query {
+				snapshot(id: "GIZMO1") {
+					id
+					... NamedFragment
+				}
+			}
+
+			fragment NamedFragment on Snapshot {
+				name
+				... on GizmoImplementation {
+					gizmos {
+						id
+						name
+				  	}
+				}
+				... on GadgetImplementation {
+					gadgets {
+						id
+						name
+				  	}
+				}
+			}`,
+			expected: `
+			{
+				"snapshot": {
+					"id": "100",
+					"name": "foo",
+					"gizmos": [{ "id": "GIZMO1", "name": "Gizmo #1" }]
+				}
+			}`,
+		}
+
+		f.checkSuccess(t)
+	})
+
+	t.Run("with multiple implementation fragment spreads (gadget implementation)", func(t *testing.T) {
+		f := &queryExecutionFixture{
+			services: []testService{serviceA, serviceB},
+			query: `
+			query Foo {
+				snapshot(id: "GADGET1") {
+					... NamedFragment
+				}
+			}
+
+			fragment GadgetFragment on GadgetImplementation {
+				gadgets {
+					id
+					name
+					agents {
+						name
+						... on Agent {
+							country
+						}
+					}
+				}
+			}
+
+			fragment NamedFragment on Snapshot {
+				id
+				name
+				... on GizmoImplementation {
+					gizmos {
+						id
+						name
+				  	}
+				}
+				... GadgetFragment
+			}`,
+			expected: `
+			{
+				"snapshot": {
+					"id": "100",
+					"name": "foo",
+					"gadgets": [
+						{
+							"id": "GADGET1",
+							"name": "Gadget #1",
+							"agents": [
+								{"name": "James Bond", "country": "UK"}
+							]
+						}
+					]
+				}
+			}`,
+		}
+
+		f.checkSuccess(t)
+	})
+
 }
 
 func TestQueryExecutionMultipleServices(t *testing.T) {
@@ -665,8 +949,7 @@ func TestQueryExecutionMultipleServices(t *testing.T) {
 				}),
 			},
 			{
-				schema: `directive @boundary on OBJECT
-				interface Node { id: ID! }
+				schema: `directive @boundary on OBJECT | FIELD_DEFINITION
 
 				type Movie @boundary {
 					id: ID!
@@ -674,7 +957,7 @@ func TestQueryExecutionMultipleServices(t *testing.T) {
 				}
 
 				type Query {
-					node(id: ID!): Node!
+					movie(id: ID!): Movie! @boundary
 				}`,
 				handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					w.Write([]byte(`{
@@ -729,9 +1012,9 @@ func TestQueryExecutionNamespaceAndFragmentSpread(t *testing.T) {
 					w.Write([]byte(`{
 						"data": {
 							"ns": {
-							"foo": {
-								"id": "1"
-							}
+								"foo": {
+									"id": "1"
+								}
 							}
 						}
 					}
@@ -763,12 +1046,13 @@ func TestQueryExecutionNamespaceAndFragmentSpread(t *testing.T) {
 					w.Write([]byte(`{
 						"data": {
 							"ns": {
-							"somePerson": {
-								"name": "Luc Besson",
-								"movies": [
-									{"title": "The Big Blue"}
-								]
-							}
+								"somePerson": {
+									"name": "Luc Besson",
+									"movies": [
+										{"title": "The Big Blue"}
+									],
+									"__typename": "Director"
+								}
 							}
 						}
 					}
@@ -778,18 +1062,18 @@ func TestQueryExecutionNamespaceAndFragmentSpread(t *testing.T) {
 		},
 		query: `{
 			ns {
-			somePerson {
-				... on Director {
-					name
-					movies {
-						title
+				somePerson {
+					... on Director {
+						name
+						movies {
+							title
+						}
 					}
 				}
+				foo {
+					id
+				}
 			}
-			foo {
-				id
-			}
-		}
 		}`,
 		expected: `{
 			"ns": {
@@ -807,6 +1091,2375 @@ func TestQueryExecutionNamespaceAndFragmentSpread(t *testing.T) {
 	}
 
 	f.run(t)
+}
+
+func TestQueryExecutionWithNullResponse(t *testing.T) {
+	f := &queryExecutionFixture{
+		services: []testService{
+			{
+				schema: `directive @boundary on OBJECT
+				type Movie @boundary {
+					id: ID!
+				}
+
+				type Query {
+					movies: [Movie!]
+				}`,
+				handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.Write([]byte(`{
+						"data": {
+							"movies": null
+						}
+					}
+					`))
+				}),
+			},
+			{
+				schema: `directive @boundary on OBJECT | FIELD_DEFINITION
+
+				type Movie @boundary {
+					id: ID!
+					title: String
+				}
+
+				type Query {
+					movie(id: ID!): Movie! @boundary
+				}`,
+				handler: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+					require.Fail(t, "handler should not be called")
+				}),
+			},
+		},
+		query: `{
+			movies {
+				id
+				title
+			}
+		}`,
+		expected: `{
+			"movies": null
+		}`,
+	}
+
+	f.checkSuccess(t)
+}
+
+func TestQueryExecutionWithSingleService(t *testing.T) {
+	f := &queryExecutionFixture{
+		services: []testService{
+			{
+				schema: `type Movie {
+					id: ID!
+					title: String
+				}
+
+				type Query {
+					movie(id: ID!): Movie!
+				}
+				`,
+				handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.Write([]byte(`{
+						"data": {
+							"movie": {
+								"id": "1",
+								"title": "Test title"
+							}
+						}
+					}`))
+				}),
+			},
+		},
+		query: `{
+			movie(id: "1") {
+				id
+				title
+			}
+		}`,
+		expected: `{
+			"movie": {
+				"id": "1",
+				"title": "Test title"
+			}
+		}`,
+	}
+
+	f.checkSuccess(t)
+}
+
+func TestQueryWithArrayBoundaryFieldsAndMultipleChildrenSteps(t *testing.T) {
+	f := &queryExecutionFixture{
+		services: []testService{
+			{
+				schema: `directive @boundary on OBJECT | FIELD_DEFINITION
+
+				type Movie @boundary {
+					id: ID!
+					title: String
+				}
+
+				type Query {
+					randomMovie: Movie!
+					movies(ids: [ID!]!): [Movie]! @boundary
+				}`,
+				handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					b, _ := io.ReadAll(r.Body)
+					if strings.Contains(string(b), "randomMovie") {
+						w.Write([]byte(`{
+						"data": {
+							"randomMovie": {
+									"id": "1",
+									"title": "Movie 1"
+							}
+						}
+					}
+					`))
+					} else {
+						w.Write([]byte(`{
+						"data": {
+							"_result": [
+								{ "id": "2", "title": "Movie 2" },
+								{ "id": "3", "title": "Movie 3" },
+								{ "id": "4", "title": "Movie 4" }
+							]
+						}
+					}
+					`))
+					}
+				}),
+			},
+			{
+				schema: `directive @boundary on OBJECT | FIELD_DEFINITION
+
+				type Movie @boundary {
+					id: ID!
+					compTitles: [Movie!]!
+				}
+
+				type Query {
+					movies(ids: [ID!]): [Movie]! @boundary
+				}`,
+				handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.Write([]byte(`{
+						"data": {
+							"_result": [
+								{
+									"_id": "1",
+									"compTitles": [
+										{"id": "2"},
+										{"id": "3"},
+										{"id": "4"}
+									]
+								}
+							]
+						}
+					}
+					`))
+				}),
+			},
+		},
+		query: `{
+			randomMovie {
+				id
+				title
+				compTitles {
+					id
+					title
+				}
+			}
+		}`,
+		expected: `{
+			"randomMovie":
+				{
+					"id": "1",
+					"title": "Movie 1",
+					"compTitles": [
+						{ "id": "2", "title": "Movie 2" },
+						{ "id": "3", "title": "Movie 3" },
+						{ "id": "4", "title": "Movie 4" }
+					]
+				}
+		}`,
+	}
+
+	f.checkSuccess(t)
+}
+
+func TestQueryWithBoundaryFieldsAndNullsAboveInsertionPoint(t *testing.T) {
+	f := &queryExecutionFixture{
+		services: []testService{
+			{
+				schema: `directive @boundary on OBJECT | FIELD_DEFINITION
+				directive @namespace on OBJECT
+
+				type Movie @boundary {
+					id: ID!
+					title: String
+					director: Person
+				}
+
+				type Person @boundary {
+					id: ID!
+				}
+
+				type Namespace @namespace {
+					movies: [Movie!]!
+				}
+
+				type Query {
+					ns: Namespace!
+				}`,
+				handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					response := jsonToInterfaceMap(`{
+						"data": {
+							"ns": {
+								"movies": [
+									{
+										"id": "MOVIE1",
+										"title": "Movie #1",
+										"director": { "id": "DIRECTOR1" }
+									},
+									{
+										"id": "MOVIE2",
+										"title": "Movie #2",
+										"director": null
+									}
+								]
+							}
+						}
+					}
+					`)
+					if err := json.NewEncoder(w).Encode(response); err != nil {
+						t.Error(err)
+					}
+				}),
+			},
+			{
+				schema: `directive @boundary on OBJECT | FIELD_DEFINITION
+
+				type Person @boundary {
+					id: ID!
+					name: String!
+				}
+
+				type Query {
+					person(id: ID!): Person @boundary
+				}`,
+				handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.Write([]byte(`{
+							"data": {
+								"_0": {
+									"_id": "DIRECTOR1",
+									"name": "David Fincher"
+								}
+							}
+						}`))
+				}),
+			},
+		},
+		query: `{
+			ns {
+				movies {
+					id
+					title
+					director {
+						id
+						name
+					}
+				}
+			}
+		}`,
+		expected: `{
+			"ns": {
+				"movies": [
+					{
+						"id": "MOVIE1",
+						"title": "Movie #1",
+						"director": {
+							"id": "DIRECTOR1",
+							"name": "David Fincher"
+						}
+					},
+					{
+						"id": "MOVIE2",
+						"title": "Movie #2",
+						"director": null
+					}
+				]
+			}
+		}`,
+	}
+
+	f.checkSuccess(t)
+}
+
+func TestExtractBoundaryIDs(t *testing.T) {
+	dataJSON := `{
+		"gizmos": [
+			{
+				"id": "1",
+				"name": "Gizmo 1",
+				"owner": {
+					"_id": "1"
+				}
+			},
+			{
+				"id": "2",
+				"name": "Gizmo 2",
+				"owner": {
+					"id": "1"
+				}
+			},
+			{
+				"id": "3",
+				"name": "Gizmo 3",
+				"owner": {
+					"_id": "2"
+				}
+			},
+			{
+				"id": "4",
+				"name": "Gizmo 4",
+				"owner": {
+					"id": "5"
+				}
+			}
+		]
+	}`
+	data := map[string]interface{}{}
+	expected := []string{"1", "1", "2", "5"}
+	insertionPoint := []string{"gizmos", "owner"}
+	require.NoError(t, json.Unmarshal([]byte(dataJSON), &data))
+	result, err := extractBoundaryIDs(data, insertionPoint)
+	require.NoError(t, err)
+	require.Equal(t, expected, result)
+}
+
+func TestTrimInsertionPointForNestedBoundaryQuery(t *testing.T) {
+	dataJSON := `[
+			{
+				"id": "1",
+				"name": "Gizmo 1",
+				"owner": {
+					"_id": "1"
+				}
+			},
+			{
+				"id": "2",
+				"name": "Gizmo 2",
+				"owner": {
+					"id": "1"
+				}
+			},
+			{
+				"id": "3",
+				"name": "Gizmo 3",
+				"owner": {
+					"_id": "2"
+				}
+			},
+			{
+				"id": "4",
+				"name": "Gizmo 4",
+				"owner": {
+					"id": "5"
+				}
+			}
+		]`
+	insertionPoint := []string{"namespace", "gizmos", "owner"}
+	expected := []string{"owner"}
+	result, err := trimInsertionPointForNestedBoundaryStep(jsonToInterfaceSlice(dataJSON), insertionPoint)
+	require.NoError(t, err)
+	require.Equal(t, expected, result)
+}
+
+func TestBuildBoundaryQueryDocuments(t *testing.T) {
+	ddl := `
+		type Gizmo {
+			id: ID!
+			color: String!
+			owner: Owner
+		}
+
+		type Owner {
+			id: ID!
+			name: String!
+		}
+
+		type Query {
+			gizmos: [Gizmo!]!
+			getOwners(ids: [ID!]!): [Owner!]!
+		}
+	`
+	schema := gqlparser.MustLoadSchema(&ast.Source{Name: "fixture", Input: ddl})
+	boundaryField := BoundaryField{Field: "getOwners", Array: true}
+	ids := []string{"1", "2", "3"}
+	selectionSet := []ast.Selection{
+		&ast.Field{
+			Alias:            "_id",
+			Name:             "id",
+			Definition:       schema.Types["Owner"].Fields.ForName("id"),
+			ObjectDefinition: schema.Types["Owner"],
+		},
+		&ast.Field{
+			Alias:            "name",
+			Name:             "name",
+			Definition:       schema.Types["Owner"].Fields.ForName("name"),
+			ObjectDefinition: schema.Types["Owner"],
+		},
+	}
+	step := &QueryPlanStep{
+		ServiceURL:     "http://example.com:8080",
+		ServiceName:    "test",
+		ParentType:     "Gizmo",
+		SelectionSet:   selectionSet,
+		InsertionPoint: []string{"gizmos", "owner"},
+		Then:           nil,
+	}
+	expected := []string{`{ _result: getOwners(ids: ["1", "2", "3"]) { _id: id name } }`}
+	ctx := testContextWithoutVariables(nil)
+	docs, err := buildBoundaryQueryDocuments(ctx, schema, step, ids, boundaryField, 1)
+	require.NoError(t, err)
+	require.Equal(t, expected, docs)
+}
+
+func TestBuildNonArrayBoundaryQueryDocuments(t *testing.T) {
+	ddl := `
+		type Gizmo {
+			id: ID!
+			color: String!
+			owner: Owner
+		}
+
+		type Owner {
+			id: ID!
+			name: String!
+		}
+
+		type Query {
+			gizmos: [Gizmo!]!
+			getOwner(id: ID!): Owner!
+		}
+	`
+	schema := gqlparser.MustLoadSchema(&ast.Source{Name: "fixture", Input: ddl})
+	boundaryField := BoundaryField{Field: "getOwner", Array: false}
+	ids := []string{"1", "2", "3"}
+	selectionSet := []ast.Selection{
+		&ast.Field{
+			Alias:            "_id",
+			Name:             "id",
+			Definition:       schema.Types["Owner"].Fields.ForName("id"),
+			ObjectDefinition: schema.Types["Owner"],
+		},
+		&ast.Field{
+			Alias:            "name",
+			Name:             "name",
+			Definition:       schema.Types["Owner"].Fields.ForName("name"),
+			ObjectDefinition: schema.Types["Owner"],
+		},
+	}
+	step := &QueryPlanStep{
+		ServiceURL:     "http://example.com:8080",
+		ServiceName:    "test",
+		ParentType:     "Gizmo",
+		SelectionSet:   selectionSet,
+		InsertionPoint: []string{"gizmos", "owner"},
+		Then:           nil,
+	}
+	expected := []string{`{ _0: getOwner(id: "1") { _id: id name } _1: getOwner(id: "2") { _id: id name } _2: getOwner(id: "3") { _id: id name } }`}
+	ctx := testContextWithoutVariables(nil)
+	docs, err := buildBoundaryQueryDocuments(ctx, schema, step, ids, boundaryField, 10)
+	require.NoError(t, err)
+	require.Equal(t, expected, docs)
+}
+
+func TestBuildBatchedNonArrayBoundaryQueryDocuments(t *testing.T) {
+	ddl := `
+		type Gizmo {
+			id: ID!
+			color: String!
+			owner: Owner
+		}
+
+		type Owner {
+			id: ID!
+			name: String!
+		}
+
+		type Query {
+			gizmos: [Gizmo!]!
+			getOwner(id: ID!): Owner!
+		}
+	`
+	schema := gqlparser.MustLoadSchema(&ast.Source{Name: "fixture", Input: ddl})
+	boundaryField := BoundaryField{Field: "getOwner", Array: false}
+	ids := []string{"1", "2", "3"}
+	selectionSet := []ast.Selection{
+		&ast.Field{
+			Alias:            "_id",
+			Name:             "id",
+			Definition:       schema.Types["Owner"].Fields.ForName("id"),
+			ObjectDefinition: schema.Types["Owner"],
+		},
+		&ast.Field{
+			Alias:            "name",
+			Name:             "name",
+			Definition:       schema.Types["Owner"].Fields.ForName("name"),
+			ObjectDefinition: schema.Types["Owner"],
+		},
+	}
+	step := &QueryPlanStep{
+		ServiceURL:     "http://example.com:8080",
+		ServiceName:    "test",
+		ParentType:     "Gizmo",
+		SelectionSet:   selectionSet,
+		InsertionPoint: []string{"gizmos", "owner"},
+		Then:           nil,
+	}
+	expected := []string{`{ _0: getOwner(id: "1") { _id: id name } _1: getOwner(id: "2") { _id: id name } }`, `{ _2: getOwner(id: "3") { _id: id name } }`}
+	ctx := testContextWithoutVariables(nil)
+	docs, err := buildBoundaryQueryDocuments(ctx, schema, step, ids, boundaryField, 2)
+	require.NoError(t, err)
+	require.Equal(t, expected, docs)
+}
+
+func TestMergeExecutionResults(t *testing.T) {
+	t.Run("merges single map", func(t *testing.T) {
+		inputMap := jsonToInterfaceMap(`{
+			"gizmo": {
+				"id": "1",
+				"color": "Gizmo A"
+			}
+		}`)
+
+		result := executionResult{
+			ServiceURL:     "http://service-a",
+			InsertionPoint: []string{},
+			Data:           inputMap,
+		}
+
+		mergedMap, err := mergeExecutionResults([]executionResult{result})
+
+		require.NoError(t, err)
+		require.Equal(t, inputMap, mergedMap)
+	})
+
+	t.Run("merges two top level results", func(t *testing.T) {
+		inputMapA := jsonToInterfaceMap(`{
+			"gizmoA": {
+				"id": "1",
+				"color": "Gizmo A"
+			}
+		}`)
+
+		resultA := executionResult{
+			ServiceURL:     "http://service-a",
+			InsertionPoint: []string{},
+			Data:           inputMapA,
+		}
+
+		inputMapB := jsonToInterfaceMap(`{
+			"gizmoB": {
+				"id": "2",
+				"color": "Gizmo B"
+			}
+		}`)
+
+		resultB := executionResult{
+			ServiceURL:     "http://service-b",
+			InsertionPoint: []string{},
+			Data:           inputMapB,
+		}
+
+		mergedMap, err := mergeExecutionResults([]executionResult{resultA, resultB})
+
+		expected := jsonToInterfaceMap(`{
+			"gizmoA": {
+				"id": "1",
+				"color": "Gizmo A"
+			},
+			"gizmoB": {
+				"id": "2",
+				"color": "Gizmo B"
+			}
+		}`)
+
+		require.NoError(t, err)
+		require.Equal(t, expected, mergedMap)
+	})
+
+	t.Run("merges mid level array", func(t *testing.T) {
+		inputMapA := jsonToInterfaceMap(`{
+			"gizmo": {
+				"id": "1",
+				"gadgets": [{"id": "GADGET1", "owner": { "id": "OWNER1" }}, {"id": "GADGET3", "owner": { "id": "OWNER3" }}, {"id": "GADGET2", "owner": null}]
+			}
+		}`)
+
+		resultA := executionResult{
+			ServiceURL:     "http://service-a",
+			InsertionPoint: []string{},
+			Data:           inputMapA,
+		}
+
+		inputMapB := jsonToInterfaceSlice(`[
+			{
+				"id": "OWNER1",
+				"name": "008"
+			}
+		]`)
+
+		resultB := executionResult{
+			ServiceURL:     "http://service-b",
+			InsertionPoint: []string{"gizmo", "gadgets", "owner"},
+			Data:           inputMapB,
+		}
+
+		mergedMap, err := mergeExecutionResults([]executionResult{resultA, resultB})
+
+		expected := jsonToInterfaceMap(`
+		{
+			"gizmo": {
+				"gadgets": [
+					{
+						"id": "GADGET1",
+						"owner": {
+							"id": "OWNER1",
+							"name": "008"
+						}
+					},
+					{
+						"id": "GADGET3",
+						"owner": {
+							"id": "OWNER3"
+						}
+					},
+					{
+						"id": "GADGET2",
+						"owner": null
+					}
+				],
+				"id": "1"
+			}
+		}`)
+
+		require.NoError(t, err)
+		require.Equal(t, expected, mergedMap)
+	})
+
+	t.Run("merges nested mid level array", func(t *testing.T) {
+		inputMapA := jsonToInterfaceMap(`{
+			"gizmo": {
+				"id": "1",
+				"gadgets": [[{"id": "GADGET1", "owner": { "id": "OWNER1" }}, {"id": "GADGET3", "owner": { "id": "OWNER3" }}], [{"id": "GADGET2", "owner": null}]]
+			}
+		}`)
+
+		resultA := executionResult{
+			ServiceURL:     "http://service-a",
+			InsertionPoint: []string{},
+			Data:           inputMapA,
+		}
+
+		inputMapB := jsonToInterfaceSlice(`[
+			{
+				"id": "OWNER1",
+				"name": "008"
+			}
+		]`)
+
+		resultB := executionResult{
+			ServiceURL:     "http://service-b",
+			InsertionPoint: []string{"gizmo", "gadgets", "owner"},
+			Data:           inputMapB,
+		}
+
+		mergedMap, err := mergeExecutionResults([]executionResult{resultA, resultB})
+
+		expected := jsonToInterfaceMap(`
+		{
+			"gizmo": {
+				"gadgets": [
+					[
+						{
+							"id": "GADGET1",
+							"owner": {
+								"id": "OWNER1",
+								"name": "008"
+							}
+						},
+						{
+							"id": "GADGET3",
+							"owner": {
+								"id": "OWNER3"
+							}
+						}
+					],
+					[
+						{
+							"id": "GADGET2",
+							"owner": null
+						}
+					]
+				],
+				"id": "1"
+			}
+		}`)
+
+		require.NoError(t, err)
+		require.Equal(t, expected, mergedMap)
+	})
+
+	t.Run("merges root step with child step (root step returns object, boundary field is non array)", func(t *testing.T) {
+		inputMapA := jsonToInterfaceMap(`{
+			"gizmo": {
+				"id": "1",
+				"color": "Gizmo A",
+				"owner": {
+					"_id": "1"
+				}
+			}
+		}`)
+
+		resultA := executionResult{
+			ServiceURL:     "http://service-a",
+			InsertionPoint: []string{},
+			Data:           inputMapA,
+		}
+
+		inputSliceB := jsonToInterfaceSlice(`[
+			{
+				"_id": "1",
+				"name": "Owner A"
+			}
+		]`)
+
+		resultB := executionResult{
+			ServiceURL:     "http://service-b",
+			InsertionPoint: []string{"gizmo", "owner"},
+			Data:           inputSliceB,
+		}
+
+		mergedMap, err := mergeExecutionResults([]executionResult{resultA, resultB})
+
+		expected := jsonToInterfaceMap(`{
+			"gizmo": {
+				"id": "1",
+				"color": "Gizmo A",
+				"owner": {
+					"_id": "1",
+					"name": "Owner A"
+				}
+			}
+		}`)
+
+		require.NoError(t, err)
+		require.Equal(t, expected, mergedMap)
+	})
+
+	t.Run("merges root step with child step (root step returns array, boundary field is non array)", func(t *testing.T) {
+		inputMapA := jsonToInterfaceMap(`{
+			"gizmos": [
+				{
+					"id": "1",
+					"color": "RED",
+					"owner": {
+						"_id": "4"
+					}
+				},
+				{
+					"id": "2",
+					"color": "GREEN",
+					"owner": {
+						"_id": "5"
+					}
+				},
+				{
+					"id": "3",
+					"color": "BLUE",
+					"owner": {
+						"_id": "6"
+					}
+				}
+			]
+		}`)
+
+		resultA := executionResult{
+			ServiceURL:     "http://service-a",
+			InsertionPoint: []string{},
+			Data:           inputMapA,
+		}
+
+		inputSliceB := jsonToInterfaceSlice(`[
+			{
+				"_id": "4",
+				"name": "Owner A"
+			},
+			{
+				"_id": "5",
+				"name": "Owner B"
+			},
+			{
+				"_id": "6",
+				"name": "Owner C"
+			}
+		]`)
+
+		resultB := executionResult{
+			ServiceURL:     "http://service-b",
+			InsertionPoint: []string{"gizmos", "owner"},
+			Data:           inputSliceB,
+		}
+
+		mergedMap, err := mergeExecutionResults([]executionResult{resultA, resultB})
+
+		expected := jsonToInterfaceMap(`{
+			"gizmos": [
+				{
+					"id": "1",
+					"color": "RED",
+					"owner": {
+						"_id": "4",
+						"name": "Owner A"
+					}
+				},
+				{
+					"id": "2",
+					"color": "GREEN",
+					"owner": {
+						"_id": "5",
+						"name": "Owner B"
+					}
+				},
+				{
+					"id": "3",
+					"color": "BLUE",
+					"owner": {
+						"_id": "6",
+						"name": "Owner C"
+					}
+				}
+			]
+		}`)
+
+		require.NoError(t, err)
+		require.Equal(t, expected, mergedMap)
+	})
+
+	t.Run("merges root step with child step (root step returns array, boundary field is array)", func(t *testing.T) {
+		inputMapA := jsonToInterfaceMap(`{
+			"gizmos": [
+				{
+					"id": "1",
+					"color": "RED",
+					"owner": {
+						"_id": "4"
+					}
+				},
+				{
+					"id": "2",
+					"color": "GREEN",
+					"owner": {
+						"_id": "5"
+					}
+				},
+				{
+					"id": "3",
+					"color": "BLUE",
+					"owner": {
+						"_id": "6"
+					}
+				}
+			]
+		}`)
+
+		resultA := executionResult{
+			ServiceURL:     "http://service-a",
+			InsertionPoint: []string{},
+			Data:           inputMapA,
+		}
+
+		inputSliceB := jsonToInterfaceSlice(`[
+			{
+				"_id": "4",
+				"name": "Owner A"
+			},
+			{
+				"_id": "5",
+				"name": "Owner B"
+			},
+			{
+				"_id": "6",
+				"name": "Owner C"
+			}
+		]`)
+
+		resultB := executionResult{
+			ServiceURL:     "http://service-b",
+			InsertionPoint: []string{"gizmos", "owner"},
+			Data:           inputSliceB,
+		}
+
+		mergedMap, err := mergeExecutionResults([]executionResult{resultA, resultB})
+
+		expected := jsonToInterfaceMap(`{
+			"gizmos": [
+				{
+					"id": "1",
+					"color": "RED",
+					"owner": {
+						"_id": "4",
+						"name": "Owner A"
+					}
+				},
+				{
+					"id": "2",
+					"color": "GREEN",
+					"owner": {
+						"_id": "5",
+						"name": "Owner B"
+					}
+				},
+				{
+					"id": "3",
+					"color": "BLUE",
+					"owner": {
+						"_id": "6",
+						"name": "Owner C"
+					}
+				}
+			]
+		}`)
+
+		require.NoError(t, err)
+		require.Equal(t, expected, mergedMap)
+	})
+
+	t.Run("allows using both 'id' and '_id'", func(t *testing.T) {
+		inputMapA := jsonToInterfaceMap(`{
+			"gizmos": [
+				{
+					"id": "1",
+					"color": "RED",
+					"owner": {
+						"id": "4"
+					}
+				},
+				{
+					"id": "2",
+					"color": "GREEN",
+					"owner": {
+						"id": "5"
+					}
+				},
+				{
+					"id": "3",
+					"color": "BLUE",
+					"owner": {
+						"_id": "6"
+					}
+				}
+			]
+		}`)
+
+		resultA := executionResult{
+			ServiceURL:     "http://service-a",
+			InsertionPoint: []string{},
+			Data:           inputMapA,
+		}
+
+		inputSliceB := jsonToInterfaceSlice(`[
+			{
+				"_id": "4",
+				"name": "Owner A"
+			},
+			{
+				"id": "5",
+				"name": "Owner B"
+			},
+			{
+				"id": "6",
+				"name": "Owner C"
+			}
+		]`)
+
+		resultB := executionResult{
+			ServiceURL:     "http://service-b",
+			InsertionPoint: []string{"gizmos", "owner"},
+			Data:           inputSliceB,
+		}
+
+		mergedMap, err := mergeExecutionResults([]executionResult{resultA, resultB})
+
+		expected := jsonToInterfaceMap(`{
+			"gizmos": [
+				{
+					"id": "1",
+					"color": "RED",
+					"owner": {
+						"id": "4",
+						"name": "Owner A"
+					}
+				},
+				{
+					"id": "2",
+					"color": "GREEN",
+					"owner": {
+						"id": "5",
+						"name": "Owner B"
+					}
+				},
+				{
+					"id": "3",
+					"color": "BLUE",
+					"owner": {
+						"_id": "6",
+						"name": "Owner C"
+					}
+				}
+			]
+		}`)
+
+		require.NoError(t, err)
+		require.Equal(t, expected, mergedMap)
+	})
+}
+
+func TestUnionAndTrimSelectionSet(t *testing.T) {
+	schemaString := `
+		directive @boundary on OBJECT
+		interface Tool {
+			id: ID!
+			name: String!
+		}
+
+		union GadgetOrGizmo = Gadget | Gizmo
+
+		type Gizmo @boundary {
+			id: ID!
+		}
+
+		type Gadget @boundary {
+			id: ID!
+		}
+
+		type Agent {
+			id: ID!
+			name: String!
+			country: Country!
+		}
+
+		type Country {
+			id: ID!
+			name: String!
+		}
+
+		type GizmoImplementation implements Tool {
+			id: ID!
+			name: String!
+			gizmos: [Gizmo!]!
+		}
+
+		type GadgetImplementation implements Tool {
+			id: ID!
+			name: String!
+			gadgets: [Gadget!]!
+		}
+
+		type Query {
+			tool(id: ID!): Tool!
+		}`
+
+	schema := gqlparser.MustLoadSchema(&ast.Source{Input: schemaString})
+	ctx := testContextWithoutVariables(nil)
+
+	t.Run("does not touch simple selection sets", func(t *testing.T) {
+		selectionSet := ast.SelectionSet{
+			&ast.Field{
+				Alias:            "id",
+				Name:             "id",
+				Definition:       schema.Types["Agent"].Fields.ForName("id"),
+				ObjectDefinition: schema.Types["Agent"],
+			},
+			&ast.Field{
+				Alias:            "name",
+				Name:             "name",
+				Definition:       schema.Types["Agent"].Fields.ForName("name"),
+				ObjectDefinition: schema.Types["Agent"],
+			},
+			&ast.Field{
+				Alias:            "country",
+				Name:             "country",
+				Definition:       schema.Types["Agent"].Fields.ForName("country"),
+				ObjectDefinition: schema.Types["Agent"],
+				SelectionSet: []ast.Selection{
+					&ast.Field{
+						Alias:            "id",
+						Name:             "id",
+						Definition:       schema.Types["Country"].Fields.ForName("id"),
+						ObjectDefinition: schema.Types["Country"],
+					},
+					&ast.Field{
+						Alias:            "name",
+						Name:             "name",
+						Definition:       schema.Types["Country"].Fields.ForName("name"),
+						ObjectDefinition: schema.Types["Country"],
+					},
+				},
+			},
+		}
+
+		filtered, err := unionAndTrimSelectionSet("", schema, selectionSet)
+		require.NoError(t, err)
+		require.Equal(t, selectionSet, filtered)
+	})
+
+	t.Run("removes field duplicates from inline fragment", func(t *testing.T) {
+		initialSelectionSet := ast.SelectionSet{
+			&ast.Field{
+				Alias:            "id",
+				Name:             "id",
+				Definition:       schema.Types["Tool"].Fields.ForName("id"),
+				ObjectDefinition: schema.Types["Tool"],
+			},
+			&ast.Field{
+				Alias:            "name",
+				Name:             "name",
+				Definition:       schema.Types["Tool"].Fields.ForName("name"),
+				ObjectDefinition: schema.Types["Tool"],
+			},
+			&ast.InlineFragment{
+				TypeCondition: schema.Types["GizmoImplementation"].Name,
+				SelectionSet: []ast.Selection{
+					&ast.Field{
+						Alias:            "id",
+						Name:             "id",
+						Definition:       schema.Types["GizmoImplementation"].Fields.ForName("id"),
+						ObjectDefinition: schema.Types["GizmoImplementation"],
+					},
+					&ast.Field{
+						Alias:            "name",
+						Name:             "name",
+						Definition:       schema.Types["GizmoImplementation"].Fields.ForName("name"),
+						ObjectDefinition: schema.Types["GizmoImplementation"],
+					},
+					&ast.Field{
+						Alias:            "gizmos",
+						Name:             "gizmos",
+						Definition:       schema.Types["GizmoImplementation"].Fields.ForName("gizmos"),
+						ObjectDefinition: schema.Types["GizmoImplementation"],
+						SelectionSet: []ast.Selection{
+							&ast.Field{
+								Alias:            "id",
+								Name:             "id",
+								Definition:       schema.Types["Gizmo"].Fields.ForName("id"),
+								ObjectDefinition: schema.Types["Gizmo"],
+							},
+						},
+					},
+				},
+				ObjectDefinition: schema.Types["GizmoImplementation"],
+			},
+		}
+
+		expected := ast.SelectionSet{
+			&ast.Field{
+				Alias:            "id",
+				Name:             "id",
+				Definition:       schema.Types["Tool"].Fields.ForName("id"),
+				ObjectDefinition: schema.Types["Tool"],
+			},
+			&ast.Field{
+				Alias:            "name",
+				Name:             "name",
+				Definition:       schema.Types["Tool"].Fields.ForName("name"),
+				ObjectDefinition: schema.Types["Tool"],
+			},
+			&ast.InlineFragment{
+				TypeCondition: schema.Types["GizmoImplementation"].Name,
+				SelectionSet: []ast.Selection{
+					&ast.Field{
+						Alias:            "gizmos",
+						Name:             "gizmos",
+						Definition:       schema.Types["GizmoImplementation"].Fields.ForName("gizmos"),
+						ObjectDefinition: schema.Types["GizmoImplementation"],
+						SelectionSet: []ast.Selection{
+							&ast.Field{
+								Alias:            "id",
+								Name:             "id",
+								Definition:       schema.Types["Gizmo"].Fields.ForName("id"),
+								ObjectDefinition: schema.Types["Gizmo"],
+							},
+						},
+					},
+				},
+				ObjectDefinition: schema.Types["GizmoImplementation"],
+			},
+		}
+
+		filtered, err := unionAndTrimSelectionSet("GizmoImplementation", schema, initialSelectionSet)
+		require.NoError(t, err)
+		require.Equal(t, formatSelectionSetSingleLine(ctx, schema, expected), formatSelectionSetSingleLine(ctx, schema, filtered))
+	})
+
+	t.Run("removes inline fragment if it only contains duplicate selections", func(t *testing.T) {
+		initialSelectionSet := ast.SelectionSet{
+			&ast.Field{
+				Alias:            "id",
+				Name:             "id",
+				Definition:       schema.Types["Tool"].Fields.ForName("id"),
+				ObjectDefinition: schema.Types["Tool"],
+			},
+			&ast.Field{
+				Alias:            "name",
+				Name:             "name",
+				Definition:       schema.Types["Tool"].Fields.ForName("name"),
+				ObjectDefinition: schema.Types["Tool"],
+			},
+			&ast.InlineFragment{
+				TypeCondition: schema.Types["GizmoImplementation"].Name,
+				SelectionSet: []ast.Selection{
+					&ast.Field{
+						Alias:            "id",
+						Name:             "id",
+						Definition:       schema.Types["GizmoImplementation"].Fields.ForName("id"),
+						ObjectDefinition: schema.Types["GizmoImplementation"],
+					},
+					&ast.Field{
+						Alias:            "name",
+						Name:             "name",
+						Definition:       schema.Types["GizmoImplementation"].Fields.ForName("name"),
+						ObjectDefinition: schema.Types["GizmoImplementation"],
+					},
+				},
+				ObjectDefinition: schema.Types["GizmoImplementation"],
+			},
+		}
+
+		expected := ast.SelectionSet{
+			&ast.Field{
+				Alias:            "id",
+				Name:             "id",
+				Definition:       schema.Types["Tool"].Fields.ForName("id"),
+				ObjectDefinition: schema.Types["Tool"],
+			},
+			&ast.Field{
+				Alias:            "name",
+				Name:             "name",
+				Definition:       schema.Types["Tool"].Fields.ForName("name"),
+				ObjectDefinition: schema.Types["Tool"],
+			},
+		}
+
+		filtered, err := unionAndTrimSelectionSet("GizmoImplementation", schema, initialSelectionSet)
+		require.NoError(t, err)
+		require.Equal(t, formatSelectionSetSingleLine(ctx, schema, expected), formatSelectionSetSingleLine(ctx, schema, filtered))
+	})
+
+	t.Run("removes inline fragment that does not match typename", func(t *testing.T) {
+		initialSelectionSet := ast.SelectionSet{
+			&ast.Field{
+				Alias:            "id",
+				Name:             "id",
+				Definition:       schema.Types["Tool"].Fields.ForName("id"),
+				ObjectDefinition: schema.Types["Tool"],
+			},
+			&ast.InlineFragment{
+				TypeCondition: schema.Types["GizmoImplementation"].Name,
+				SelectionSet: []ast.Selection{
+					&ast.Field{
+						Alias:            "id",
+						Name:             "id",
+						Definition:       schema.Types["GizmoImplementation"].Fields.ForName("id"),
+						ObjectDefinition: schema.Types["GizmoImplementation"],
+					},
+					&ast.Field{
+						Alias:            "name",
+						Name:             "name",
+						Definition:       schema.Types["GizmoImplementation"].Fields.ForName("name"),
+						ObjectDefinition: schema.Types["GizmoImplementation"],
+					},
+				},
+				ObjectDefinition: schema.Types["GizmoImplementation"],
+			},
+			&ast.InlineFragment{
+				TypeCondition: schema.Types["GadgetImplementation"].Name,
+				SelectionSet: []ast.Selection{
+					&ast.Field{
+						Alias:            "name",
+						Name:             "name",
+						Definition:       schema.Types["GadgetImplementation"].Fields.ForName("name"),
+						ObjectDefinition: schema.Types["GadgetImplementation"],
+					},
+				},
+				ObjectDefinition: schema.Types["GadgetImplementation"],
+			},
+		}
+
+		expected := ast.SelectionSet{
+			&ast.Field{
+				Alias:            "id",
+				Name:             "id",
+				Definition:       schema.Types["Tool"].Fields.ForName("id"),
+				ObjectDefinition: schema.Types["Tool"],
+			},
+			&ast.InlineFragment{
+				TypeCondition: schema.Types["GizmoImplementation"].Name,
+				SelectionSet: []ast.Selection{
+					&ast.Field{
+						Alias:            "name",
+						Name:             "name",
+						Definition:       schema.Types["GizmoImplementation"].Fields.ForName("name"),
+						ObjectDefinition: schema.Types["GizmoImplementation"],
+					},
+				},
+				ObjectDefinition: schema.Types["GizmoImplementation"],
+			},
+		}
+
+		filtered, err := unionAndTrimSelectionSet("GizmoImplementation", schema, initialSelectionSet)
+		require.NoError(t, err)
+		require.Equal(t, formatSelectionSetSingleLine(ctx, schema, expected), formatSelectionSetSingleLine(ctx, schema, filtered))
+	})
+
+	t.Run("works with unions", func(t *testing.T) {
+		initialSelectionSet := ast.SelectionSet{
+			&ast.InlineFragment{
+				TypeCondition: schema.Types["Gizmo"].Name,
+				SelectionSet: []ast.Selection{
+					&ast.Field{
+						Alias:            "id",
+						Name:             "id",
+						Definition:       schema.Types["Gizmo"].Fields.ForName("id"),
+						ObjectDefinition: schema.Types["Gizmo"],
+					},
+				},
+				ObjectDefinition: schema.Types["GadgetOrGizmo"],
+			},
+			&ast.InlineFragment{
+				TypeCondition: schema.Types["Gadget"].Name,
+				SelectionSet: []ast.Selection{
+					&ast.Field{
+						Alias:            "name",
+						Name:             "name",
+						Definition:       schema.Types["Gadget"].Fields.ForName("name"),
+						ObjectDefinition: schema.Types["Gadget"],
+					},
+				},
+				ObjectDefinition: schema.Types["GadgetOrGizmo"],
+			},
+		}
+
+		expected := ast.SelectionSet{
+			&ast.InlineFragment{
+				TypeCondition: schema.Types["Gadget"].Name,
+				SelectionSet: []ast.Selection{
+					&ast.Field{
+						Alias:            "name",
+						Name:             "name",
+						Definition:       schema.Types["Gadget"].Fields.ForName("name"),
+						ObjectDefinition: schema.Types["Gadget"],
+					},
+				},
+				ObjectDefinition: schema.Types["GadgetOrGizmo"],
+			},
+		}
+
+		filtered, err := unionAndTrimSelectionSet("Gadget", schema, initialSelectionSet)
+		require.NoError(t, err)
+		require.Equal(t, formatSelectionSetSingleLine(ctx, schema, expected), formatSelectionSetSingleLine(ctx, schema, filtered))
+	})
+}
+
+func TestBubbleUpNullValuesInPlace(t *testing.T) {
+	t.Run("no expected or unexpected nulls", func(t *testing.T) {
+		ddl := `
+		type Gizmo {
+			id: ID!
+			color: String!
+			owner: Owner
+		}
+
+		type Owner {
+			id: ID!
+			name: String!
+		}
+
+		type Query {
+			gizmos: [Gizmo!]!
+			getOwners(ids: [ID!]!): [Owner!]!
+		}`
+
+		result := jsonToInterfaceMap(`
+			{
+				"gizmos": [
+					{ "id": "GIZMO1" },
+					{ "id": "GIZMO2" },
+					{ "id": "GIZMO3" }
+				]
+			}
+		`)
+
+		schema := gqlparser.MustLoadSchema(&ast.Source{Name: "fixture", Input: ddl})
+
+		query := `
+			{
+				gizmos {
+					id
+				}
+			}`
+
+		document := gqlparser.MustLoadQuery(schema, query)
+		errs, err := bubbleUpNullValuesInPlace(schema, document.Operations[0].SelectionSet, result)
+		require.NoError(t, err)
+		require.Nil(t, errs)
+	})
+
+	t.Run("1 expected null (bubble to root)", func(t *testing.T) {
+		ddl := `
+		type Gizmo {
+			id: ID!
+			color: String!
+			owner: Owner
+		}
+
+		type Owner {
+			id: ID!
+			name: String!
+		}
+
+		type Query {
+			gizmos: [Gizmo!]!
+			getOwners(ids: [ID!]!): [Owner!]!
+		}`
+
+		result := jsonToInterfaceMap(`
+			{
+				"gizmos": [
+					{ "id": "GIZMO1", "color": "RED" },
+					{ "id": "GIZMO2", "color": "GREEN" },
+					{ "id": "GIZMO3", "color": null }
+				]
+			}
+		`)
+
+		schema := gqlparser.MustLoadSchema(&ast.Source{Name: "fixture", Input: ddl})
+
+		query := `
+			{
+				gizmos {
+					id
+					color
+				}
+			}`
+
+		document := gqlparser.MustLoadQuery(schema, query)
+		errs, err := bubbleUpNullValuesInPlace(schema, document.Operations[0].SelectionSet, result)
+		require.Equal(t, errNullBubbledToRoot, err)
+		require.Len(t, errs, 1)
+	})
+
+	t.Run("1 expected null (bubble to middle)", func(t *testing.T) {
+		ddl := `
+		type Gizmo {
+			id: ID!
+			color: String!
+			owner: Owner
+		}
+
+		type Owner {
+			id: ID!
+			name: String!
+		}
+
+		type Query {
+			gizmos: [Gizmo!]
+			getOwners(ids: [ID!]!): [Owner!]!
+		}`
+
+		result := jsonToInterfaceMap(`
+			{
+				"gizmos": [
+					{ "id": "GIZMO1", "color": "RED" },
+					{ "id": "GIZMO2", "color": "GREEN" },
+					{ "id": "GIZMO3", "color": null }
+				]
+			}
+		`)
+
+		schema := gqlparser.MustLoadSchema(&ast.Source{Name: "fixture", Input: ddl})
+
+		query := `
+			{
+				gizmos {
+					id
+					color
+				}
+			}`
+
+		document := gqlparser.MustLoadQuery(schema, query)
+		errs, err := bubbleUpNullValuesInPlace(schema, document.Operations[0].SelectionSet, result)
+		require.NoError(t, err)
+		require.Equal(t, []*gqlerror.Error([]*gqlerror.Error{
+			{
+				Message:    `got a null response for non-nullable field "color"`,
+				Path:       ast.Path{ast.PathName("gizmos"), ast.PathIndex(2), ast.PathName("color")},
+				Extensions: nil,
+			}}), errs)
+		require.Equal(t, jsonToInterfaceMap(`{ "gizmos": null }`), result)
+	})
+
+	t.Run("all nulls (bubble to middle)", func(t *testing.T) {
+		ddl := `
+		type Gizmo {
+			id: ID!
+			color: String!
+			owner: Owner
+		}
+
+		type Owner {
+			id: ID!
+			name: String!
+		}
+
+		type Query {
+			gizmos: [Gizmo!]
+			getOwners(ids: [ID!]!): [Owner!]!
+		}`
+
+		result := jsonToInterfaceMap(`
+			{
+				"gizmos": [
+					{ "id": "GIZMO1", "color": null },
+					{ "id": "GIZMO2", "color": null },
+					{ "id": "GIZMO3", "color": null }
+				]
+			}
+		`)
+
+		schema := gqlparser.MustLoadSchema(&ast.Source{Name: "fixture", Input: ddl})
+
+		query := `
+			{
+				gizmos {
+					id
+					color
+				}
+			}`
+
+		document := gqlparser.MustLoadQuery(schema, query)
+		errs, err := bubbleUpNullValuesInPlace(schema, document.Operations[0].SelectionSet, result)
+		require.NoError(t, err)
+		require.Equal(t, []*gqlerror.Error([]*gqlerror.Error{
+			{
+				Message:    `got a null response for non-nullable field "color"`,
+				Path:       ast.Path{ast.PathName("gizmos"), ast.PathIndex(0), ast.PathName("color")},
+				Extensions: nil,
+			},
+			{
+				Message:    `got a null response for non-nullable field "color"`,
+				Path:       ast.Path{ast.PathName("gizmos"), ast.PathIndex(1), ast.PathName("color")},
+				Extensions: nil,
+			},
+			{
+				Message:    `got a null response for non-nullable field "color"`,
+				Path:       ast.Path{ast.PathName("gizmos"), ast.PathIndex(2), ast.PathName("color")},
+				Extensions: nil,
+			},
+		}), errs)
+		require.Equal(t, jsonToInterfaceMap(`{ "gizmos": null }`), result)
+	})
+
+	t.Run("1 expected null (bubble to middle in array)", func(t *testing.T) {
+		ddl := `
+		type Gizmo {
+			id: ID!
+			color: String!
+			owner: Owner
+		}
+
+		type Owner {
+			id: ID!
+			name: String!
+		}
+
+		type Query {
+			gizmos: [Gizmo]!
+			getOwners(ids: [ID!]!): [Owner!]!
+		}`
+
+		result := jsonToInterfaceMap(`
+			{
+				"gizmos": [
+					{ "id": "GIZMO1", "color": "RED" },
+					{ "id": "GIZMO3", "color": null },
+					{ "id": "GIZMO2", "color": "GREEN" }
+				]
+			}
+		`)
+
+		schema := gqlparser.MustLoadSchema(&ast.Source{Name: "fixture", Input: ddl})
+
+		query := `
+			{
+				gizmos {
+					id
+					color
+				}
+			}`
+
+		document := gqlparser.MustLoadQuery(schema, query)
+		errs, err := bubbleUpNullValuesInPlace(schema, document.Operations[0].SelectionSet, result)
+		require.NoError(t, err)
+		require.Equal(t, []*gqlerror.Error([]*gqlerror.Error{
+			{
+				Message:    `got a null response for non-nullable field "color"`,
+				Path:       ast.Path{ast.PathName("gizmos"), ast.PathIndex(1), ast.PathName("color")},
+				Extensions: nil,
+			}}), errs)
+		require.Equal(t, jsonToInterfaceMap(`{ "gizmos": [ { "id": "GIZMO1", "color": "RED" }, null, { "id": "GIZMO2", "color": "GREEN" } ]	}`), result)
+	})
+
+	t.Run("0 expected nulls", func(t *testing.T) {
+		ddl := `
+		type Gizmo {
+			id: ID!
+			color: String
+			owner: Owner
+		}
+
+		type Owner {
+			id: ID!
+			name: String!
+		}
+
+		type Query {
+			gizmos: [Gizmo!]!
+			getOwners(ids: [ID!]!): [Owner!]!
+		}`
+
+		resultJSON := `{
+			"gizmos": [
+				{ "id": "GIZMO1", "color": "RED" },
+				{ "id": "GIZMO2", "color": "GREEN" },
+				{ "id": "GIZMO3", "color": null }
+			]
+		}`
+
+		schema := gqlparser.MustLoadSchema(&ast.Source{Name: "fixture", Input: ddl})
+
+		query := `
+			{
+				gizmos {
+					id
+					color
+				}
+			}`
+
+		document := gqlparser.MustLoadQuery(schema, query)
+		result := jsonToInterfaceMap(resultJSON)
+		errs, err := bubbleUpNullValuesInPlace(schema, document.Operations[0].SelectionSet, result)
+		require.NoError(t, err)
+		require.Empty(t, errs)
+		require.Equal(t, jsonToInterfaceMap(resultJSON), result)
+	})
+
+	t.Run("works with fragment spreads", func(t *testing.T) {
+		ddl := `
+		type Gizmo {
+			id: ID!
+			color: String!
+			owner: Owner
+		}
+
+		type Owner {
+			id: ID!
+			name: String!
+		}
+
+		type Query {
+			gizmos: [Gizmo]!
+			getOwners(ids: [ID!]!): [Owner!]!
+		}`
+
+		resultJSON := `{
+			"gizmos": [
+				{ "id": "GIZMO1", "color": "RED", "__typename": "Gizmo" },
+				{ "id": "GIZMO2", "color": "GREEN", "__typename": "Gizmo" },
+				{ "id": "GIZMO3", "color": null, "__typename": "Gizmo" }
+			]
+		}`
+
+		schema := gqlparser.MustLoadSchema(&ast.Source{Name: "fixture", Input: ddl})
+
+		query := `
+			fragment GizmoDetails on Gizmo {
+				id
+				color
+				__typename
+			}
+			{
+				gizmos {
+					...GizmoDetails
+				}
+			}
+		`
+
+		document := gqlparser.MustLoadQuery(schema, query)
+
+		result := jsonToInterfaceMap(resultJSON)
+
+		errs, err := bubbleUpNullValuesInPlace(schema, document.Operations[0].SelectionSet, result)
+		require.NoError(t, err)
+		require.Equal(t, []*gqlerror.Error([]*gqlerror.Error{
+			{
+				Message:    `got a null response for non-nullable field "color"`,
+				Path:       ast.Path{ast.PathName("gizmos"), ast.PathIndex(2), ast.PathName("color")},
+				Extensions: nil,
+			}}), errs)
+		require.Equal(t, jsonToInterfaceMap(`{ "gizmos": [ { "id": "GIZMO1", "color": "RED", "__typename": "Gizmo" }, { "id": "GIZMO2", "color": "GREEN", "__typename": "Gizmo" }, null ]	}`), result)
+	})
+
+	t.Run("works with inline fragments", func(t *testing.T) {
+		ddl := `
+		type Gizmo {
+			id: ID!
+			color: String!
+			owner: Owner
+		}
+
+		type Owner {
+			id: ID!
+			name: String!
+		}
+
+		type Query {
+			gizmos: [Gizmo]!
+			getOwners(ids: [ID!]!): [Owner!]!
+		}`
+
+		resultJSON := `{
+			"gizmos": [
+				{ "id": "GIZMO1", "color": "RED", "__typename": "Gizmo" },
+				{ "id": "GIZMO2", "color": "GREEN", "__typename": "Gizmo" },
+				{ "id": "GIZMO3", "color": null, "__typename": "Gizmo" }
+			]
+		}`
+
+		schema := gqlparser.MustLoadSchema(&ast.Source{Name: "fixture", Input: ddl})
+
+		query := `
+			{
+				gizmos {
+					... on Gizmo {
+						id
+						color
+						__typename
+					}
+				}
+			}
+		`
+
+		document := gqlparser.MustLoadQuery(schema, query)
+		result := jsonToInterfaceMap(resultJSON)
+		errs, err := bubbleUpNullValuesInPlace(schema, document.Operations[0].SelectionSet, result)
+		require.NoError(t, err)
+		require.Equal(t, []*gqlerror.Error([]*gqlerror.Error{
+			{
+				Message:    `got a null response for non-nullable field "color"`,
+				Path:       ast.Path{ast.PathName("gizmos"), ast.PathIndex(2), ast.PathName("color")},
+				Extensions: nil,
+			}}), errs)
+		require.Equal(t, jsonToInterfaceMap(`{ "gizmos": [ { "id": "GIZMO1", "color": "RED", "__typename": "Gizmo" }, { "id": "GIZMO2", "color": "GREEN", "__typename": "Gizmo" }, null ]	}`), result)
+	})
+
+	t.Run("inline fragment inside interface", func(t *testing.T) {
+		ddl := `
+		interface Critter {
+			id: ID!
+		}
+
+		type Gizmo implements Critter {
+			id: ID!
+			color: String!
+		}
+
+		type Gremlin implements Critter {
+			id: ID!
+			name: String!
+		}
+
+		type Query {
+			critters: [Critter]!
+		}`
+
+		resultJSON := `{
+			"critters": [
+				{ "id": "GIZMO1", "color": "RED", "__typename": "Gizmo" },
+				{ "id": "GREMLIN1", "name": "Spikey", "__typename": "Gremlin" },
+				{ "id": "GIZMO2", "color": null, "__typename": "Gizmo" }
+			]
+		}`
+
+		schema := gqlparser.MustLoadSchema(&ast.Source{Name: "fixture", Input: ddl})
+
+		query := `
+			{
+				critters {
+					id
+					... on Gizmo {
+						color
+						__typename
+					}
+					... on Gremlin {
+						name
+						__typename
+					}
+				}
+			}
+		`
+
+		document := gqlparser.MustLoadQuery(schema, query)
+		result := jsonToInterfaceMap(resultJSON)
+		errs, err := bubbleUpNullValuesInPlace(schema, document.Operations[0].SelectionSet, result)
+		require.NoError(t, err)
+		require.Equal(t, []*gqlerror.Error([]*gqlerror.Error{
+			{
+				Message:    `got a null response for non-nullable field "color"`,
+				Path:       ast.Path{ast.PathName("critters"), ast.PathIndex(2), ast.PathName("color")},
+				Extensions: nil,
+			}}), errs)
+		require.Equal(t, jsonToInterfaceMap(`{ "critters": [ { "id": "GIZMO1", "color": "RED", "__typename": "Gizmo"  }, { "id": "GREMLIN1", "name": "Spikey", "__typename": "Gremlin" }, null ]	}`), result)
+	})
+
+	t.Run("fragment spread inside interface", func(t *testing.T) {
+		ddl := `
+		interface Critter {
+			id: ID!
+		}
+
+		type Gizmo implements Critter {
+			id: ID!
+			color: String!
+		}
+
+		type Gremlin implements Critter {
+			id: ID!
+			name: String!
+		}
+
+		type Query {
+			critters: [Critter]!
+		}`
+
+		resultJSON := `{
+			"critters": [
+				{ "id": "GIZMO1", "color": "RED", "__typename": "Gizmo" },
+				{ "id": "GREMLIN1", "name": "Spikey", "__typename": "Gremlin" },
+				{ "id": "GIZMO2", "color": null, "__typename": "Gizmo" }
+			]
+		}`
+
+		schema := gqlparser.MustLoadSchema(&ast.Source{Name: "fixture", Input: ddl})
+
+		query := `
+			fragment CritterDetails on Critter {
+				... on Gizmo {
+					color
+					__typename
+				}
+				... on Gremlin {
+					name
+					__typename
+				}
+			}
+
+			{
+				critters {
+					id
+					... CritterDetails
+				}
+			}
+		`
+
+		document := gqlparser.MustLoadQuery(schema, query)
+		result := jsonToInterfaceMap(resultJSON)
+		errs, err := bubbleUpNullValuesInPlace(schema, document.Operations[0].SelectionSet, result)
+		require.NoError(t, err)
+		require.Equal(t, []*gqlerror.Error([]*gqlerror.Error{
+			{
+				Message:    `got a null response for non-nullable field "color"`,
+				Path:       ast.Path{ast.PathName("critters"), ast.PathIndex(2), ast.PathName("color")},
+				Extensions: nil,
+			}}), errs)
+		require.Equal(t, jsonToInterfaceMap(`{ "critters": [ { "id": "GIZMO1", "color": "RED", "__typename": "Gizmo"  }, { "id": "GREMLIN1", "name": "Spikey", "__typename": "Gremlin" }, null ]	}`), result)
+	})
+}
+
+func TestFormatResponseBody(t *testing.T) {
+	t.Run("simple response with no errors", func(t *testing.T) {
+		ddl := `
+		type Gizmo {
+			id: ID!
+			color: String!
+			owner: Owner
+		}
+
+		type Owner {
+			id: ID!
+			name: String!
+		}
+
+		type Query {
+			gizmos: [Gizmo!]!
+		}`
+
+		result := jsonToInterfaceMap(`
+			{
+				"gizmos": [
+					{ "color": "RED","owner": { "name": "Owner1", "id": "1" }, "id": "GIZMO1" },
+					{ "color": "BLUE","owner": { "name": "Owner2", "id": "2" }, "id": "GIZMO2" },
+					{ "color": "GREEN","owner": { "name": "Owner3", "id": "3" }, "id": "GIZMO3" }
+				]
+			}
+		`)
+
+		schema := gqlparser.MustLoadSchema(&ast.Source{Name: "fixture", Input: ddl})
+
+		query := `
+			{
+				gizmos {
+					id
+					color
+					owner {
+						id
+						name
+					}
+				}
+			}`
+
+		expectedJSON := `
+			{
+				"gizmos": [
+					{ "id": "GIZMO1", "color": "RED", "owner": { "id": "1", "name": "Owner1" } },
+					{ "id": "GIZMO2", "color": "BLUE", "owner": { "id": "2", "name": "Owner2" } },
+					{ "id": "GIZMO3", "color": "GREEN", "owner": { "id": "3", "name": "Owner3" } }
+				]
+			}`
+
+		document := gqlparser.MustLoadQuery(schema, query)
+		bodyJSON, err := formatResponseData(schema, document.Operations[0].SelectionSet, result)
+		require.NoError(t, err)
+		require.JSONEq(t, expectedJSON, string(bodyJSON))
+	})
+
+	t.Run("null data", func(t *testing.T) {
+		ddl := `
+		type Gizmo {
+			id: ID!
+			color: String!
+			owner: Owner
+		}
+
+		type Owner {
+			id: ID!
+			name: String
+		}
+
+		type Query {
+			gizmos: [Gizmo!]!
+			gizmo: Gizmo!
+		}`
+
+		result := jsonToInterfaceMap(`
+			{
+				"gizmos": [
+					{ "color": "RED","owner": null, "id": "GIZMO1" },
+					{ "color": "BLUE","owner": { "name": "Owner2", "id": "2" }, "id": "GIZMO2" },
+					{ "color": "GREEN","owner": { "name": null, "id": "3" }, "id": "GIZMO3" }
+				]
+			}
+		`)
+
+		schema := gqlparser.MustLoadSchema(&ast.Source{Name: "fixture", Input: ddl})
+
+		query := `
+			{
+				gizmos {
+					id
+					color
+					owner {
+						id
+						name
+					}
+				}
+			}`
+
+		expectedJSON := `
+			{
+				"gizmos": [
+					{ "id": "GIZMO1", "color": "RED", "owner": null },
+					{ "id": "GIZMO2", "color": "BLUE", "owner": { "id": "2", "name": "Owner2" } },
+					{ "id": "GIZMO3", "color": "GREEN", "owner": { "id": "3", "name": null } }
+				]
+			}`
+
+		document := gqlparser.MustLoadQuery(schema, query)
+		bodyJSON, err := formatResponseData(schema, document.Operations[0].SelectionSet, result)
+		require.NoError(t, err)
+		require.JSONEq(t, expectedJSON, string(bodyJSON))
+	})
+
+	t.Run("simple response with errors", func(t *testing.T) {
+		ddl := `
+		type Gizmo {
+			id: ID!
+			color: String!
+			owner: Owner
+		}
+
+		type Owner {
+			id: ID!
+			name: String!
+		}
+
+		type Query {
+			gizmos: [Gizmo!]!
+		}`
+
+		result := jsonToInterfaceMap(`
+			{
+				"gizmos": [
+					{ "color": "RED","owner": { "name": "Owner1", "id": "1" }, "id": "GIZMO1" },
+					{ "color": "BLUE","owner": { "name": "Owner2", "id": "2" }, "id": "GIZMO2" },
+					{ "color": "GREEN","owner": { "name": "Owner3", "id": "3" }, "id": "GIZMO3" }
+				]
+			}
+		`)
+
+		schema := gqlparser.MustLoadSchema(&ast.Source{Name: "fixture", Input: ddl})
+
+		query := `
+			{
+				gizmos {
+					id
+					color
+					owner {
+						id
+						name
+					}
+				}
+			}`
+
+		expectedJSON := `
+			{
+				"gizmos": [
+					{ "id": "GIZMO1", "color": "RED", "owner": { "id": "1", "name": "Owner1" } },
+					{ "id": "GIZMO2", "color": "BLUE", "owner": { "id": "2", "name": "Owner2" } },
+					{ "id": "GIZMO3", "color": "GREEN", "owner": { "id": "3", "name": "Owner3" } }
+				]
+			}`
+
+		document := gqlparser.MustLoadQuery(schema, query)
+		bodyJSON, err := formatResponseData(schema, document.Operations[0].SelectionSet, result)
+		require.NoError(t, err)
+		require.JSONEq(t, expectedJSON, string(bodyJSON))
+	})
+
+	t.Run("field selection overlaps with fragment selection", func(t *testing.T) {
+		ddl := `
+			interface Gizmo {
+				id: ID!
+				name: String!
+			}
+
+			type Owner {
+				id: ID!
+				fullName: String!
+			}
+
+			type Gadget implements Gizmo {
+				id: ID!
+				name: String!
+				owner: Owner
+			}
+
+			type Query {
+				gizmo: Gizmo!
+			}
+		`
+
+		result := jsonToInterfaceMap(`{
+			"gizmo": {
+				"id": "GADGET1",
+				"name": "Gadget #1",
+				"owner": {
+					"id": "OWNER1",
+					"fullName": "James Bond"
+				},
+				"__typename": "Gadget"
+			}
+		}
+	`)
+
+		schema := gqlparser.MustLoadSchema(&ast.Source{Name: "fixture", Input: ddl})
+
+		query := `
+		query Gizmo {
+			gizmo {
+				__typename
+				...GizmoDetails
+			}
+		}
+
+		fragment GizmoDetails on Gizmo {
+			id
+			name
+			... on Gadget {
+				id
+				name
+				owner {
+					id
+					fullName
+				}
+			}
+		}`
+
+		expectedJSON := `
+		{
+			"gizmo": {
+				"id": "GADGET1",
+				"name": "Gadget #1",
+				"owner": {
+					"id": "OWNER1",
+					"fullName": "James Bond"
+				},
+				"__typename": "Gadget"
+			}
+		}`
+
+		document := gqlparser.MustLoadQuery(schema, query)
+		bodyJSON, err := formatResponseData(schema, document.Operations[0].SelectionSet, result)
+		require.NoError(t, err)
+		require.JSONEq(t, expectedJSON, string(bodyJSON))
+	})
+
+	t.Run("field selection entirely overlaps with fragment selection", func(t *testing.T) {
+		ddl := `
+			interface Gizmo {
+				id: ID!
+				name: String!
+			}
+
+			type Owner {
+				id: ID!
+				fullName: String!
+			}
+
+			type Gadget implements Gizmo {
+				id: ID!
+				name: String!
+				owner: Owner
+			}
+
+			type Query {
+				gizmo: Gizmo!
+			}
+		`
+
+		result := jsonToInterfaceMap(`{
+			"gizmo": {
+				"id": "GADGET1",
+				"name": "Gadget #1",
+				"__typename": "Gadget"
+			}
+		}
+	`)
+
+		schema := gqlparser.MustLoadSchema(&ast.Source{Name: "fixture", Input: ddl})
+
+		query := `
+		query Gizmo {
+			gizmo {
+				...GizmoDetails
+				__typename
+			}
+		}
+
+		fragment GizmoDetails on Gizmo {
+			id
+			name
+			... on Gadget {
+				id
+				name
+			}
+		}`
+
+		expectedJSON := `
+		{
+			"gizmo": {
+				"id": "GADGET1",
+				"name": "Gadget #1",
+				"__typename": "Gadget"
+			}
+		}`
+
+		document := gqlparser.MustLoadQuery(schema, query)
+		bodyJSON, err := formatResponseData(schema, document.Operations[0].SelectionSet, result)
+		require.NoError(t, err)
+		require.JSONEq(t, expectedJSON, string(bodyJSON))
+	})
+
+	t.Run("multiple implementation fragment spreads", func(t *testing.T) {
+		ddl := `
+			interface Gizmo {
+				id: ID!
+				name: String!
+			}
+
+			type Owner {
+				id: ID!
+				fullName: String!
+			}
+
+			type Gadget implements Gizmo {
+				id: ID!
+				name: String!
+				owner: Owner
+			}
+
+			type Tool implements Gizmo {
+				id: ID!
+				name: String!
+				category: String!
+			}
+
+			type Query {
+				gizmo: Gizmo!
+			}
+		`
+
+		result := jsonToInterfaceMap(`{
+			"gizmo": {
+				"id": "GADGET1",
+				"name": "Gadget #1",
+				"__typename": "Gadget"
+			}
+		}
+	`)
+
+		schema := gqlparser.MustLoadSchema(&ast.Source{Name: "fixture", Input: ddl})
+
+		query := `
+		query Gizmo {
+			gizmo {
+				...GizmoDetails
+				__typename
+			}
+		}
+
+		fragment GizmoDetails on Gizmo {
+			id
+			name
+			... on Gadget {
+				id
+				name
+			}
+			... on Tool {
+				category
+			}
+		}`
+
+		expectedJSON := `
+		{
+			"gizmo": {
+				"id": "GADGET1",
+				"name": "Gadget #1",
+				"__typename": "Gadget"
+			}
+		}`
+
+		document := gqlparser.MustLoadQuery(schema, query)
+		bodyJSON, err := formatResponseData(schema, document.Operations[0].SelectionSet, result)
+		require.NoError(t, err)
+		require.JSONEq(t, expectedJSON, string(bodyJSON))
+	})
+
+	t.Run("multiple implementation fragment spreads (bottom fragment matches)", func(t *testing.T) {
+		ddl := `
+			interface Gizmo {
+				id: ID!
+				name: String!
+			}
+
+			type Owner {
+				id: ID!
+				fullName: String!
+			}
+
+			type Gadget implements Gizmo {
+				id: ID!
+				name: String!
+				owner: Owner
+			}
+
+			type Tool implements Gizmo {
+				id: ID!
+				name: String!
+				category: String!
+			}
+
+			type Query {
+				gizmo: Gizmo!
+			}
+		`
+
+		result := jsonToInterfaceMap(`{
+			"gizmo": {
+				"id": "TOOL1",
+				"name": "Tool #1",
+				"category": "Screwdriver",
+				"__typename": "Tool"
+			}
+		}
+	`)
+
+		schema := gqlparser.MustLoadSchema(&ast.Source{Name: "fixture", Input: ddl})
+
+		query := `
+		query Gizmo {
+			gizmo {
+				...GizmoDetails
+				__typename
+			}
+		}
+
+		fragment GizmoDetails on Gizmo {
+			id
+			name
+			... on Gadget {
+				id
+				name
+			}
+			... on Tool {
+				category
+			}
+		}`
+
+		expectedJSON := `
+		{
+			"gizmo": {
+				"id": "TOOL1",
+				"name": "Tool #1",
+				"category": "Screwdriver",
+				"__typename": "Tool"
+			}
+		}`
+
+		document := gqlparser.MustLoadQuery(schema, query)
+		bodyJSON, err := formatResponseData(schema, document.Operations[0].SelectionSet, result)
+		require.NoError(t, err)
+		require.JSONEq(t, expectedJSON, string(bodyJSON))
+	})
 }
 
 func TestQueryExecutionWithTypename(t *testing.T) {
@@ -926,8 +3579,8 @@ func TestQueryExecutionWithTypenameAndNamespaces(t *testing.T) {
 	f.checkSuccess(t)
 }
 
-func TestQueryExecutionWithMultipleNodeQueries(t *testing.T) {
-	schema1 := `directive @boundary on OBJECT
+func TestQueryExecutionWithMultipleBoundaryQueries(t *testing.T) {
+	schema1 := `directive @boundary on OBJECT | FIELD_DEFINITION
 				type Movie @boundary {
 					id: ID!
 					title: String
@@ -936,17 +3589,16 @@ func TestQueryExecutionWithMultipleNodeQueries(t *testing.T) {
 				type Query {
 					movies: [Movie!]!
 				}`
-	schema2 := `directive @boundary on OBJECT
-				interface Node { id: ID! }
+	schema2 := `directive @boundary on OBJECT | FIELD_DEFINITION
 
-				type Movie implements Node @boundary {
+				type Movie @boundary {
 					id: ID!
 					release: Int
 				}
 
 				type Query {
-					node(id: ID!): Node!
-	}`
+					movie(id: ID!): Movie @boundary
+				}`
 
 	f := &queryExecutionFixture{
 		services: []testService{
@@ -956,9 +3608,9 @@ func TestQueryExecutionWithMultipleNodeQueries(t *testing.T) {
 					w.Write([]byte(`{
 						"data": {
 							"movies": [
-							{ "id": "1", "title": "Test title 1" },
-							{ "id": "2", "title": "Test title 2" },
-							{ "id": "3", "title": "Test title 3" }
+								{ "id": "1", "title": "Test title 1" },
+								{ "id": "2", "title": "Test title 2" },
+								{ "id": "3", "title": "Test title 3" }
 							]
 						}
 					}
@@ -970,11 +3622,6 @@ func TestQueryExecutionWithMultipleNodeQueries(t *testing.T) {
 				handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					var q map[string]string
 					json.NewDecoder(r.Body).Decode(&q)
-					assertQueriesEqual(t, schema2, `{
-						_0: node(id: "1") { ... on Movie { _id: id release } }
-						_1: node(id: "2") { ... on Movie { _id: id release } }
-						_2: node(id: "3") { ... on Movie { _id: id release } }
-					}`, q["query"])
 					w.Write([]byte(`{
 						"data": {
 							"_0": { "id": "1", "release": 2007 },
@@ -1018,16 +3665,15 @@ func TestQueryExecutionWithMultipleNodeQueries(t *testing.T) {
 }
 
 func TestQueryExecutionMultipleServicesWithArray(t *testing.T) {
-	schema1 := `directive @boundary on OBJECT
-	interface Node { id: ID! }
+	schema1 := `directive @boundary on OBJECT | FIELD_DEFINITION
 
-	type Movie implements Node @boundary {
+	type Movie @boundary {
 		id: ID!
 		title: String
 	}
 
 	type Query {
-		node(id: ID!): Node
+		_movie(id: ID!): Movie @boundary
 		movie(id: ID!): Movie!
 	}`
 
@@ -1043,7 +3689,7 @@ func TestQueryExecutionMultipleServicesWithArray(t *testing.T) {
 					for _, s := range query.Operations[0].SelectionSet {
 						ids = append(ids, s.(*ast.Field).Arguments[0].Value.Raw)
 					}
-					if query.Operations[0].SelectionSet[0].(*ast.Field).Name == "node" {
+					if query.Operations[0].SelectionSet[0].(*ast.Field).Name == "_movie" {
 						var res string
 						for i, id := range ids {
 							if i != 0 {
@@ -1069,16 +3715,15 @@ func TestQueryExecutionMultipleServicesWithArray(t *testing.T) {
 				}),
 			},
 			{
-				schema: `directive @boundary on OBJECT
-				interface Node { id: ID! }
+				schema: `directive @boundary on OBJECT | FIELD_DEFINITION
 
-				type Movie implements Node @boundary {
+				type Movie @boundary {
 					id: ID!
 					compTitles: [Movie]
 				}
 
 				type Query {
-					node(id: ID!): Node
+					movie(id: ID!): Movie @boundary
 				}`,
 				handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					w.Write([]byte(`{
@@ -1167,10 +3812,9 @@ func TestQueryExecutionMultipleServicesWithEmptyArray(t *testing.T) {
 	f := &queryExecutionFixture{
 		services: []testService{
 			{
-				schema: `directive @boundary on OBJECT
-				interface Node { id: ID! }
+				schema: `directive @boundary on OBJECT | FIELD_DEFINITION
 
-				type Movie implements Node @boundary {
+				type Movie @boundary {
 					id: ID!
 				}
 
@@ -1186,16 +3830,15 @@ func TestQueryExecutionMultipleServicesWithEmptyArray(t *testing.T) {
 				}),
 			},
 			{
-				schema: `directive @boundary on OBJECT
-				interface Node { id: ID! }
+				schema: `directive @boundary on OBJECT | FIELD_DEFINITION
 
-				type Movie implements Node @boundary {
+				type Movie @boundary {
 					id: ID!
 					title: String
 				}
 
 				type Query {
-					node(id: ID!): Node
+					movie(id: ID!): Movie @boundary
 				}`,
 				handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					t.Fatal("service should not be called on empty array")
@@ -1217,16 +3860,15 @@ func TestQueryExecutionMultipleServicesWithEmptyArray(t *testing.T) {
 }
 
 func TestQueryExecutionMultipleServicesWithNestedArrays(t *testing.T) {
-	schema1 := `directive @boundary on OBJECT
-				interface Node { id: ID! }
+	schema1 := `directive @boundary on OBJECT | FIELD_DEFINITION
 
-				type Movie implements Node @boundary {
+				type Movie @boundary {
 					id: ID!
 					title: String
 				}
 
 				type Query {
-					node(id: ID!): Node
+					_movie(id: ID!): Movie @boundary
 					movie(id: ID!): Movie!
 			}`
 	services := []testService{
@@ -1240,7 +3882,7 @@ func TestQueryExecutionMultipleServicesWithNestedArrays(t *testing.T) {
 				for _, s := range query.Operations[0].SelectionSet {
 					ids = append(ids, s.(*ast.Field).Arguments[0].Value.Raw)
 				}
-				if query.Operations[0].SelectionSet[0].(*ast.Field).Name == "node" {
+				if query.Operations[0].SelectionSet[0].(*ast.Field).Name == "_movie" {
 					var res string
 					for i, id := range ids {
 						if i != 0 {
@@ -1266,16 +3908,15 @@ func TestQueryExecutionMultipleServicesWithNestedArrays(t *testing.T) {
 			}),
 		},
 		{
-			schema: `directive @boundary on OBJECT
-			interface Node { id: ID! }
+			schema: `directive @boundary on OBJECT | FIELD_DEFINITION
 
-			type Movie implements Node @boundary {
+			type Movie @boundary {
 				id: ID!
 				compTitles: [[Movie]]
 			}
 
 			type Query {
-				node(id: ID!): Node
+				movie(id: ID!): Movie @boundary
 			}`,
 			handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.Write([]byte(`{
@@ -1330,11 +3971,11 @@ func TestQueryExecutionMultipleServicesWithNestedArrays(t *testing.T) {
 	f.checkSuccess(t)
 }
 
-func TestQueryExecutionEmptyNodeResponse(t *testing.T) {
+func TestQueryExecutionEmptyBoundaryResponse(t *testing.T) {
 	f := &queryExecutionFixture{
 		services: []testService{
 			{
-				schema: `directive @boundary on OBJECT
+				schema: `directive @boundary on OBJECT | FIELD_DEFINITION
 				type Movie @boundary {
 					id: ID!
 					title: String
@@ -1356,8 +3997,7 @@ func TestQueryExecutionEmptyNodeResponse(t *testing.T) {
 				}),
 			},
 			{
-				schema: `directive @boundary on OBJECT
-				interface Node { id: ID! }
+				schema: `directive @boundary on OBJECT | FIELD_DEFINITION
 
 				type Movie @boundary {
 					id: ID!
@@ -1365,7 +4005,7 @@ func TestQueryExecutionEmptyNodeResponse(t *testing.T) {
 				}
 
 				type Query {
-					node(id: ID!): Node!
+					movie(id: ID!): Movie @boundary
 				}`,
 				handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					w.Write([]byte(`{
@@ -1396,58 +4036,6 @@ func TestQueryExecutionEmptyNodeResponse(t *testing.T) {
 	f.checkSuccess(t)
 }
 
-func TestQueryExecutionWithNullResponse(t *testing.T) {
-	f := &queryExecutionFixture{
-		services: []testService{
-			{
-				schema: `directive @boundary on OBJECT
-				type Movie @boundary {
-					id: ID!
-				}
-
-				type Query {
-					movies: [Movie!]
-				}`,
-				handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					w.Write([]byte(`{
-						"data": {
-							"movies": null
-						}
-					}
-					`))
-				}),
-			},
-			{
-				schema: `directive @boundary on OBJECT
-				interface Node { id: ID! }
-
-				type Movie @boundary {
-					id: ID!
-					title: String
-				}
-
-				type Query {
-					node(id: ID!): Node!
-				}`,
-				handler: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
-					assert.Fail(t, "handler should not be called")
-				}),
-			},
-		},
-		query: `{
-			movies {
-				id
-				title
-			}
-		}`,
-		expected: `{
-			"movies": null
-		}`,
-	}
-
-	f.checkSuccess(t)
-}
-
 func TestQueryExecutionWithNullResponseAndSubBoundaryType(t *testing.T) {
 	f := &queryExecutionFixture{
 		services: []testService{
@@ -1471,7 +4059,7 @@ func TestQueryExecutionWithNullResponseAndSubBoundaryType(t *testing.T) {
 				}),
 			},
 			{
-				schema: `directive @boundary on OBJECT
+				schema: `directive @boundary on OBJECT | FIELD_DEFINITION
 				interface Node { id: ID! }
 
 				type Movie @boundary {
@@ -1480,7 +4068,7 @@ func TestQueryExecutionWithNullResponseAndSubBoundaryType(t *testing.T) {
 				}
 
 				type Query {
-					node(id: ID!): Node!
+					movie(id: ID!): Movie @boundary
 				}`,
 				handler: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 					assert.Fail(t, "handler should not be called")
@@ -1505,7 +4093,7 @@ func TestQueryExecutionWithNullResponseAndSubBoundaryType(t *testing.T) {
 }
 
 func TestQueryExecutionWithInputObject(t *testing.T) {
-	schema1 := `directive @boundary on OBJECT
+	schema1 := `directive @boundary on OBJECT | FIELD_DEFINITION
 		type Movie @boundary {
 			id: ID!
 			title: String
@@ -1551,8 +4139,7 @@ func TestQueryExecutionWithInputObject(t *testing.T) {
 				}),
 			},
 			{
-				schema: `directive @boundary on OBJECT
-				interface Node { id: ID! }
+				schema: `directive @boundary on OBJECT | FIELD_DEFINITION
 
 				type Movie @boundary {
 					id: ID!
@@ -1560,7 +4147,7 @@ func TestQueryExecutionWithInputObject(t *testing.T) {
 				}
 
 				type Query {
-					node(id: ID!): Node!
+					movie(id: ID!): Movie! @boundary
 				}`,
 				handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					w.Write([]byte(`{
@@ -1626,8 +4213,7 @@ func TestQueryExecutionMultipleObjects(t *testing.T) {
 				}),
 			},
 			{
-				schema: `directive @boundary on OBJECT
-				interface Node { id: ID! }
+				schema: `directive @boundary on OBJECT | FIELD_DEFINITION
 
 				type Movie @boundary {
 					id: ID!
@@ -1635,7 +4221,7 @@ func TestQueryExecutionMultipleObjects(t *testing.T) {
 				}
 
 				type Query {
-					node(id: ID!): Node!
+					movie(id: ID!): Movie! @boundary
 					movies: [Movie!]
 				}`,
 				handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1716,8 +4302,7 @@ func TestQueryExecutionMultipleServicesWithSkipTrueDirectives(t *testing.T) {
 				}),
 			},
 			{
-				schema: `directive @boundary on OBJECT
-				interface Node { id: ID! }
+				schema: `directive @boundary on OBJECT | FIELD_DEFINITION
 				type Gizmo {
 					foo: String!
 					bar: String!
@@ -1727,7 +4312,7 @@ func TestQueryExecutionMultipleServicesWithSkipTrueDirectives(t *testing.T) {
 					gizmo: Gizmo
 				}
 				type Query {
-					node(id: ID!): Node!
+					movie(id: ID!): Movie @boundary
 				}`,
 				handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					panic("should not be called")
@@ -1782,8 +4367,7 @@ func TestQueryExecutionMultipleServicesWithSkipFalseDirectives(t *testing.T) {
 				}),
 			},
 			{
-				schema: `directive @boundary on OBJECT
-				interface Node { id: ID! }
+				schema: `directive @boundary on OBJECT | FIELD_DEFINITION
 				type Gizmo {
 					foo: String!
 					bar: String!
@@ -1793,7 +4377,7 @@ func TestQueryExecutionMultipleServicesWithSkipFalseDirectives(t *testing.T) {
 					gizmo: Gizmo
 				}
 				type Query {
-					node(id: ID!): Node!
+					movie(id: ID!): Movie @boundary
 				}`,
 				handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					w.Write([]byte(`{
@@ -1865,8 +4449,7 @@ func TestQueryExecutionMultipleServicesWithIncludeFalseDirectives(t *testing.T) 
 				}),
 			},
 			{
-				schema: `directive @boundary on OBJECT
-				interface Node { id: ID! }
+				schema: `directive @boundary on OBJECT | FIELD_DEFINITION
 				type Gizmo {
 					foo: String!
 					bar: String!
@@ -1876,7 +4459,7 @@ func TestQueryExecutionMultipleServicesWithIncludeFalseDirectives(t *testing.T) 
 					gizmo: Gizmo
 				}
 				type Query {
-					node(id: ID!): Node!
+					movie(id: ID!): Movie @boundary
 				}`,
 				handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					panic("should not be called")
@@ -1931,8 +4514,7 @@ func TestQueryExecutionMultipleServicesWithIncludeTrueDirectives(t *testing.T) {
 				}),
 			},
 			{
-				schema: `directive @boundary on OBJECT
-				interface Node { id: ID! }
+				schema: `directive @boundary on OBJECT | FIELD_DEFINITION
 				type Gizmo {
 					foo: String!
 					bar: String!
@@ -1942,7 +4524,7 @@ func TestQueryExecutionMultipleServicesWithIncludeTrueDirectives(t *testing.T) {
 					gizmo: Gizmo
 				}
 				type Query {
-					node(id: ID!): Node!
+					movie(id: ID!): Movie @boundary
 				}`,
 				handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					w.Write([]byte(`{
@@ -2023,14 +4605,13 @@ func TestMutationExecution(t *testing.T) {
 				}),
 			},
 			{
-				schema: `directive @boundary on OBJECT
-				interface Node { id: ID! }
+				schema: `directive @boundary on OBJECT | FIELD_DEFINITION
 				type Movie @boundary {
 					id: ID!
 					release: Int
 				}
 				type Query {
-					node(id: ID!): Node!
+					movie(id: ID!): Movie @boundary
 				}`,
 				handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					w.Write([]byte(`{
@@ -2061,13 +4642,13 @@ func TestMutationExecution(t *testing.T) {
 
 	f.checkSuccess(t)
 }
+
 func TestQueryExecutionWithUnions(t *testing.T) {
 	f := &queryExecutionFixture{
 		services: []testService{
 			{
 				schema: `
-				interface Node { id: ID! }
-				directive @boundary on OBJECT
+				directive @boundary on OBJECT | FIELD_DEFINITION
 
 				type Dog { name: String! age: Int }
 				type Cat { name: String! age: Int }
@@ -2080,7 +4661,8 @@ func TestQueryExecutionWithUnions(t *testing.T) {
 				}
 
 				type Query {
-					node(id: ID!): Node
+					animal(id: ID!): Animal
+					person(id: ID!): Person @boundary
 					animals: [Animal]!
 				}`,
 				handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -2089,9 +4671,9 @@ func TestQueryExecutionWithUnions(t *testing.T) {
 						w.Write([]byte(`{
 							"data": {
 								"foo": [
-									{ "name": "fido", "age": 4 },
-									{ "name": "felix", "age": 2 },
-									{ "age": 20, "name": "ka" }
+									{ "name": "fido", "age": 4, "__typename": "Dog" },
+									{ "name": "felix", "age": 2, "__typename": "Cat" },
+									{ "age": 20, "name": "ka", "__typename": "Snake" }
 								]
 							}
 						}
@@ -2103,7 +4685,8 @@ func TestQueryExecutionWithUnions(t *testing.T) {
 									"_id": "2",
 									"pet": {
 										"name": "felix",
-										"age": 2
+										"age": 2,
+										"__typename": "Cat"
 									}
 								}
 							}
@@ -2113,7 +4696,7 @@ func TestQueryExecutionWithUnions(t *testing.T) {
 				}),
 			},
 			{
-				schema: `directive @boundary on OBJECT
+				schema: `directive @boundary on OBJECT | FIELD_DEFINITION
 
 				type Person @boundary {
 					id: ID!
@@ -2176,11 +4759,10 @@ func TestQueryExecutionWithNamespaces(t *testing.T) {
 		services: []testService{
 			{
 				schema: `
-					directive @boundary on OBJECT
+					directive @boundary on OBJECT | FIELD_DEFINITION
 					directive @namespace on OBJECT
-					interface Node { id: ID! }
 
-					type Cat implements Node @boundary {
+					type Cat @boundary {
 						id: ID!
 						name: String!
 					}
@@ -2195,16 +4777,17 @@ func TestQueryExecutionWithNamespaces(t *testing.T) {
 
 					type Query {
 						animals: AnimalsQuery!
-						node(id: ID!): Node!
+						cat(id: ID!): Cat @boundary
 					}
 				`,
 				handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					b, _ := ioutil.ReadAll(r.Body)
 
-					if strings.Contains(string(b), "node") {
+					if strings.Contains(string(b), "CA7") {
 						w.Write([]byte(`{
 							"data": {
 								"_0": {
+									"_id": "CA7",
 									"name": "Felix"
 								}
 							}
@@ -2229,11 +4812,10 @@ func TestQueryExecutionWithNamespaces(t *testing.T) {
 			},
 			{
 				schema: `
-					directive @boundary on OBJECT
+					directive @boundary on OBJECT | FIELD_DEFINITION
 					directive @namespace on OBJECT
-					interface Node { id: ID! }
 
-					type Cat implements Node @boundary {
+					type Cat @boundary {
 						id: ID!
 					}
 
@@ -2503,160 +5085,6 @@ func TestQueryWithArrayBoundaryFields(t *testing.T) {
 	f.checkSuccess(t)
 }
 
-func TestQueryWithArrayBoundaryFieldsAndMultipleChildrenSteps(t *testing.T) {
-	f := &queryExecutionFixture{
-		services: []testService{
-			{
-				schema: `directive @boundary on OBJECT | FIELD_DEFINITION
-
-				type Movie @boundary {
-					id: ID!
-					title: String
-				}
-
-				type Query {
-					randomMovie: Movie!
-					movies(ids: [ID!]!): [Movie]! @boundary
-				}`,
-				handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					b, _ := io.ReadAll(r.Body)
-					if strings.Contains(string(b), "randomMovie") {
-						w.Write([]byte(`{
-						"data": {
-							"randomMovie": {
-									"id": "1",
-									"title": "Movie 1"
-							}
-						}
-					}
-					`))
-					} else {
-						w.Write([]byte(`{
-						"data": {
-							"_result": [
-								{ "id": 2, "title": "Movie 2" },
-								{ "id": 3, "title": "Movie 3" },
-								{ "id": 4, "title": "Movie 4" }
-							]
-						}
-					}
-					`))
-					}
-				}),
-			},
-			{
-				schema: `directive @boundary on OBJECT | FIELD_DEFINITION
-
-				type Movie @boundary {
-					id: ID!
-					compTitles: [Movie!]!
-				}
-
-				type Query {
-					movies(ids: [ID!]): [Movie]! @boundary
-				}`,
-				handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					w.Write([]byte(`{
-						"data": {
-							"_result": [
-								{
-									"_id": "1",
-									"compTitles": [
-										{"id": "2"},
-										{"id": "3"},
-										{"id": "4"}
-									]
-								}
-							]
-						}
-					}
-					`))
-				}),
-			},
-		},
-		query: `{
-			randomMovie {
-				id
-				title
-				compTitles {
-					id
-					title
-				}
-			}
-		}`,
-		expected: `{
-			"randomMovie":
-				{
-					"id": "1",
-					"title": "Movie 1",
-					"compTitles": [
-						{ "id": 2, "title": "Movie 2" },
-						{ "id": 3, "title": "Movie 3" },
-						{ "id": 4, "title": "Movie 4" }
-					]
-				}
-		}`,
-	}
-
-	f.checkSuccess(t)
-}
-
-func TestQueryError(t *testing.T) {
-	f := &queryExecutionFixture{
-		services: []testService{
-			{
-				schema: `type Movie {
-					id: ID!
-					title: String
-				}
-
-				type Query {
-					movie(id: ID!): Movie!
-				}
-				`,
-				handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					w.Write([]byte(`{
-						"errors": [
-							{
-								"message": "Movie does not exist",
-								"path": ["movie"],
-								"extensions": {
-									"code": "NOT_FOUND"
-								}
-							}
-						]
-					}`))
-				}),
-			},
-		},
-		query: `{
-			movie(id: "1") {
-				id
-				title
-			}
-		}`,
-		errors: gqlerror.List{
-			&gqlerror.Error{
-				Message: "Movie does not exist",
-				Path:    ast.Path{ast.PathName("movie")},
-				Locations: []gqlerror.Location{
-					{Line: 2, Column: 4},
-				},
-				Extensions: map[string]interface{}{
-					"code":         "NOT_FOUND",
-					"selectionSet": `{ movie(id: "1") { id title } }`,
-					"serviceName":  "",
-				},
-			},
-			&gqlerror.Error{
-				Message: `got a null response for non-nullable field "movie"`,
-			},
-		},
-	}
-
-	f.run(t)
-}
-
 type testService struct {
 	schema  string
 	handler http.Handler
@@ -2675,7 +5103,7 @@ type queryExecutionFixture struct {
 func (f *queryExecutionFixture) checkSuccess(t *testing.T) {
 	f.run(t)
 
-	assert.Empty(t, f.resp.Errors)
+	require.Empty(t, f.resp.Errors)
 	jsonEqWithOrder(t, f.expected, string(f.resp.Data))
 }
 
@@ -2701,7 +5129,7 @@ func (f *queryExecutionFixture) run(t *testing.T) {
 
 	es := newExecutableSchema(nil, 50, nil, services...)
 	es.MergedSchema = merged
-	es.BoundaryQueries = buildBoundaryQueriesMap(services...)
+	es.BoundaryQueries = buildBoundaryFieldsMap(services...)
 	es.Locations = buildFieldURLMap(services...)
 	es.IsBoundary = buildIsBoundaryMap(services...)
 	query := gqlparser.MustLoadQuery(merged, f.query)
@@ -2717,15 +5145,35 @@ func (f *queryExecutionFixture) run(t *testing.T) {
 	f.resp.Extensions = graphql.GetExtensions(ctx)
 
 	if len(f.errors) == 0 {
-		assert.Empty(t, f.resp.Errors)
+		require.Empty(t, f.resp.Errors)
 		jsonEqWithOrder(t, f.expected, string(f.resp.Data))
 	} else {
 		require.Equal(t, len(f.errors), len(f.resp.Errors))
 		for i := range f.errors {
 			delete(f.resp.Errors[i].Extensions, "serviceUrl")
-			assert.Equal(t, *f.errors[i], *f.resp.Errors[i])
+			require.Equal(t, *f.errors[i], *f.resp.Errors[i])
 		}
 	}
+}
+
+func jsonToInterfaceMap(jsonString string) map[string]interface{} {
+	var outputMap map[string]interface{}
+	err := json.Unmarshal([]byte(jsonString), &outputMap)
+	if err != nil {
+		panic(err)
+	}
+
+	return outputMap
+}
+
+func jsonToInterfaceSlice(jsonString string) []interface{} {
+	var outputSlice []interface{}
+	err := json.Unmarshal([]byte(jsonString), &outputSlice)
+	if err != nil {
+		panic(err)
+	}
+
+	return outputSlice
 }
 
 // jsonEqWithOrder checks that the JSON are equals, including the order of the

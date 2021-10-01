@@ -187,6 +187,9 @@ func extractSelectionSet(ctx *PlanningContext, insertionPoint []string, parentTy
 			if err != nil {
 				return nil, nil, err
 			}
+			if !selectionSetHasFieldNamed(selectionSet, "__typename") {
+				selectionSet = append(selectionSet, &ast.Field{Alias: "__typename", Name: "__typename", Definition: &ast.FieldDefinition{Name: "__typename", Type: ast.NamedType("String", nil)}})
+			}
 			inlineFragment := *selection
 			inlineFragment.SelectionSet = selectionSet
 			selectionSetResult = append(selectionSetResult, &inlineFragment)
@@ -202,6 +205,9 @@ func extractSelectionSet(ctx *PlanningContext, insertionPoint []string, parentTy
 			)
 			if err != nil {
 				return nil, nil, err
+			}
+			if !selectionSetHasFieldNamed(selectionSet, "__typename") {
+				selectionSet = append(selectionSet, &ast.Field{Alias: "__typename", Name: "__typename", Definition: &ast.FieldDefinition{Name: "__typename", Type: ast.NamedType("String", nil)}})
 			}
 			inlineFragment := ast.InlineFragment{
 				TypeCondition: selection.Definition.TypeCondition,
@@ -363,36 +369,42 @@ func stringArraysEqual(a, b []string) bool {
 	return true
 }
 
-// BoundaryQuery contains the name and format for a boundary query
-type BoundaryQuery struct {
-	Query string
+// BoundaryField contains the name and format for a boundary query
+type BoundaryField struct {
+	Field string
 	// Whether the query is in the array format
 	Array bool
 }
 
-// BoundaryQueriesMap is a mapping service -> type -> boundary query
-type BoundaryQueriesMap map[string]map[string]BoundaryQuery
+// BoundaryFieldsMap is a mapping service -> type -> boundary query
+type BoundaryFieldsMap map[string]map[string]BoundaryField
 
-// RegisterQuery registers a boundary query
-func (m BoundaryQueriesMap) RegisterQuery(serviceURL, typeName, query string, array bool) {
+// RegisterField registers a boundary field
+func (m BoundaryFieldsMap) RegisterField(serviceURL, typeName, field string, array bool) {
 	if _, ok := m[serviceURL]; !ok {
-		m[serviceURL] = make(map[string]BoundaryQuery)
+		m[serviceURL] = make(map[string]BoundaryField)
 	}
 
-	m[serviceURL][typeName] = BoundaryQuery{Query: query, Array: array}
+	// We prefer to use the array based boundary lookup
+	_, exists := m[serviceURL][typeName]
+	if exists && !array {
+		return
+	}
+
+	m[serviceURL][typeName] = BoundaryField{Field: field, Array: array}
 }
 
-// Query returns the boundary query for the given service and type
-func (m BoundaryQueriesMap) Query(serviceURL, typeName string) BoundaryQuery {
+// Query returns the boundary field for the given service and type
+func (m BoundaryFieldsMap) Field(serviceURL, typeName string) (BoundaryField, error) {
 	serviceMap, ok := m[serviceURL]
 	if !ok {
-		return BoundaryQuery{Query: "node"}
+		return BoundaryField{}, fmt.Errorf("could not find BoundaryFieldsMap entry for service %s", serviceURL)
 	}
 
-	query, ok := serviceMap[typeName]
+	field, ok := serviceMap[typeName]
 	if !ok {
-		return BoundaryQuery{Query: "node"}
+		return BoundaryField{}, fmt.Errorf("could not find BoundaryFieldsMap entry for typeName %s", typeName)
 	}
 
-	return query
+	return field, nil
 }

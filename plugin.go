@@ -25,7 +25,7 @@ type Plugin interface {
 	GraphqlQueryPath() (bool, string)
 	ApplyMiddlewarePublicMux(http.Handler) http.Handler
 	ApplyMiddlewarePrivateMux(http.Handler) http.Handler
-	ModifyExtensions(ctx context.Context, e *QueryExecution, extensions map[string]interface{}) error
+	ModifyExtensions(ctx context.Context, e *queryExecution, extensions map[string]interface{}) error
 }
 
 // BasePlugin is an empty plugin. It can be embedded by any plugin as a way to avoid
@@ -62,7 +62,7 @@ func (p *BasePlugin) ApplyMiddlewarePrivateMux(h http.Handler) http.Handler {
 }
 
 // ModifyExtensions ...
-func (p *BasePlugin) ModifyExtensions(ctx context.Context, e *QueryExecution, extensions map[string]interface{}) error {
+func (p *BasePlugin) ModifyExtensions(ctx context.Context, e *queryExecution, extensions map[string]interface{}) error {
 	return nil
 }
 

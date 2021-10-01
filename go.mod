@@ -4,7 +4,6 @@ go 1.16
 
 require (
 	github.com/99designs/gqlgen v0.11.2
-	github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd // indirect
 	github.com/felixge/httpsnoop v1.0.1
 	github.com/fsnotify/fsnotify v1.4.9
 	github.com/golang-jwt/jwt/v4 v4.0.0
@@ -18,20 +17,17 @@ require (
 	github.com/kr/pretty v0.2.0 // indirect
 	github.com/kr/text v0.2.0 // indirect
 	github.com/mitchellh/mapstructure v1.1.2 // indirect
-	github.com/opentracing/opentracing-go v1.1.0
-	github.com/pkg/errors v0.9.1 // indirect
 	github.com/prometheus/client_golang v1.2.1
 	github.com/prometheus/common v0.9.1 // indirect
 	github.com/prometheus/procfs v0.0.10 // indirect
 	github.com/rs/cors v1.7.0
 	github.com/sirupsen/logrus v1.4.2
-	github.com/stretchr/testify v1.5.1
-	github.com/uber/jaeger-client-go v2.22.1+incompatible
-	github.com/uber/jaeger-lib v2.2.0+incompatible // indirect
+	github.com/stretchr/testify v1.7.0
 	github.com/vektah/gqlparser/v2 v2.0.1
-	go.uber.org/atomic v1.6.0 // indirect
-	golang.org/x/lint v0.0.0-20201208152925-83fdc39ff7b5 // indirect
-	golang.org/x/tools v0.1.0 // indirect
+	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9 // indirect
+	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
+	golang.org/x/sys v0.0.0-20210119212857-b64e53b001e4 // indirect
+	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 	google.golang.org/protobuf v1.25.0 // indirect
 	gopkg.in/square/go-jose.v2 v2.5.1
 	gopkg.in/yaml.v2 v2.3.0 // indirect
