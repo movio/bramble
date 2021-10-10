@@ -4983,6 +4983,55 @@ func TestQueryWithBoundaryFields(t *testing.T) {
 	f.checkSuccess(t)
 }
 
+func TestQuerySelectionSetFragmentMismatchesWithResponse(t *testing.T) {
+	f := &queryExecutionFixture{
+		services: []testService{{
+			schema: `
+				interface Transport {
+					speed: Int!
+				}
+
+				type Bicycle implements Transport {
+					speed: Int!
+					dropbars: Boolean!
+				}
+
+				type Plane implements Transport {
+					speed: Int!
+					winglength: Int!
+				}
+
+				type Query {
+					selectedTransport: Transport!
+				}`,
+			handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Write([]byte(`{
+					"data": {
+						"selectedTransport": {
+							"speed": 30
+						}
+					}
+        }`))
+			}),
+		}},
+		query: `query {
+			selectedTransport {
+				speed
+				... on Plane {
+					__typename
+					winglength
+				}
+			}
+    	}`,
+		expected: `{
+			"selectedTransport": {
+				"speed": 30
+			}
+    	}`,
+	}
+	f.checkSuccess(t)
+}
+
 func TestQueryWithArrayBoundaryFields(t *testing.T) {
 	f := &queryExecutionFixture{
 		services: []testService{
