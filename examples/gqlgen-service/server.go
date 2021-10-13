@@ -9,6 +9,7 @@ import (
 	"os"
 	"time"
 
+	_ "github.com/99designs/gqlgen/cmd"
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/99designs/gqlgen/handler"
 )
