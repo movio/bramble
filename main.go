@@ -39,7 +39,7 @@ func Main() {
 
 	go gtw.UpdateSchemas(cfg.PollIntervalDuration)
 
-	signalChan := make(chan os.Signal)
+	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, os.Interrupt)
 
 	ctx, cancel := context.WithCancel(context.Background())
