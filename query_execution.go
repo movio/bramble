@@ -844,10 +844,6 @@ func unionAndTrimSelectionSetRec(objectTypename string, schema *ast.Schema, sele
 			filteredSelectionSet = append(filteredSelectionSet, selection)
 		case *ast.InlineFragment:
 			fragment := selection
-			if objectTypename == "" {
-				return nil, errors.New("unionAndTrimSelectionSetRec: expected __typename")
-			}
-
 			if fragment.ObjectDefinition.IsAbstractType() &&
 				fragmentImplementsAbstractType(schema, fragment.ObjectDefinition.Name, fragment.TypeCondition) &&
 				objectTypenameMatchesDifferentFragment(objectTypename, fragment) {
