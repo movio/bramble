@@ -220,21 +220,48 @@ func extractSelectionSet(ctx *PlanningContext, insertionPoint []string, parentTy
 		}
 	}
 
-	// We need to add the id field only if it's a boundary type and the result
-	// is going to be merged with another step (we have children steps or it's a
-	// child step).
-	if parentType != queryObjectName && parentType != mutationObjectName &&
-		ctx.IsBoundary[parentType] &&
-		ctx.Schema.Types[parentType].Fields.ForName("id") != nil &&
-		(childstep || len(childrenStepsResult) > 0) {
-		if !selectionSetHasFieldNamed(selectionSetResult, "id") {
-			id := &ast.Field{
-				Alias:      "_id",
-				Name:       "id",
-				Definition: ctx.Schema.Types[parentType].Fields.ForName("id"),
+	parentDef := ctx.Schema.Types[parentType]
+	// For abstract types, add an id fragment for all possible boundary
+	// implementations. This assures that abstract boundaries always return
+	// with an id, even if they didn't make a selection on the returned type.
+	if parentDef.IsAbstractType() {
+		for implementationName, abstractTypes := range ctx.Schema.Implements {
+			if !ctx.IsBoundary[implementationName] {
+				continue
 			}
-			selectionSetResult = append([]ast.Selection{id}, selectionSetResult...)
+			for _, abstractType := range abstractTypes {
+				if abstractType.Name != parentType {
+					continue
+				}
+				implementationType := ctx.Schema.Types[implementationName]
+				possibleId := &ast.InlineFragment{
+					TypeCondition: implementationName,
+					SelectionSet: []ast.Selection{
+						&ast.Field{
+							Alias:      "_id",
+							Name:       "id",
+							Definition: implementationType.Fields.ForName("id"),
+						},
+					},
+					ObjectDefinition: implementationType,
+				}
+				selectionSetResult = append([]ast.Selection{possibleId}, selectionSetResult...)
+			}
 		}
+	// Otherwise, add an id selection to boundary types where the result
+	// will be merged with another step (i.e.: has children or is a child step).
+	} else if parentType != queryObjectName &&
+		parentType != mutationObjectName &&
+		ctx.IsBoundary[parentType] &&
+		(childstep || len(childrenStepsResult) > 0) &&
+		parentDef.Fields.ForName("id") != nil &&
+		!selectionSetHasFieldNamed(selectionSetResult, "id") {
+		id := &ast.Field{
+			Alias:      "_id",
+			Name:       "id",
+			Definition: parentDef.Fields.ForName("id"),
+		}
+		selectionSetResult = append([]ast.Selection{id}, selectionSetResult...)
 	}
 	return selectionSetResult, childrenStepsResult, nil
 }

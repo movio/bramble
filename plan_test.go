@@ -408,6 +408,27 @@ func TestQueryPlanFragmentSpread2(t *testing.T) {
 	PlanTestFixture1.Check(t, query, plan)
 }
 
+func TestQueryPlanExpandAbstractTypesWithPossibleBoundaryIds(t *testing.T) {
+	query := `
+	{
+		animals {
+			name
+		}
+	}`
+	plan := `{
+		"RootSteps": [
+			{
+				"ServiceURL": "A",
+				"ParentType": "Query",
+				"SelectionSet": "{ animals { ... on Snake { _id: id } ... on Lion { _id: id } name } }",
+				"InsertionPoint": null,
+				"Then": null
+			}
+		]
+	}`
+	PlanTestFixture3.Check(t, query, plan)
+}
+
 func TestQueryPlanInlineFragmentSpreadOfInterface(t *testing.T) {
 	query := `
 	{
@@ -426,7 +447,7 @@ func TestQueryPlanInlineFragmentSpreadOfInterface(t *testing.T) {
 			{
 				"ServiceURL": "A",
 				"ParentType": "Query",
-				"SelectionSet": "{ animals { name ... on Lion { maneColor __typename } ... on Snake { _id: id __typename } } }",
+				"SelectionSet": "{ animals { ... on Snake { _id: id } ... on Lion { _id: id } name ... on Lion { maneColor __typename } ... on Snake { _id: id __typename } } }",
 				"InsertionPoint": null,
 				"Then": [
 					{
