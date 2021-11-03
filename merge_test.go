@@ -822,7 +822,7 @@ func TestMergeRemovesCustomDirectives(t *testing.T) {
 			directive @boundary on OBJECT
 
 			directive @myObjectDirective on OBJECT
-			directive @myFieldDirective on FIELD
+			directive @myFieldDirective on FIELD | FIELD_DEFINITION
 
             type Query @myObjectDirective {
 				name: String! @myFieldDirective @deprecated
@@ -842,7 +842,7 @@ func TestMergeRemovesCustomDirectives(t *testing.T) {
 			directive @boundary on OBJECT
 
 			directive @myObjectDirective on OBJECT
-			directive @myFieldDirective on FIELD
+			directive @myFieldDirective on FIELD | FIELD_DEFINITION
 
 			type MyBoundaryType implements Node @boundary @myObjectDirective {
 				id: ID! @myFieldDirective

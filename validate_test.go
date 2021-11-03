@@ -92,7 +92,7 @@ func TestBoundaryDirectiveRequirements(t *testing.T) {
 	})
 	t.Run("@boundary is checked if it is used", func(t *testing.T) {
 		withSchema(t, `
-		directive @boundary(incorrect: String) on FIELD
+		directive @boundary(incorrect: String) on OBJECT
 		type Filler @boundary {
 			id: ID!
 		}
@@ -100,7 +100,7 @@ func TestBoundaryDirectiveRequirements(t *testing.T) {
 	})
 	t.Run("@boundary is checked if it is used", func(t *testing.T) {
 		withSchema(t, `
-		directive @boundary(incorrect: String) on FIELD
+		directive @boundary(incorrect: String) on OBJECT
 		type Filler @boundary {
 			id: ID!
 		}
