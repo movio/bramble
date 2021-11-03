@@ -524,7 +524,7 @@ func TestQueryPlanInlineFragmentSpreadOfInterface(t *testing.T) {
 			{
 				"ServiceURL": "A",
 				"ParentType": "Query",
-				"SelectionSet": "{ animals { ... on Lion { _id: id } ... on Snake { _id: id } name ... on Lion { maneColor __typename } ... on Snake { _id: id __typename } } }",
+				"SelectionSet": "{ animals { ... on Snake { _id: id } ... on Lion { _id: id } name ... on Lion { maneColor __typename } ... on Snake { _id: id __typename } } }",
 				"InsertionPoint": null,
 				"Then": [
 					{
