@@ -2,6 +2,7 @@ package bramble
 
 import (
 	"context"
+	"strings"
 	"encoding/json"
 	"fmt"
 
@@ -206,13 +207,30 @@ func extractSelectionSet(ctx *PlanningContext, insertionPoint []string, parentTy
 		}
 	}
 
-	// Create child steps for all remote field selections
 	if len(remoteSelections) > 0 {
+		// Create child steps for all remote field selections
 		childrenSteps, err := createSteps(ctx, insertionPoint, parentType, location, remoteSelections, true)
 		if err != nil {
 			return nil, nil, err
 		}
 		childrenStepsResult = append(childrenStepsResult, childrenSteps...)
+	}
+
+	if len(childrenStepsResult) > 1 {
+		// Merge steps targeting distinct service/path locations
+		mergedSteps := []*QueryPlanStep{}
+		mergedStepsMap := map[string]*QueryPlanStep{}
+		for _, step := range childrenStepsResult {
+			key := strings.Join(append([]string{step.ServiceURL}, step.InsertionPoint...), "/")
+			if existingStep, ok := mergedStepsMap[key]; ok {
+				existingStep.SelectionSet = append(existingStep.SelectionSet, step.SelectionSet...)
+				existingStep.Then = append(existingStep.Then, step.Then...)
+			} else {
+				mergedStepsMap[key] = step
+				mergedSteps = append(mergedSteps, step)
+			}
+		}
+		childrenStepsResult = mergedSteps
 	}
 
 	parentDef := ctx.Schema.Types[parentType]
@@ -241,6 +259,7 @@ func extractSelectionSet(ctx *PlanningContext, insertionPoint []string, parentTy
 					ObjectDefinition: implementationType,
 				}
 				selectionSetResult = append([]ast.Selection{possibleId}, selectionSetResult...)
+				break
 			}
 		}
 	// Otherwise, add an id selection to boundary types where the result

@@ -118,7 +118,7 @@ func TestQueryPlanABA2(t *testing.T) {
 				"SelectionSet": "{ _id: id compTitles(limit: 42) { id compTitles(limit: 666) { id } } }",
 				"InsertionPoint": ["movies"],
 				"Then": [
-					{
+				  {
 					"ServiceURL": "A",
 					"ParentType": "Movie",
 					"SelectionSet": "{ _id: id title }",
@@ -408,7 +408,7 @@ func TestQueryPlanFragmentSpread2(t *testing.T) {
 	PlanTestFixture1.Check(t, query, plan)
 }
 
-func TestQueryPlanMergeDeepTraversal(t *testing.T) {
+func TestQueryPlanCompleteDeepTraversal(t *testing.T) {
 	query := `
 	{
 		shop1 {
@@ -443,6 +443,40 @@ func TestQueryPlanMergeDeepTraversal(t *testing.T) {
 							"Then": null
 							}
 						]
+					}
+				]
+			}
+		]
+	}`
+	PlanTestFixture6.Check(t, query, plan)
+}
+
+func TestQueryPlanMergeInsertionPointSteps(t *testing.T) {
+	query := `
+	{
+		shop1 {
+			products {
+				name
+			}
+			products {
+				name
+			}
+		}
+	}`
+	plan := `{
+		"RootSteps": [
+			{
+				"ServiceURL": "A",
+				"ParentType": "Query",
+				"SelectionSet": "{ shop1 { products { _id: id } products { _id: id } } }",
+				"InsertionPoint": null,
+				"Then": [
+					{
+					"ServiceURL": "B",
+					"ParentType": "Product",
+					"SelectionSet": "{ _id: id name _id: id name }",
+					"InsertionPoint": ["shop1", "products"],
+					"Then": null
 					}
 				]
 			}
@@ -490,7 +524,7 @@ func TestQueryPlanInlineFragmentSpreadOfInterface(t *testing.T) {
 			{
 				"ServiceURL": "A",
 				"ParentType": "Query",
-				"SelectionSet": "{ animals { ... on Snake { _id: id } ... on Lion { _id: id } name ... on Lion { maneColor __typename } ... on Snake { _id: id __typename } } }",
+				"SelectionSet": "{ animals { ... on Lion { _id: id } ... on Snake { _id: id } name ... on Lion { maneColor __typename } ... on Snake { _id: id __typename } } }",
 				"InsertionPoint": null,
 				"Then": [
 					{
