@@ -117,6 +117,7 @@ func createSteps(ctx *PlanningContext, insertionPoint []string, parentType, pare
 func extractSelectionSet(ctx *PlanningContext, insertionPoint []string, parentType string, input ast.SelectionSet, location string, childstep bool) (ast.SelectionSet, []*QueryPlanStep, error) {
 	var selectionSetResult []ast.Selection
 	var childrenStepsResult []*QueryPlanStep
+	var remoteSelections []ast.Selection
 	for _, selection := range input {
 		switch selection := selection.(type) {
 		case *ast.Field:
@@ -136,44 +137,29 @@ func extractSelectionSet(ctx *PlanningContext, insertionPoint []string, parentTy
 				childrenStepsResult = append(childrenStepsResult, steps...)
 				continue
 			}
-			if loc == location {
-				if selection.SelectionSet == nil {
-					selectionSetResult = append(selectionSetResult, selection)
-				} else {
-					newField := *selection
-					selectionSet, childrenSteps, err := extractSelectionSet(
-						ctx,
-						append(insertionPoint, selection.Alias),
-						selection.Definition.Type.Name(),
-						selection.SelectionSet,
-						location,
-						childstep,
-					)
-					if err != nil {
-						return nil, nil, err
-					}
-					newField.SelectionSet = selectionSet
-					selectionSetResult = append(selectionSetResult, &newField)
-					childrenStepsResult = append(childrenStepsResult, childrenSteps...)
-				}
+			if loc != location {
+				// field transitions to another service location
+				remoteSelections = append(remoteSelections, selection)
+			} else if selection.SelectionSet == nil {
+				// field is a leaf type in the current service
+				selectionSetResult = append(selectionSetResult, selection)
 			} else {
-				mergedWithExistingStep := false
-				for _, step := range childrenStepsResult {
-					if stringArraysEqual(step.InsertionPoint, insertionPoint) && step.ServiceURL == loc {
-						step.SelectionSet = append(step.SelectionSet, selection)
-						mergedWithExistingStep = true
-						break
-					}
+				// field is a composite type in the current service
+				newField := *selection
+				selectionSet, childrenSteps, err := extractSelectionSet(
+					ctx,
+					append(insertionPoint, selection.Alias),
+					selection.Definition.Type.Name(),
+					selection.SelectionSet,
+					location,
+					childstep,
+				)
+				if err != nil {
+					return nil, nil, err
 				}
-
-				if !mergedWithExistingStep {
-					newSelectionSet := []ast.Selection{selection}
-					childrenSteps, err := createSteps(ctx, insertionPoint, parentType, location, newSelectionSet, true)
-					if err != nil {
-						return nil, nil, err
-					}
-					childrenStepsResult = append(childrenStepsResult, childrenSteps...)
-				}
+				newField.SelectionSet = selectionSet
+				selectionSetResult = append(selectionSetResult, &newField)
+				childrenStepsResult = append(childrenStepsResult, childrenSteps...)
 			}
 		case *ast.InlineFragment:
 			selectionSet, childrenSteps, err := extractSelectionSet(
@@ -218,6 +204,15 @@ func extractSelectionSet(ctx *PlanningContext, insertionPoint []string, parentTy
 		default:
 			return nil, nil, fmt.Errorf("unexpected %T in SelectionSet", selection)
 		}
+	}
+
+	// Create child steps for all remote field selections
+	if len(remoteSelections) > 0 {
+		childrenSteps, err := createSteps(ctx, insertionPoint, parentType, location, remoteSelections, true)
+		if err != nil {
+			return nil, nil, err
+		}
+		childrenStepsResult = append(childrenStepsResult, childrenSteps...)
 	}
 
 	parentDef := ctx.Schema.Types[parentType]
@@ -380,20 +375,6 @@ func (m FieldURLMap) RegisterURL(parent string, field string, location string) {
 
 func (m FieldURLMap) keyFor(parent string, field string) string {
 	return fmt.Sprintf("%s.%s", parent, field)
-}
-
-func stringArraysEqual(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-
-	for i, v := range a {
-		if v != b[i] {
-			return false
-		}
-	}
-
-	return true
 }
 
 // BoundaryField contains the name and format for a boundary query

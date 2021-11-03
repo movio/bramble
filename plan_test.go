@@ -118,18 +118,18 @@ func TestQueryPlanABA2(t *testing.T) {
 				"SelectionSet": "{ _id: id compTitles(limit: 42) { id compTitles(limit: 666) { id } } }",
 				"InsertionPoint": ["movies"],
 				"Then": [
-				  {
+					{
 					"ServiceURL": "A",
 					"ParentType": "Movie",
 					"SelectionSet": "{ _id: id title }",
-					"InsertionPoint": ["movies", "compTitles"],
+					"InsertionPoint": ["movies", "compTitles", "compTitles"],
 					"Then": null
 				  },
 				  {
 					"ServiceURL": "A",
 					"ParentType": "Movie",
 					"SelectionSet": "{ _id: id title }",
-					"InsertionPoint": ["movies", "compTitles", "compTitles"],
+					"InsertionPoint": ["movies", "compTitles"],
 					"Then": null
 				  }
 				]
@@ -406,6 +406,49 @@ func TestQueryPlanFragmentSpread2(t *testing.T) {
 		]
 	}`
 	PlanTestFixture1.Check(t, query, plan)
+}
+
+func TestQueryPlanMergeDeepTraversal(t *testing.T) {
+	query := `
+	{
+		shop1 {
+			name
+			products {
+				name
+				collection {
+					name
+				}
+			}
+		}
+	}`
+	plan := `{
+		"RootSteps": [
+			{
+				"ServiceURL": "A",
+				"ParentType": "Query",
+				"SelectionSet": "{ shop1 { name products { _id: id } } }",
+				"InsertionPoint": null,
+				"Then": [
+					{
+					"ServiceURL": "B",
+					"ParentType": "Product",
+					"SelectionSet": "{ _id: id name collection { _id: id } }",
+					"InsertionPoint": ["shop1", "products"],
+					"Then": [
+							{
+							"ServiceURL": "C",
+							"ParentType": "Collection",
+							"SelectionSet": "{ _id: id name }",
+							"InsertionPoint": ["shop1", "products", "collection"],
+							"Then": null
+							}
+						]
+					}
+				]
+			}
+		]
+	}`
+	PlanTestFixture6.Check(t, query, plan)
 }
 
 func TestQueryPlanExpandAbstractTypesWithPossibleBoundaryIds(t *testing.T) {
