@@ -220,6 +220,47 @@ var PlanTestFixture5 = &PlanTestFixture{
 	},
 }
 
+var PlanTestFixture6 = &PlanTestFixture{
+	Schema: `
+	type Shop {
+		id: ID!
+		name: String!
+		products: [Product]!
+	}
+
+	type Product {
+		id: ID!
+		name: String!
+		collection: Collection
+	}
+
+	type Collection {
+		id: ID!
+		name: String!
+	}
+
+	type Query {
+		shop1: Shop!
+	}`,
+
+	Locations: map[string]string{
+		"Query.shop1":         "A",
+		"Shop.id":             "A",
+		"Shop.name":           "A",
+		"Shop.products":       "A",
+		"Product.name":        "B",
+		"Product.collection":  "B",
+		"Collection.name":     "C",
+	},
+
+	IsBoundary: map[string]bool{
+		"Shop":        false,
+		"Product":     true,
+		"Collection":  true,
+	},
+}
+
+
 func (f *PlanTestFixture) Check(t *testing.T, query, expectedJSON string) {
 	t.Helper()
 	schema := gqlparser.MustLoadSchema(&ast.Source{Name: "fixture", Input: f.Schema})
