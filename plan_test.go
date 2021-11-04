@@ -496,6 +496,7 @@ func TestQueryPlanExpandAbstractTypesWithPossibleBoundaryIds(t *testing.T) {
 		"name",
 		"... on Lion { _id: id }",
 		"... on Snake { _id: id }",
+		"__typename",
 	}
 	PlanTestFixture3.CheckUnorderedRootFieldSelections(t, query, rootFieldSelections)
 }
@@ -519,6 +520,7 @@ func TestQueryPlanInlineFragmentSpreadOfInterface(t *testing.T) {
 		"... on Snake { _id: id }",
 		"... on Lion { maneColor __typename }",
 		"... on Snake { _id: id __typename }",
+		"__typename",
 	}
 	PlanTestFixture3.CheckUnorderedRootFieldSelections(t, query, rootFieldSelections)
 }
@@ -638,7 +640,7 @@ func TestQueryPlanSupportsUnions(t *testing.T) {
         {
           "ServiceURL": "A",
           "ParentType": "Query",
-          "SelectionSet": "{ animals { ... on Dog { name __typename } ... on Cat { name __typename } ... on Snake { name __typename } } }",
+          "SelectionSet": "{ animals { ... on Dog { name __typename } ... on Cat { name __typename } ... on Snake { name __typename } __typename } }",
           "InsertionPoint": null,
           "Then": null
         }

@@ -262,6 +262,11 @@ func extractSelectionSet(ctx *PlanningContext, insertionPoint []string, parentTy
 				break
 			}
 		}
+		selectionSetResult = append(selectionSetResult, &ast.Field{
+			Alias: "__typename",
+			Name: "__typename",
+			Definition: &ast.FieldDefinition{Name: "__typename", Type: ast.NamedType("String", nil)},
+		})
 	// Otherwise, add an id selection to boundary types where the result
 	// will be merged with another step (i.e.: has children or is a child step).
 	} else if parentType != queryObjectName &&
