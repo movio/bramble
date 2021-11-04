@@ -4,12 +4,15 @@ import (
 	"encoding/json"
 	"sort"
 	"testing"
+	"context"
+	"fmt"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/vektah/gqlparser/v2"
 	"github.com/vektah/gqlparser/v2/ast"
+	"github.com/99designs/gqlgen/graphql"
 )
 
 type PlanTestFixture struct {
@@ -261,7 +264,7 @@ var PlanTestFixture6 = &PlanTestFixture{
 }
 
 
-func (f *PlanTestFixture) Check(t *testing.T, query, expectedJSON string) {
+func (f *PlanTestFixture) Plan(t *testing.T, query string) *QueryPlan {
 	t.Helper()
 	schema := gqlparser.MustLoadSchema(&ast.Source{Name: "fixture", Input: f.Schema})
 	operation := gqlparser.MustLoadQuery(schema, query)
@@ -273,7 +276,34 @@ func (f *PlanTestFixture) Check(t *testing.T, query, expectedJSON string) {
 	}})
 	require.NoError(t, err)
 	actual.SortSteps()
-	assert.JSONEq(t, expectedJSON, jsonMustMarshal(actual))
+	return actual
+}
+
+func (f *PlanTestFixture) Check(t *testing.T, query string, expectedJSON string) {
+	assert.JSONEq(t, expectedJSON, jsonMustMarshal(f.Plan(t, query)))
+}
+
+func (f *PlanTestFixture) CheckUnorderedRootFieldSelections(t *testing.T, query string, expectedSelections []string) {
+	ctx := graphql.WithOperationContext(context.Background(), &graphql.OperationContext{
+		Variables: map[string]interface{}{},
+	})
+
+	result := f.Plan(t, query)
+	rootField := result.RootSteps[0].SelectionSet[0].(*ast.Field)
+
+	assert.Equal(t, len(rootField.SelectionSet), len(expectedSelections))
+
+	for _, expectedSelection := range expectedSelections {
+		var foundSelection string
+		expectedSelection = fmt.Sprintf("{ %s }", expectedSelection)
+		for _, selection := range rootField.SelectionSet {
+		    if expectedSelection == formatSelectionSetSingleLine(ctx, nil, []ast.Selection{selection}) {
+		      foundSelection = expectedSelection
+		      break
+		    }
+		}
+		assert.Equal(t, expectedSelection, foundSelection)
+	}
 }
 
 type ByServiceURL []*QueryPlanStep

@@ -492,18 +492,12 @@ func TestQueryPlanExpandAbstractTypesWithPossibleBoundaryIds(t *testing.T) {
 			name
 		}
 	}`
-	plan := `{
-		"RootSteps": [
-			{
-				"ServiceURL": "A",
-				"ParentType": "Query",
-				"SelectionSet": "{ animals { ... on Snake { _id: id } ... on Lion { _id: id } name } }",
-				"InsertionPoint": null,
-				"Then": null
-			}
-		]
-	}`
-	PlanTestFixture3.Check(t, query, plan)
+	rootFieldSelections := []string{
+		"name",
+		"... on Lion { _id: id }",
+		"... on Snake { _id: id }",
+	}
+	PlanTestFixture3.CheckUnorderedRootFieldSelections(t, query, rootFieldSelections)
 }
 
 func TestQueryPlanInlineFragmentSpreadOfInterface(t *testing.T) {
@@ -519,26 +513,14 @@ func TestQueryPlanInlineFragmentSpreadOfInterface(t *testing.T) {
 			}
 		}
 	}`
-	plan := `{
-		"RootSteps": [
-			{
-				"ServiceURL": "A",
-				"ParentType": "Query",
-				"SelectionSet": "{ animals { ... on Snake { _id: id } ... on Lion { _id: id } name ... on Lion { maneColor __typename } ... on Snake { _id: id __typename } } }",
-				"InsertionPoint": null,
-				"Then": [
-					{
-						"ServiceURL": "B",
-						"ParentType": "Snake",
-						"SelectionSet": "{ _id: id venomous }",
-						"InsertionPoint": ["animals"],
-						"Then": null
-					}
-				]
-			}
-		]
-	}`
-	PlanTestFixture3.Check(t, query, plan)
+	rootFieldSelections := []string{
+		"name",
+		"... on Lion { _id: id }",
+		"... on Snake { _id: id }",
+		"... on Lion { maneColor __typename }",
+		"... on Snake { _id: id __typename }",
+	}
+	PlanTestFixture3.CheckUnorderedRootFieldSelections(t, query, rootFieldSelections)
 }
 
 func TestQueryPlanSkipDirective(t *testing.T) {
