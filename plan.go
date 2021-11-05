@@ -8,6 +8,7 @@ import (
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/vektah/gqlparser/v2/ast"
+	"github.com/vektah/gqlparser/v2/gqlerror"
 )
 
 // QueryPlanStep is a single execution step
@@ -115,6 +116,11 @@ func createSteps(ctx *PlanningContext, insertionPoint []string, parentType, pare
 	return result, nil
 }
 
+var reservedAliases = map[string]string{
+	"__typename": "__typename",
+	"__id": "id",
+}
+
 func extractSelectionSet(ctx *PlanningContext, insertionPoint []string, parentType string, input ast.SelectionSet, location string, childstep bool) (ast.SelectionSet, []*QueryPlanStep, error) {
 	var selectionSetResult []ast.Selection
 	var childrenStepsResult []*QueryPlanStep
@@ -122,6 +128,11 @@ func extractSelectionSet(ctx *PlanningContext, insertionPoint []string, parentTy
 	for _, selection := range input {
 		switch selection := selection.(type) {
 		case *ast.Field:
+			for reservedAlias, requiredName := range reservedAliases {
+				if selection.Alias == reservedAlias && selection.Name != requiredName {
+					return nil, nil, gqlerror.Errorf("%s.%s: alias \"%s\" is reserved for system use", strings.Join(insertionPoint, "."), reservedAlias, reservedAlias)
+				}
+			}
 			if parentType != queryObjectName && parentType != mutationObjectName && ctx.IsBoundary[parentType] && selection.Name == "id" {
 				selectionSetResult = append(selectionSetResult, selection)
 				continue
@@ -251,7 +262,7 @@ func extractSelectionSet(ctx *PlanningContext, insertionPoint []string, parentTy
 					TypeCondition: implementationName,
 					SelectionSet: []ast.Selection{
 						&ast.Field{
-							Alias:      "_id",
+							Alias:      "__id",
 							Name:       "id",
 							Definition: implementationType.Fields.ForName("id"),
 						},
@@ -271,7 +282,7 @@ func extractSelectionSet(ctx *PlanningContext, insertionPoint []string, parentTy
 		parentDef.Fields.ForName("id") != nil &&
 		!selectionSetHasFieldNamed(selectionSetResult, "id") {
 		id := &ast.Field{
-			Alias:      "_id",
+			Alias:      "__id",
 			Name:       "id",
 			Definition: parentDef.Fields.ForName("id"),
 		}
@@ -363,7 +374,7 @@ func filterSelectionSetByLoc(ctx *PlanningContext, ss ast.SelectionSet, loc, par
 func selectionSetHasFieldNamed(selectionSet []ast.Selection, fieldName string) bool {
 	for _, selection := range selectionSet {
 		field, ok := selection.(*ast.Field)
-		if ok && field.Name == fieldName {
+		if ok && field.Name == fieldName && (field.Alias == fieldName || field.Alias == "") {
 			return true
 		}
 	}

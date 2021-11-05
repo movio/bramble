@@ -35,7 +35,7 @@ func TestQueryPlanAB1(t *testing.T) {
 			  {
 				"ServiceURL": "B",
 				"ParentType": "Movie",
-				"SelectionSet": "{ _id: id compTitles(limit: 42) { id } }",
+				"SelectionSet": "{ __id: id compTitles(limit: 42) { id } }",
 				"InsertionPoint": ["movies"],
 				"Then": null
 			  }
@@ -59,7 +59,7 @@ func TestQueryPlanAB2(t *testing.T) {
 			  {
 				"ServiceURL": "B",
 				"ParentType": "Movie",
-				"SelectionSet": "{ _id: id compTitles(limit: 42) { id compTitles(limit: 666) { id } } }",
+				"SelectionSet": "{ __id: id compTitles(limit: 42) { id compTitles(limit: 666) { id } } }",
 				"InsertionPoint": ["movies"],
 				"Then": null
 			  }
@@ -83,13 +83,13 @@ func TestQueryPlanABA1(t *testing.T) {
 			  {
 				"ServiceURL": "B",
 				"ParentType": "Movie",
-				"SelectionSet": "{ _id: id compTitles(limit: 42) { id } }",
+				"SelectionSet": "{ __id: id compTitles(limit: 42) { id } }",
 				"InsertionPoint": ["movies"],
 				"Then": [
 				  {
 					"ServiceURL": "A",
 					"ParentType": "Movie",
-					"SelectionSet": "{ _id: id title }",
+					"SelectionSet": "{ __id: id title }",
 					"InsertionPoint": ["movies", "compTitles"],
 					"Then": null
 				  }
@@ -115,20 +115,20 @@ func TestQueryPlanABA2(t *testing.T) {
 			  {
 				"ServiceURL": "B",
 				"ParentType": "Movie",
-				"SelectionSet": "{ _id: id compTitles(limit: 42) { id compTitles(limit: 666) { id } } }",
+				"SelectionSet": "{ __id: id compTitles(limit: 42) { id compTitles(limit: 666) { id } } }",
 				"InsertionPoint": ["movies"],
 				"Then": [
 				  {
 					"ServiceURL": "A",
 					"ParentType": "Movie",
-					"SelectionSet": "{ _id: id title }",
+					"SelectionSet": "{ __id: id title }",
 					"InsertionPoint": ["movies", "compTitles", "compTitles"],
 					"Then": null
 				  },
 				  {
 					"ServiceURL": "A",
 					"ParentType": "Movie",
-					"SelectionSet": "{ _id: id title }",
+					"SelectionSet": "{ __id: id title }",
 					"InsertionPoint": ["movies", "compTitles"],
 					"Then": null
 				  }
@@ -171,13 +171,13 @@ func TestQueryPlanWithAliases(t *testing.T) {
 		  {
 			"ServiceURL": "A",
 			"ParentType": "Query",
-			"SelectionSet": "{ a1: movies { a2: id a3: title } }",
+			"SelectionSet": "{ a1: movies { __id: id a2: id a3: title } }",
 			"InsertionPoint": null,
 			"Then": [
 			  {
 				"ServiceURL": "B",
 				"ParentType": "Movie",
-				"SelectionSet": "{ _id: id a4: compTitles(limit: 42) { a5: id } }",
+				"SelectionSet": "{ __id: id a4: compTitles(limit: 42) { __id: id a5: id } }",
 				"InsertionPoint": ["a1"],
 				"Then": null
 			  }
@@ -314,13 +314,13 @@ func TestQueryPlanInlineFragmentPlan(t *testing.T) {
 			{
 				"ServiceURL": "A",
 				"ParentType": "Query",
-				"SelectionSet": "{ movies { _id: id ... on Movie { id title(language: French) __typename } } }",
+				"SelectionSet": "{ movies { __id: id ... on Movie { id title(language: French) __typename } } }",
 				"InsertionPoint": null,
 				"Then": [
 					{
 						"ServiceURL": "B",
 						"ParentType": "Movie",
-						"SelectionSet": "{ _id: id compTitles(limit: 42) { id } }",
+						"SelectionSet": "{ __id: id compTitles(limit: 42) { id } }",
 						"InsertionPoint": ["movies"],
 						"Then": null
 					}
@@ -426,19 +426,19 @@ func TestQueryPlanCompleteDeepTraversal(t *testing.T) {
 			{
 				"ServiceURL": "A",
 				"ParentType": "Query",
-				"SelectionSet": "{ shop1 { name products { _id: id } } }",
+				"SelectionSet": "{ shop1 { name products { __id: id } } }",
 				"InsertionPoint": null,
 				"Then": [
 					{
 					"ServiceURL": "B",
 					"ParentType": "Product",
-					"SelectionSet": "{ _id: id name collection { _id: id } }",
+					"SelectionSet": "{ __id: id name collection { __id: id } }",
 					"InsertionPoint": ["shop1", "products"],
 					"Then": [
 							{
 							"ServiceURL": "C",
 							"ParentType": "Collection",
-							"SelectionSet": "{ _id: id name }",
+							"SelectionSet": "{ __id: id name }",
 							"InsertionPoint": ["shop1", "products", "collection"],
 							"Then": null
 							}
@@ -468,13 +468,13 @@ func TestQueryPlanMergeInsertionPointSteps(t *testing.T) {
 			{
 				"ServiceURL": "A",
 				"ParentType": "Query",
-				"SelectionSet": "{ shop1 { products { _id: id } products { _id: id } } }",
+				"SelectionSet": "{ shop1 { products { __id: id } products { __id: id } } }",
 				"InsertionPoint": null,
 				"Then": [
 					{
 					"ServiceURL": "B",
 					"ParentType": "Product",
-					"SelectionSet": "{ _id: id name _id: id name }",
+					"SelectionSet": "{ __id: id name __id: id name }",
 					"InsertionPoint": ["shop1", "products"],
 					"Then": null
 					}
@@ -494,8 +494,8 @@ func TestQueryPlanExpandAbstractTypesWithPossibleBoundaryIds(t *testing.T) {
 	}`
 	rootFieldSelections := []string{
 		"name",
-		"... on Lion { _id: id }",
-		"... on Snake { _id: id }",
+		"... on Lion { __id: id }",
+		"... on Snake { __id: id }",
 	}
 	PlanTestFixture3.CheckUnorderedRootFieldSelections(t, query, rootFieldSelections)
 }
@@ -515,10 +515,10 @@ func TestQueryPlanInlineFragmentSpreadOfInterface(t *testing.T) {
 	}`
 	rootFieldSelections := []string{
 		"name",
-		"... on Lion { _id: id }",
-		"... on Snake { _id: id }",
+		"... on Lion { __id: id }",
+		"... on Snake { __id: id }",
 		"... on Lion { maneColor __typename }",
-		"... on Snake { _id: id __typename }",
+		"... on Snake { __id: id __typename }",
 	}
 	PlanTestFixture3.CheckUnorderedRootFieldSelections(t, query, rootFieldSelections)
 }
@@ -584,7 +584,7 @@ func TestQueryPlanSkipAndIncludeDirectiveInChildStep(t *testing.T) {
 			  {
 				"ServiceURL": "B",
 				"ParentType": "Movie",
-				"SelectionSet": "{ _id: id compTitles(limit: 42) { id @skip(if: false) @include(if: true) } }",
+				"SelectionSet": "{ __id: id compTitles(limit: 42) { id @skip(if: false) @include(if: true) } }",
 				"InsertionPoint": ["movies"],
 				"Then": null
 			  }
@@ -608,7 +608,7 @@ func TestQueryPlanSupportsAliasing(t *testing.T) {
             {
               "ServiceURL": "B",
               "ParentType": "Movie",
-              "SelectionSet": "{ _id: id bar: compTitles(limit: 42) { id } }",
+              "SelectionSet": "{ __id: id bar: compTitles(limit: 42) { id } }",
               "InsertionPoint": [
                 "foo"
               ],
@@ -616,7 +616,7 @@ func TestQueryPlanSupportsAliasing(t *testing.T) {
                 {
                   "ServiceURL": "A",
                   "ParentType": "Movie",
-                  "SelectionSet": "{ _id: id compTitleAliasTitle: title }",
+                  "SelectionSet": "{ __id: id compTitleAliasTitle: title }",
                   "InsertionPoint": [
                     "foo",
                     "bar"
@@ -686,13 +686,13 @@ func TestQueryPlanSupportsMutations(t *testing.T) {
 		  {
 			"ServiceURL": "A",
 			"ParentType": "Mutation",
-			"SelectionSet": "{ updateTitle(id: \"2\", title: \"New title\") { _id: id title } }",
+			"SelectionSet": "{ updateTitle(id: \"2\", title: \"New title\") { __id: id title } }",
 			"InsertionPoint": null,
 			"Then": [
 			  {
 				"ServiceURL": "B",
 				"ParentType": "Movie",
-				"SelectionSet": "{ _id: id release }",
+				"SelectionSet": "{ __id: id release }",
 				"InsertionPoint": [
 				  "updateTitle"
 				],
@@ -718,7 +718,7 @@ func TestQueryPlanWithPaginatedBoundaryType(t *testing.T) {
 			{
 				"ServiceURL": "B",
 				"ParentType": "Foo",
-				"SelectionSet": "{ _id: id size }",
+				"SelectionSet": "{ __id: id size }",
 				"InsertionPoint": [ "foo", "foos", "page" ],
 				"Then": null
 			}
@@ -811,7 +811,7 @@ func TestQueryPlanWithNestedNamespaces(t *testing.T) {
 			  {
 				"ServiceURL": "B",
 				"ParentType": "CompTitle",
-				"SelectionSet": "{ _id: id score }",
+				"SelectionSet": "{ __id: id score }",
 				"InsertionPoint": [
 				  "firstLevel",
 				  "secondLevel",
@@ -851,4 +851,12 @@ func TestQueryPlanNoUnnessecaryID(t *testing.T) {
 		]
 	  }
 	`)
+}
+
+func TestQueryPlanValidateReservedIdAlias(t *testing.T) {
+	PlanTestFixture1.CheckError(t, "{ movies { __id: title } }")
+}
+
+func TestQueryPlanValidateReservedTypenameAlias(t *testing.T) {
+	PlanTestFixture1.CheckError(t, "{ movies { __typename: title } }")
 }

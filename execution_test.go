@@ -1243,7 +1243,7 @@ func TestQueryWithArrayBoundaryFieldsAndMultipleChildrenSteps(t *testing.T) {
 						"data": {
 							"_result": [
 								{
-									"_id": "1",
+									"__id": "1",
 									"compTitles": [
 										{"id": "2"},
 										{"id": "3"},
@@ -1348,7 +1348,7 @@ func TestQueryWithBoundaryFieldsAndNullsAboveInsertionPoint(t *testing.T) {
 					w.Write([]byte(`{
 							"data": {
 								"_0": {
-									"_id": "DIRECTOR1",
+									"__id": "DIRECTOR1",
 									"name": "David Fincher"
 								}
 							}
@@ -1399,7 +1399,7 @@ func TestExtractBoundaryIDs(t *testing.T) {
 				"id": "1",
 				"name": "Gizmo 1",
 				"owner": {
-					"_id": "1"
+					"__id": "1"
 				}
 			},
 			{
@@ -1413,7 +1413,7 @@ func TestExtractBoundaryIDs(t *testing.T) {
 				"id": "3",
 				"name": "Gizmo 3",
 				"owner": {
-					"_id": "2"
+					"__id": "2"
 				}
 			},
 			{
@@ -1440,7 +1440,7 @@ func TestTrimInsertionPointForNestedBoundaryQuery(t *testing.T) {
 				"id": "1",
 				"name": "Gizmo 1",
 				"owner": {
-					"_id": "1"
+					"__id": "1"
 				}
 			},
 			{
@@ -1454,7 +1454,7 @@ func TestTrimInsertionPointForNestedBoundaryQuery(t *testing.T) {
 				"id": "3",
 				"name": "Gizmo 3",
 				"owner": {
-					"_id": "2"
+					"__id": "2"
 				}
 			},
 			{
@@ -1495,7 +1495,7 @@ func TestBuildBoundaryQueryDocuments(t *testing.T) {
 	ids := []string{"1", "2", "3"}
 	selectionSet := []ast.Selection{
 		&ast.Field{
-			Alias:            "_id",
+			Alias:            "__id",
 			Name:             "id",
 			Definition:       schema.Types["Owner"].Fields.ForName("id"),
 			ObjectDefinition: schema.Types["Owner"],
@@ -1515,7 +1515,7 @@ func TestBuildBoundaryQueryDocuments(t *testing.T) {
 		InsertionPoint: []string{"gizmos", "owner"},
 		Then:           nil,
 	}
-	expected := []string{`{ _result: getOwners(ids: ["1", "2", "3"]) { _id: id name } }`}
+	expected := []string{`{ _result: getOwners(ids: ["1", "2", "3"]) { __id: id name } }`}
 	ctx := testContextWithoutVariables(nil)
 	docs, err := buildBoundaryQueryDocuments(ctx, schema, step, ids, boundaryField, 1)
 	require.NoError(t, err)
@@ -1545,7 +1545,7 @@ func TestBuildNonArrayBoundaryQueryDocuments(t *testing.T) {
 	ids := []string{"1", "2", "3"}
 	selectionSet := []ast.Selection{
 		&ast.Field{
-			Alias:            "_id",
+			Alias:            "__id",
 			Name:             "id",
 			Definition:       schema.Types["Owner"].Fields.ForName("id"),
 			ObjectDefinition: schema.Types["Owner"],
@@ -1565,7 +1565,7 @@ func TestBuildNonArrayBoundaryQueryDocuments(t *testing.T) {
 		InsertionPoint: []string{"gizmos", "owner"},
 		Then:           nil,
 	}
-	expected := []string{`{ _0: getOwner(id: "1") { _id: id name } _1: getOwner(id: "2") { _id: id name } _2: getOwner(id: "3") { _id: id name } }`}
+	expected := []string{`{ _0: getOwner(id: "1") { __id: id name } _1: getOwner(id: "2") { __id: id name } _2: getOwner(id: "3") { __id: id name } }`}
 	ctx := testContextWithoutVariables(nil)
 	docs, err := buildBoundaryQueryDocuments(ctx, schema, step, ids, boundaryField, 10)
 	require.NoError(t, err)
@@ -1595,7 +1595,7 @@ func TestBuildBatchedNonArrayBoundaryQueryDocuments(t *testing.T) {
 	ids := []string{"1", "2", "3"}
 	selectionSet := []ast.Selection{
 		&ast.Field{
-			Alias:            "_id",
+			Alias:            "__id",
 			Name:             "id",
 			Definition:       schema.Types["Owner"].Fields.ForName("id"),
 			ObjectDefinition: schema.Types["Owner"],
@@ -1615,7 +1615,7 @@ func TestBuildBatchedNonArrayBoundaryQueryDocuments(t *testing.T) {
 		InsertionPoint: []string{"gizmos", "owner"},
 		Then:           nil,
 	}
-	expected := []string{`{ _0: getOwner(id: "1") { _id: id name } _1: getOwner(id: "2") { _id: id name } }`, `{ _2: getOwner(id: "3") { _id: id name } }`}
+	expected := []string{`{ _0: getOwner(id: "1") { __id: id name } _1: getOwner(id: "2") { __id: id name } }`, `{ _2: getOwner(id: "3") { __id: id name } }`}
 	ctx := testContextWithoutVariables(nil)
 	docs, err := buildBoundaryQueryDocuments(ctx, schema, step, ids, boundaryField, 2)
 	require.NoError(t, err)
@@ -1815,7 +1815,7 @@ func TestMergeExecutionResults(t *testing.T) {
 				"id": "1",
 				"color": "Gizmo A",
 				"owner": {
-					"_id": "1"
+					"__id": "1"
 				}
 			}
 		}`)
@@ -1828,7 +1828,7 @@ func TestMergeExecutionResults(t *testing.T) {
 
 		inputSliceB := jsonToInterfaceSlice(`[
 			{
-				"_id": "1",
+				"__id": "1",
 				"name": "Owner A"
 			}
 		]`)
@@ -1846,7 +1846,7 @@ func TestMergeExecutionResults(t *testing.T) {
 				"id": "1",
 				"color": "Gizmo A",
 				"owner": {
-					"_id": "1",
+					"__id": "1",
 					"name": "Owner A"
 				}
 			}
@@ -1863,21 +1863,21 @@ func TestMergeExecutionResults(t *testing.T) {
 					"id": "1",
 					"color": "RED",
 					"owner": {
-						"_id": "4"
+						"__id": "4"
 					}
 				},
 				{
 					"id": "2",
 					"color": "GREEN",
 					"owner": {
-						"_id": "5"
+						"__id": "5"
 					}
 				},
 				{
 					"id": "3",
 					"color": "BLUE",
 					"owner": {
-						"_id": "6"
+						"__id": "6"
 					}
 				}
 			]
@@ -1891,15 +1891,15 @@ func TestMergeExecutionResults(t *testing.T) {
 
 		inputSliceB := jsonToInterfaceSlice(`[
 			{
-				"_id": "4",
+				"__id": "4",
 				"name": "Owner A"
 			},
 			{
-				"_id": "5",
+				"__id": "5",
 				"name": "Owner B"
 			},
 			{
-				"_id": "6",
+				"__id": "6",
 				"name": "Owner C"
 			}
 		]`)
@@ -1918,7 +1918,7 @@ func TestMergeExecutionResults(t *testing.T) {
 					"id": "1",
 					"color": "RED",
 					"owner": {
-						"_id": "4",
+						"__id": "4",
 						"name": "Owner A"
 					}
 				},
@@ -1926,7 +1926,7 @@ func TestMergeExecutionResults(t *testing.T) {
 					"id": "2",
 					"color": "GREEN",
 					"owner": {
-						"_id": "5",
+						"__id": "5",
 						"name": "Owner B"
 					}
 				},
@@ -1934,7 +1934,7 @@ func TestMergeExecutionResults(t *testing.T) {
 					"id": "3",
 					"color": "BLUE",
 					"owner": {
-						"_id": "6",
+						"__id": "6",
 						"name": "Owner C"
 					}
 				}
@@ -1952,21 +1952,21 @@ func TestMergeExecutionResults(t *testing.T) {
 					"id": "1",
 					"color": "RED",
 					"owner": {
-						"_id": "4"
+						"__id": "4"
 					}
 				},
 				{
 					"id": "2",
 					"color": "GREEN",
 					"owner": {
-						"_id": "5"
+						"__id": "5"
 					}
 				},
 				{
 					"id": "3",
 					"color": "BLUE",
 					"owner": {
-						"_id": "6"
+						"__id": "6"
 					}
 				}
 			]
@@ -1980,15 +1980,15 @@ func TestMergeExecutionResults(t *testing.T) {
 
 		inputSliceB := jsonToInterfaceSlice(`[
 			{
-				"_id": "4",
+				"__id": "4",
 				"name": "Owner A"
 			},
 			{
-				"_id": "5",
+				"__id": "5",
 				"name": "Owner B"
 			},
 			{
-				"_id": "6",
+				"__id": "6",
 				"name": "Owner C"
 			}
 		]`)
@@ -2007,7 +2007,7 @@ func TestMergeExecutionResults(t *testing.T) {
 					"id": "1",
 					"color": "RED",
 					"owner": {
-						"_id": "4",
+						"__id": "4",
 						"name": "Owner A"
 					}
 				},
@@ -2015,7 +2015,7 @@ func TestMergeExecutionResults(t *testing.T) {
 					"id": "2",
 					"color": "GREEN",
 					"owner": {
-						"_id": "5",
+						"__id": "5",
 						"name": "Owner B"
 					}
 				},
@@ -2023,7 +2023,7 @@ func TestMergeExecutionResults(t *testing.T) {
 					"id": "3",
 					"color": "BLUE",
 					"owner": {
-						"_id": "6",
+						"__id": "6",
 						"name": "Owner C"
 					}
 				}
@@ -2034,7 +2034,7 @@ func TestMergeExecutionResults(t *testing.T) {
 		require.Equal(t, expected, mergedMap)
 	})
 
-	t.Run("allows using both 'id' and '_id'", func(t *testing.T) {
+	t.Run("allows using both 'id' and '__id'", func(t *testing.T) {
 		inputMapA := jsonToInterfaceMap(`{
 			"gizmos": [
 				{
@@ -2055,7 +2055,7 @@ func TestMergeExecutionResults(t *testing.T) {
 					"id": "3",
 					"color": "BLUE",
 					"owner": {
-						"_id": "6"
+						"__id": "6"
 					}
 				}
 			]
@@ -2069,7 +2069,7 @@ func TestMergeExecutionResults(t *testing.T) {
 
 		inputSliceB := jsonToInterfaceSlice(`[
 			{
-				"_id": "4",
+				"__id": "4",
 				"name": "Owner A"
 			},
 			{
@@ -2112,7 +2112,7 @@ func TestMergeExecutionResults(t *testing.T) {
 					"id": "3",
 					"color": "BLUE",
 					"owner": {
-						"_id": "6",
+						"__id": "6",
 						"name": "Owner C"
 					}
 				}
@@ -4591,7 +4591,7 @@ func TestMutationExecution(t *testing.T) {
 				handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					var q map[string]string
 					json.NewDecoder(r.Body).Decode(&q)
-					assertQueriesEqual(t, schema1, `mutation { updateTitle(id: "2", title: "New title") { _id: id title } }`, q["query"])
+					assertQueriesEqual(t, schema1, `mutation { updateTitle(id: "2", title: "New title") { __id: id title } }`, q["query"])
 
 					w.Write([]byte(`{
 						"data": {
@@ -4682,7 +4682,7 @@ func TestQueryExecutionWithUnions(t *testing.T) {
 						w.Write([]byte(`{
 							"data": {
 								"_0": {
-									"_id": "2",
+									"__id": "2",
 									"pet": {
 										"name": "felix",
 										"age": 2,
@@ -4711,7 +4711,7 @@ func TestQueryExecutionWithUnions(t *testing.T) {
 					w.Write([]byte(`{
 						"data": {
 							"person": {
-								"_id": "2",
+								"__id": "2",
 								"name": "Bob"
 							}
 						}
@@ -4787,7 +4787,7 @@ func TestQueryExecutionWithNamespaces(t *testing.T) {
 						w.Write([]byte(`{
 							"data": {
 								"_0": {
-									"_id": "CA7",
+									"__id": "CA7",
 									"name": "Felix"
 								}
 							}

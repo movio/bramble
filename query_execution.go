@@ -283,10 +283,10 @@ func (q *queryExecution) createGQLErrors(step *QueryPlanStep, err error) gqlerro
 // crawling for ids:
 // [
 // 	 {
-//     "_id": "MOVIE1",
+//     "__id": "MOVIE1",
 //     "compTitles": [
 //       {
-//   	   "_id": "1"
+//   	   "__id": "1"
 // 		 }
 //	   ]
 //   }
@@ -520,7 +520,7 @@ func mergeExecutionResultsRec(src interface{}, dst interface{}, insertionPoint [
 					}
 					if srcID == dstID {
 						for k, v := range result {
-							if k == "_id" || k == "id" {
+							if k == "__id" || k == "id" {
 								continue
 							}
 
@@ -570,7 +570,7 @@ func mergeExecutionResultsRec(src interface{}, dst interface{}, insertionPoint [
 }
 
 func boundaryIDFromMap(boundaryMap map[string]interface{}) (string, error) {
-	id, ok := boundaryMap["_id"].(string)
+	id, ok := boundaryMap["__id"].(string)
 	if ok {
 		return id, nil
 	}
@@ -578,7 +578,7 @@ func boundaryIDFromMap(boundaryMap map[string]interface{}) (string, error) {
 	if ok {
 		return id, nil
 	}
-	return "", errors.New("boundaryIDFromMap: 'id' or '_id' not found")
+	return "", errors.New("boundaryIDFromMap: \"__id\" or \"id\" not found")
 }
 
 func getBoundaryFieldResults(src []interface{}) ([]map[string]interface{}, error) {
