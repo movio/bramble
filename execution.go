@@ -85,6 +85,7 @@ func (s *ExecutableSchema) UpdateSchema(forceRebuild bool) error {
 		if err != nil {
 			promServiceUpdateError.WithLabelValues(s.ServiceURL).Inc()
 			invalidschema = 1
+			forceRebuild = true
 			logger.WithError(err).Error("unable to update service")
 			// Ignore this service in this update
 			continue

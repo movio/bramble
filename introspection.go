@@ -41,6 +41,7 @@ func (s *Service) Update() (bool, error) {
 	}{}
 
 	if err := s.client.Request(context.Background(), s.ServiceURL, req, &response); err != nil {
+		s.SchemaSource = ""
 		s.Status = "Unreachable"
 		return false, err
 	}
