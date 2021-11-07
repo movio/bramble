@@ -5134,6 +5134,95 @@ func TestQueryWithArrayBoundaryFields(t *testing.T) {
 	f.checkSuccess(t)
 }
 
+func TestSchemaUpdate_serviceError(t *testing.T) {
+	schemaA := `directive @boundary on OBJECT
+				type Service {
+					name: String!
+					version: String!
+					schema: String!
+				}
+
+				type Gizmo {
+					name: String!
+				}
+
+				type Query {
+					service: Service!
+				}`
+
+	schemaB := `directive @boundary on OBJECT
+				type Service {
+					name: String!
+					version: String!
+					schema: String!
+				}
+
+				type Gadget {
+					name: String!
+				}
+
+				type Query {
+					service: Service!
+				}`
+	f := &queryExecutionFixture{
+		services: []testService{
+			{
+				schema: schemaA,
+				handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					http.Error(w, "", http.StatusInternalServerError)
+				}),
+			},
+			{
+				schema: schemaB,
+				handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.Write([]byte(fmt.Sprintf(`{
+						"data": {
+							"service": {
+								"name": "serviceB",
+								"version": "v0.0.1",
+								"schema": %q
+							}
+						}
+					}
+					`, schemaB)))
+				}),
+			},
+		},
+	}
+
+	executableSchema, cleanup := f.setup(t)
+	defer cleanup()
+
+	foundGizmo, foundGadget := false, false
+
+	for typeName := range executableSchema.MergedSchema.Types {
+		if typeName == "Gizmo" {
+			foundGizmo = true
+		}
+		if typeName == "Gadget" {
+			foundGadget = true
+		}
+	}
+
+	if !foundGizmo || !foundGadget {
+		t.Error("expected both Gadget and Gizmo in schema")
+	}
+
+	executableSchema.UpdateSchema(false)
+
+	for _, service := range executableSchema.Services {
+		if service.Name == "serviceA" {
+			require.Equal(t, "", service.SchemaSource)
+		}
+	}
+
+	for typeName := range executableSchema.MergedSchema.Types {
+		if typeName == "Gizmo" {
+			t.Error("expected Gizmo to be dropped from schema")
+		}
+	}
+}
+
 type testService struct {
 	schema  string
 	handler http.Handler
