@@ -5134,19 +5134,109 @@ func TestQueryWithArrayBoundaryFields(t *testing.T) {
 	f.checkSuccess(t)
 }
 
+func TestSchemaUpdate_serviceError(t *testing.T) {
+	schemaA := `directive @boundary on OBJECT
+				type Service {
+					name: String!
+					version: String!
+					schema: String!
+				}
+
+				type Gizmo {
+					name: String!
+				}
+
+				type Query {
+					service: Service!
+				}`
+
+	schemaB := `directive @boundary on OBJECT
+				type Service {
+					name: String!
+					version: String!
+					schema: String!
+				}
+
+				type Gadget {
+					name: String!
+				}
+
+				type Query {
+					service: Service!
+				}`
+	f := &queryExecutionFixture{
+		services: []testService{
+			{
+				schema: schemaA,
+				handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					http.Error(w, "", http.StatusInternalServerError)
+				}),
+			},
+			{
+				schema: schemaB,
+				handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.Write([]byte(fmt.Sprintf(`{
+						"data": {
+							"service": {
+								"name": "serviceB",
+								"version": "v0.0.1",
+								"schema": %q
+							}
+						}
+					}
+					`, schemaB)))
+				}),
+			},
+		},
+	}
+
+	executableSchema, cleanup := f.setup(t)
+	defer cleanup()
+
+	foundGizmo, foundGadget := false, false
+
+	for typeName := range executableSchema.MergedSchema.Types {
+		if typeName == "Gizmo" {
+			foundGizmo = true
+		}
+		if typeName == "Gadget" {
+			foundGadget = true
+		}
+	}
+
+	if !foundGizmo || !foundGadget {
+		t.Error("expected both Gadget and Gizmo in schema")
+	}
+
+	executableSchema.UpdateSchema(false)
+
+	for _, service := range executableSchema.Services {
+		if service.Name == "serviceA" {
+			require.Equal(t, "", service.SchemaSource)
+		}
+	}
+
+	for typeName := range executableSchema.MergedSchema.Types {
+		if typeName == "Gizmo" {
+			t.Error("expected Gizmo to be dropped from schema")
+		}
+	}
+}
+
 type testService struct {
 	schema  string
 	handler http.Handler
 }
 
 type queryExecutionFixture struct {
-	services  []testService
-	variables map[string]interface{}
-	query     string
-	expected  string
-	resp      *graphql.Response
-	debug     *DebugInfo
-	errors    gqlerror.List
+	services     []testService
+	variables    map[string]interface{}
+	mergedSchema *ast.Schema
+	query        string
+	expected     string
+	resp         *graphql.Response
+	debug        *DebugInfo
+	errors       gqlerror.List
 }
 
 func (f *queryExecutionFixture) checkSuccess(t *testing.T) {
@@ -5156,19 +5246,20 @@ func (f *queryExecutionFixture) checkSuccess(t *testing.T) {
 	jsonEqWithOrder(t, f.expected, string(f.resp.Data))
 }
 
-func (f *queryExecutionFixture) run(t *testing.T) {
+func (f *queryExecutionFixture) setup(t *testing.T) (*ExecutableSchema, func()) {
 	var services []*Service
 	var schemas []*ast.Schema
+	var serverCloses []func()
 
 	for _, s := range f.services {
 		serv := httptest.NewServer(s.handler)
-		defer serv.Close()
+		serverCloses = append(serverCloses, serv.Close)
 
 		schema := gqlparser.MustLoadSchema(&ast.Source{Input: s.schema})
-		services = append(services, &Service{
-			ServiceURL: serv.URL,
-			Schema:     schema,
-		})
+		service := NewService(serv.URL)
+		service.Schema = schema
+		service.SchemaSource = s.schema
+		services = append(services, service)
 
 		schemas = append(schemas, schema)
 	}
@@ -5176,12 +5267,25 @@ func (f *queryExecutionFixture) run(t *testing.T) {
 	merged, err := MergeSchemas(schemas...)
 	require.NoError(t, err)
 
+	f.mergedSchema = merged
+
 	es := newExecutableSchema(nil, 50, nil, services...)
 	es.MergedSchema = merged
 	es.BoundaryQueries = buildBoundaryFieldsMap(services...)
 	es.Locations = buildFieldURLMap(services...)
 	es.IsBoundary = buildIsBoundaryMap(services...)
-	query := gqlparser.MustLoadQuery(merged, f.query)
+
+	return es, func() {
+		for _, close := range serverCloses {
+			close()
+		}
+	}
+}
+
+func (f *queryExecutionFixture) run(t *testing.T) {
+	es, cleanup := f.setup(t)
+	defer cleanup()
+	query := gqlparser.MustLoadQuery(f.mergedSchema, f.query)
 	vars := f.variables
 	if vars == nil {
 		vars = map[string]interface{}{}
