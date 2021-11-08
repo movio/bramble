@@ -13,7 +13,7 @@ func TestQueryPlanA(t *testing.T) {
 		  {
 			"ServiceURL": "A",
 			"ParentType": "Query",
-			"SelectionSet": "{ movies { id title } }",
+			"SelectionSet": "{ movies { id title _bramble_id: id } }",
 			"InsertionPoint": null,
 			"Then": null
 		  }
@@ -29,13 +29,13 @@ func TestQueryPlanAB1(t *testing.T) {
 		  {
 			"ServiceURL": "A",
 			"ParentType": "Query",
-			"SelectionSet": "{ movies { id } }",
+			"SelectionSet": "{ movies { id _bramble_id: id } }",
 			"InsertionPoint": null,
 			"Then": [
 			  {
 				"ServiceURL": "B",
 				"ParentType": "Movie",
-				"SelectionSet": "{ _id: id compTitles(limit: 42) { id } }",
+				"SelectionSet": "{ compTitles(limit: 42) { id _bramble_id: id } _bramble_id: id }",
 				"InsertionPoint": ["movies"],
 				"Then": null
 			  }
@@ -53,13 +53,13 @@ func TestQueryPlanAB2(t *testing.T) {
 		  {
 			"ServiceURL": "A",
 			"ParentType": "Query",
-			"SelectionSet": "{ movies { id } }",
+			"SelectionSet": "{ movies { id _bramble_id: id } }",
 			"InsertionPoint": null,
 			"Then": [
 			  {
 				"ServiceURL": "B",
 				"ParentType": "Movie",
-				"SelectionSet": "{ _id: id compTitles(limit: 42) { id compTitles(limit: 666) { id } } }",
+				"SelectionSet": "{ compTitles(limit: 42) { id compTitles(limit: 666) { id _bramble_id: id } _bramble_id: id } _bramble_id: id }",
 				"InsertionPoint": ["movies"],
 				"Then": null
 			  }
@@ -77,19 +77,19 @@ func TestQueryPlanABA1(t *testing.T) {
 		  {
 			"ServiceURL": "A",
 			"ParentType": "Query",
-			"SelectionSet": "{ movies { id } }",
+			"SelectionSet": "{ movies { id _bramble_id: id } }",
 			"InsertionPoint": null,
 			"Then": [
 			  {
 				"ServiceURL": "B",
 				"ParentType": "Movie",
-				"SelectionSet": "{ _id: id compTitles(limit: 42) { id } }",
+				"SelectionSet": "{ compTitles(limit: 42) { id _bramble_id: id } _bramble_id: id }",
 				"InsertionPoint": ["movies"],
 				"Then": [
 				  {
 					"ServiceURL": "A",
 					"ParentType": "Movie",
-					"SelectionSet": "{ _id: id title }",
+					"SelectionSet": "{ title _bramble_id: id }",
 					"InsertionPoint": ["movies", "compTitles"],
 					"Then": null
 				  }
@@ -109,26 +109,26 @@ func TestQueryPlanABA2(t *testing.T) {
 		  {
 			"ServiceURL": "A",
 			"ParentType": "Query",
-			"SelectionSet": "{ movies { id } }",
+			"SelectionSet": "{ movies { id _bramble_id: id } }",
 			"InsertionPoint": null,
 			"Then": [
 			  {
 				"ServiceURL": "B",
 				"ParentType": "Movie",
-				"SelectionSet": "{ _id: id compTitles(limit: 42) { id compTitles(limit: 666) { id } } }",
+				"SelectionSet": "{ compTitles(limit: 42) { id compTitles(limit: 666) { id _bramble_id: id } _bramble_id: id } _bramble_id: id }",
 				"InsertionPoint": ["movies"],
 				"Then": [
 				  {
 					"ServiceURL": "A",
 					"ParentType": "Movie",
-					"SelectionSet": "{ _id: id title }",
+					"SelectionSet": "{ title _bramble_id: id }",
 					"InsertionPoint": ["movies", "compTitles", "compTitles"],
 					"Then": null
 				  },
 				  {
 					"ServiceURL": "A",
 					"ParentType": "Movie",
-					"SelectionSet": "{ _id: id title }",
+					"SelectionSet": "{ title _bramble_id: id }",
 					"InsertionPoint": ["movies", "compTitles"],
 					"Then": null
 				  }
@@ -148,7 +148,7 @@ func TestQueryPlanAC(t *testing.T) {
 		  {
 			"ServiceURL": "A",
 			"ParentType": "Query",
-			"SelectionSet": "{ movies { id title } }",
+			"SelectionSet": "{ movies { id title _bramble_id: id } }",
 			"InsertionPoint": null,
 			"Then": null
 		  },
@@ -171,13 +171,13 @@ func TestQueryPlanWithAliases(t *testing.T) {
 		  {
 			"ServiceURL": "A",
 			"ParentType": "Query",
-			"SelectionSet": "{ a1: movies { a2: id a3: title } }",
+			"SelectionSet": "{ a1: movies { a2: id a3: title _bramble_id: id } }",
 			"InsertionPoint": null,
 			"Then": [
 			  {
 				"ServiceURL": "B",
 				"ParentType": "Movie",
-				"SelectionSet": "{ _id: id a4: compTitles(limit: 42) { a5: id } }",
+				"SelectionSet": "{ a4: compTitles(limit: 42) { a5: id _bramble_id: id } _bramble_id: id }",
 				"InsertionPoint": ["a1"],
 				"Then": null
 			  }
@@ -195,7 +195,7 @@ func TestQueryPlanWithTypename(t *testing.T) {
 			  {
 				"ServiceURL": "A",
 				"ParentType": "Query",
-				"SelectionSet": "{ movies { id title __typename } }",
+				"SelectionSet": "{ movies { id title __typename _bramble_id: id } }",
 				"InsertionPoint": null,
 				"Then": null
 			  },
@@ -241,7 +241,7 @@ func TestQueryPlanOptionalArgument(t *testing.T) {
 		  {
 			"ServiceURL": "A",
 			"ParentType": "Query",
-			"SelectionSet": "{ movies { id title(language: French) } }",
+			"SelectionSet": "{ movies { id title(language: French) _bramble_id: id } }",
 			"InsertionPoint": null,
 			"Then": null
 		  }
@@ -264,7 +264,7 @@ func TestQueryPlanInlineFragment(t *testing.T) {
 			{
 				"ServiceURL": "A",
 				"ParentType": "Query",
-				"SelectionSet": "{ movies { ... on Movie { id title(language: French) __typename } } }",
+				"SelectionSet": "{ movies { ... on Movie { id title(language: French) _bramble_id: id __typename } _bramble_id: id } }",
 				"InsertionPoint": null,
 				"Then": null
 			}
@@ -288,7 +288,7 @@ func TestQueryPlanInlineFragmentDoesNotDuplicateTypename(t *testing.T) {
 			{
 				"ServiceURL": "A",
 				"ParentType": "Query",
-				"SelectionSet": "{ movies { ... on Movie { __typename id title(language: French) } } }",
+				"SelectionSet": "{ movies { ... on Movie { __typename id title(language: French) _bramble_id: id __typename } _bramble_id: id } }",
 				"InsertionPoint": null,
 				"Then": null
 			}
@@ -314,13 +314,13 @@ func TestQueryPlanInlineFragmentPlan(t *testing.T) {
 			{
 				"ServiceURL": "A",
 				"ParentType": "Query",
-				"SelectionSet": "{ movies { _id: id ... on Movie { id title(language: French) __typename } } }",
+				"SelectionSet": "{ movies { ... on Movie { id title(language: French) _bramble_id: id __typename } _bramble_id: id } }",
 				"InsertionPoint": null,
 				"Then": [
 					{
 						"ServiceURL": "B",
 						"ParentType": "Movie",
-						"SelectionSet": "{ _id: id compTitles(limit: 42) { id } }",
+						"SelectionSet": "{ compTitles(limit: 42) { id _bramble_id: id } _bramble_id: id }",
 						"InsertionPoint": ["movies"],
 						"Then": null
 					}
@@ -347,39 +347,13 @@ func TestQueryPlanFragmentSpread1(t *testing.T) {
 			{
 				"ServiceURL": "A",
 				"ParentType": "Query",
-				"SelectionSet": "{ movies { ... on Movie { id title(language: French) __typename } } }",
+				"SelectionSet": "{ movies { ... on Movie { id title(language: French) _bramble_id: id __typename } _bramble_id: id } }",
 				"InsertionPoint": null,
 				"Then": null
 			}
 		]
 	}`
 
-	PlanTestFixture1.Check(t, query, plan)
-}
-
-func TestQueryPlanFragmentSpread1DontDuplicateTypename(t *testing.T) {
-	query := `
-	fragment Frag on Movie {
-		id
-		__typename
-		title(language: French)
-	}
-	{
-		movies {
-			...Frag
-		}
-	}`
-	plan := `{
-		"RootSteps": [
-			{
-				"ServiceURL": "A",
-				"ParentType": "Query",
-				"SelectionSet": "{ movies { ... on Movie { id __typename title(language: French) } } }",
-				"InsertionPoint": null,
-				"Then": null
-			}
-		]
-	}`
 	PlanTestFixture1.Check(t, query, plan)
 }
 
@@ -399,7 +373,7 @@ func TestQueryPlanFragmentSpread2(t *testing.T) {
 			{
 				"ServiceURL": "A",
 				"ParentType": "Query",
-				"SelectionSet": "{ movies { id title(language: French) } }",
+				"SelectionSet": "{ movies { id title(language: French) _bramble_id: id } }",
 				"InsertionPoint": null,
 				"Then": null
 			}
@@ -426,19 +400,19 @@ func TestQueryPlanCompleteDeepTraversal(t *testing.T) {
 			{
 				"ServiceURL": "A",
 				"ParentType": "Query",
-				"SelectionSet": "{ shop1 { name products { _id: id } } }",
+				"SelectionSet": "{ shop1 { name products { _bramble_id: id } } }",
 				"InsertionPoint": null,
 				"Then": [
 					{
 					"ServiceURL": "B",
 					"ParentType": "Product",
-					"SelectionSet": "{ _id: id name collection { _id: id } }",
+					"SelectionSet": "{ name collection { _bramble_id: id } _bramble_id: id }",
 					"InsertionPoint": ["shop1", "products"],
 					"Then": [
 							{
 							"ServiceURL": "C",
 							"ParentType": "Collection",
-							"SelectionSet": "{ _id: id name }",
+							"SelectionSet": "{ name _bramble_id: id }",
 							"InsertionPoint": ["shop1", "products", "collection"],
 							"Then": null
 							}
@@ -468,13 +442,13 @@ func TestQueryPlanMergeInsertionPointSteps(t *testing.T) {
 			{
 				"ServiceURL": "A",
 				"ParentType": "Query",
-				"SelectionSet": "{ shop1 { products { _id: id } products { _id: id } } }",
+				"SelectionSet": "{ shop1 { products { _bramble_id: id } products { _bramble_id: id } } }",
 				"InsertionPoint": null,
 				"Then": [
 					{
 					"ServiceURL": "B",
 					"ParentType": "Product",
-					"SelectionSet": "{ _id: id name _id: id name }",
+					"SelectionSet": "{ name _bramble_id: id name _bramble_id: id }",
 					"InsertionPoint": ["shop1", "products"],
 					"Then": null
 					}
@@ -494,8 +468,8 @@ func TestQueryPlanExpandAbstractTypesWithPossibleBoundaryIds(t *testing.T) {
 	}`
 	rootFieldSelections := []string{
 		"name",
-		"... on Lion { _id: id }",
-		"... on Snake { _id: id }",
+		"... on Lion { _bramble_id: id }",
+		"... on Snake { _bramble_id: id }",
 		"__typename",
 	}
 	PlanTestFixture3.CheckUnorderedRootFieldSelections(t, query, rootFieldSelections)
@@ -516,10 +490,10 @@ func TestQueryPlanInlineFragmentSpreadOfInterface(t *testing.T) {
 	}`
 	rootFieldSelections := []string{
 		"name",
-		"... on Lion { _id: id }",
-		"... on Snake { _id: id }",
-		"... on Lion { maneColor __typename }",
-		"... on Snake { _id: id __typename }",
+		"... on Lion { _bramble_id: id }",
+		"... on Snake { _bramble_id: id }",
+		"... on Lion { maneColor _bramble_id: id __typename }",
+		"... on Snake { _bramble_id: id __typename }",
 		"__typename",
 	}
 	PlanTestFixture3.CheckUnorderedRootFieldSelections(t, query, rootFieldSelections)
@@ -532,7 +506,7 @@ func TestQueryPlanSkipDirective(t *testing.T) {
 		  {
 			"ServiceURL": "A",
 			"ParentType": "Query",
-			"SelectionSet": "{ movies { id title @skip(if: false) } }",
+			"SelectionSet": "{ movies { id title @skip(if: false) _bramble_id: id } }",
 			"InsertionPoint": null,
 			"Then": null
 		  }
@@ -548,7 +522,7 @@ func TestQueryPlanIncludeDirective(t *testing.T) {
 		  {
 			"ServiceURL": "A",
 			"ParentType": "Query",
-			"SelectionSet": "{ movies { id title @include(if: true) } }",
+			"SelectionSet": "{ movies { id title @include(if: true) _bramble_id: id } }",
 			"InsertionPoint": null,
 			"Then": null
 		  }
@@ -564,7 +538,7 @@ func TestQueryPlanSkipAndIncludeDirective(t *testing.T) {
 		  {
 			"ServiceURL": "A",
 			"ParentType": "Query",
-			"SelectionSet": "{ movies { id title @skip(if: false) @include(if: true) } }",
+			"SelectionSet": "{ movies { id title @skip(if: false) @include(if: true) _bramble_id: id } }",
 			"InsertionPoint": null,
 			"Then": null
 		  }
@@ -580,13 +554,13 @@ func TestQueryPlanSkipAndIncludeDirectiveInChildStep(t *testing.T) {
 		  {
 			"ServiceURL": "A",
 			"ParentType": "Query",
-			"SelectionSet": "{ movies { id } }",
+			"SelectionSet": "{ movies { id _bramble_id: id } }",
 			"InsertionPoint": null,
 			"Then": [
 			  {
 				"ServiceURL": "B",
 				"ParentType": "Movie",
-				"SelectionSet": "{ _id: id compTitles(limit: 42) { id @skip(if: false) @include(if: true) } }",
+				"SelectionSet": "{ compTitles(limit: 42) { id @skip(if: false) @include(if: true) _bramble_id: id } _bramble_id: id }",
 				"InsertionPoint": ["movies"],
 				"Then": null
 			  }
@@ -604,13 +578,13 @@ func TestQueryPlanSupportsAliasing(t *testing.T) {
         {
           "ServiceURL": "A",
           "ParentType": "Query",
-          "SelectionSet": "{ foo: movies { id aliasTitle: title } }",
+          "SelectionSet": "{ foo: movies { id aliasTitle: title _bramble_id: id } }",
           "InsertionPoint": null,
           "Then": [
             {
               "ServiceURL": "B",
               "ParentType": "Movie",
-              "SelectionSet": "{ _id: id bar: compTitles(limit: 42) { id } }",
+              "SelectionSet": "{ bar: compTitles(limit: 42) { id _bramble_id: id } _bramble_id: id }",
               "InsertionPoint": [
                 "foo"
               ],
@@ -618,7 +592,7 @@ func TestQueryPlanSupportsAliasing(t *testing.T) {
                 {
                   "ServiceURL": "A",
                   "ParentType": "Movie",
-                  "SelectionSet": "{ _id: id compTitleAliasTitle: title }",
+                  "SelectionSet": "{ compTitleAliasTitle: title _bramble_id: id }",
                   "InsertionPoint": [
                     "foo",
                     "bar"
@@ -688,13 +662,13 @@ func TestQueryPlanSupportsMutations(t *testing.T) {
 		  {
 			"ServiceURL": "A",
 			"ParentType": "Mutation",
-			"SelectionSet": "{ updateTitle(id: \"2\", title: \"New title\") { _id: id title } }",
+			"SelectionSet": "{ updateTitle(id: \"2\", title: \"New title\") { title _bramble_id: id } }",
 			"InsertionPoint": null,
 			"Then": [
 			  {
 				"ServiceURL": "B",
 				"ParentType": "Movie",
-				"SelectionSet": "{ _id: id release }",
+				"SelectionSet": "{ release _bramble_id: id }",
 				"InsertionPoint": [
 				  "updateTitle"
 				],
@@ -714,13 +688,13 @@ func TestQueryPlanWithPaginatedBoundaryType(t *testing.T) {
         {
           "ServiceURL": "A",
           "ParentType": "Query",
-          "SelectionSet": "{ foo { foos { cursor page { id name } } } }",
+          "SelectionSet": "{ foo { foos { cursor page { id name _bramble_id: id } } } }",
           "InsertionPoint": null,
           "Then": [
 			{
 				"ServiceURL": "B",
 				"ParentType": "Foo",
-				"SelectionSet": "{ _id: id size }",
+				"SelectionSet": "{ size _bramble_id: id }",
 				"InsertionPoint": [ "foo", "foos", "page" ],
 				"Then": null
 			}
@@ -764,7 +738,7 @@ func TestQueryPlanWithNestedNamespaces(t *testing.T) {
 		date: String!
 	}
 
-	type CompTitle {
+	type CompTitle @boundary {
 		id: ID!
 		score: Int!
 	}
@@ -807,13 +781,13 @@ func TestQueryPlanWithNestedNamespaces(t *testing.T) {
 		  {
 			"ServiceURL": "A",
 			"ParentType": "Mutation",
-			"SelectionSet": "{ firstLevel { secondLevel { movie { id compTitles { id } releases { date } } } } }",
+			"SelectionSet": "{ firstLevel { secondLevel { movie { id compTitles { id _bramble_id: id } releases { date _bramble_id: id } _bramble_id: id } } } }",
 			"InsertionPoint": null,
 			"Then": [
 			  {
 				"ServiceURL": "B",
 				"ParentType": "CompTitle",
-				"SelectionSet": "{ _id: id score }",
+				"SelectionSet": "{ score _bramble_id: id }",
 				"InsertionPoint": [
 				  "firstLevel",
 				  "secondLevel",
@@ -846,11 +820,19 @@ func TestQueryPlanNoUnnessecaryID(t *testing.T) {
 		  {
 			"ServiceURL": "A",
 			"ParentType": "Query",
-			"SelectionSet": "{ movies { title } }",
+			"SelectionSet": "{ movies { title _bramble_id: id } }",
 			"InsertionPoint": null,
 			"Then": null
 		  }
 		]
 	  }
 	`)
+}
+
+func TestQueryPlanValidateReservedIdAlias(t *testing.T) {
+	PlanTestFixture1.CheckError(t, "{ movies { _bramble_id: title } }")
+}
+
+func TestQueryPlanValidateReservedTypenameAlias(t *testing.T) {
+	PlanTestFixture1.CheckError(t, "{ movies { __typename: title } }")
 }

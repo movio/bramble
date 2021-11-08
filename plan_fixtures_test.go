@@ -264,7 +264,7 @@ var PlanTestFixture6 = &PlanTestFixture{
 }
 
 
-func (f *PlanTestFixture) Plan(t *testing.T, query string) *QueryPlan {
+func (f *PlanTestFixture) Plan(t *testing.T, query string) (*QueryPlan, error) {
 	t.Helper()
 	schema := gqlparser.MustLoadSchema(&ast.Source{Name: "fixture", Input: f.Schema})
 	operation := gqlparser.MustLoadQuery(schema, query)
@@ -274,13 +274,19 @@ func (f *PlanTestFixture) Plan(t *testing.T, query string) *QueryPlan {
 		"B": {Name: "B", ServiceURL: "B"},
 		"C": {Name: "C", ServiceURL: "C"},
 	}})
-	require.NoError(t, err)
-	actual.SortSteps()
-	return actual
+	return actual, err
 }
 
 func (f *PlanTestFixture) Check(t *testing.T, query string, expectedJSON string) {
-	assert.JSONEq(t, expectedJSON, jsonMustMarshal(f.Plan(t, query)))
+	plan, err := f.Plan(t, query)
+	require.NoError(t, err)
+	plan.SortSteps()
+	assert.JSONEq(t, expectedJSON, jsonMustMarshal(plan))
+}
+
+func (f *PlanTestFixture) CheckError(t *testing.T, query string) {
+	_, err := f.Plan(t, query)
+	require.Error(t, err)
 }
 
 func (f *PlanTestFixture) CheckUnorderedRootFieldSelections(t *testing.T, query string, expectedSelections []string) {
@@ -288,9 +294,10 @@ func (f *PlanTestFixture) CheckUnorderedRootFieldSelections(t *testing.T, query 
 		Variables: map[string]interface{}{},
 	})
 
-	result := f.Plan(t, query)
-	rootField := result.RootSteps[0].SelectionSet[0].(*ast.Field)
+	result, err := f.Plan(t, query)
+	require.NoError(t, err)
 
+	rootField := result.RootSteps[0].SelectionSet[0].(*ast.Field)
 	assert.Equal(t, len(rootField.SelectionSet), len(expectedSelections))
 
 	for _, expectedSelection := range expectedSelections {

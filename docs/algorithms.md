@@ -260,8 +260,8 @@ function ExtractSelectionSet(ctx, insertionPoint, parentType, selectionSet, loca
             append childrenSteps to the result's query plan steps
         }
     }
-    if parentType is a boundary type and the result selectionSet doesn't have an "id" field {
-        add the "id" field to the result selectionSet, aliased to "_id"
+    if parentType is a boundary type {
+        add the "id" field to the result selectionSet, aliased as "_bramble_id"
     }
     return result :: (ast.SelectionSet, []QueryPlanStep)
 }
