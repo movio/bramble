@@ -264,7 +264,7 @@ func TestQueryPlanInlineFragment(t *testing.T) {
 			{
 				"ServiceURL": "A",
 				"ParentType": "Query",
-				"SelectionSet": "{ movies { ... on Movie { id title(language: French) _bramble_id: id __typename } _bramble_id: id } }",
+				"SelectionSet": "{ movies { ... on Movie { id title(language: French) _bramble_id: id _bramble__typename: __typename } _bramble_id: id } }",
 				"InsertionPoint": null,
 				"Then": null
 			}
@@ -288,7 +288,7 @@ func TestQueryPlanInlineFragmentDoesNotDuplicateTypename(t *testing.T) {
 			{
 				"ServiceURL": "A",
 				"ParentType": "Query",
-				"SelectionSet": "{ movies { ... on Movie { __typename id title(language: French) _bramble_id: id __typename } _bramble_id: id } }",
+				"SelectionSet": "{ movies { ... on Movie { __typename id title(language: French) _bramble_id: id _bramble__typename: __typename } _bramble_id: id } }",
 				"InsertionPoint": null,
 				"Then": null
 			}
@@ -314,7 +314,7 @@ func TestQueryPlanInlineFragmentPlan(t *testing.T) {
 			{
 				"ServiceURL": "A",
 				"ParentType": "Query",
-				"SelectionSet": "{ movies { ... on Movie { id title(language: French) _bramble_id: id __typename } _bramble_id: id } }",
+				"SelectionSet": "{ movies { ... on Movie { id title(language: French) _bramble_id: id _bramble__typename: __typename } _bramble_id: id } }",
 				"InsertionPoint": null,
 				"Then": [
 					{
@@ -347,7 +347,7 @@ func TestQueryPlanFragmentSpread1(t *testing.T) {
 			{
 				"ServiceURL": "A",
 				"ParentType": "Query",
-				"SelectionSet": "{ movies { ... on Movie { id title(language: French) _bramble_id: id __typename } _bramble_id: id } }",
+				"SelectionSet": "{ movies { ... on Movie { id title(language: French) _bramble_id: id _bramble__typename: __typename } _bramble_id: id } }",
 				"InsertionPoint": null,
 				"Then": null
 			}
@@ -470,7 +470,7 @@ func TestQueryPlanExpandAbstractTypesWithPossibleBoundaryIds(t *testing.T) {
 		"name",
 		"... on Lion { _bramble_id: id }",
 		"... on Snake { _bramble_id: id }",
-		"__typename",
+		"_bramble__typename: __typename",
 	}
 	PlanTestFixture3.CheckUnorderedRootFieldSelections(t, query, rootFieldSelections)
 }
@@ -492,9 +492,9 @@ func TestQueryPlanInlineFragmentSpreadOfInterface(t *testing.T) {
 		"name",
 		"... on Lion { _bramble_id: id }",
 		"... on Snake { _bramble_id: id }",
-		"... on Lion { maneColor _bramble_id: id __typename }",
-		"... on Snake { _bramble_id: id __typename }",
-		"__typename",
+		"... on Lion { maneColor _bramble_id: id _bramble__typename: __typename }",
+		"... on Snake { _bramble_id: id _bramble__typename: __typename }",
+		"_bramble__typename: __typename",
 	}
 	PlanTestFixture3.CheckUnorderedRootFieldSelections(t, query, rootFieldSelections)
 }
@@ -614,7 +614,7 @@ func TestQueryPlanSupportsUnions(t *testing.T) {
         {
           "ServiceURL": "A",
           "ParentType": "Query",
-          "SelectionSet": "{ animals { ... on Dog { name __typename } ... on Cat { name __typename } ... on Snake { name __typename } __typename } }",
+          "SelectionSet": "{ animals { ... on Dog { name _bramble__typename: __typename } ... on Cat { name _bramble__typename: __typename } ... on Snake { name _bramble__typename: __typename } _bramble__typename: __typename } }",
           "InsertionPoint": null,
           "Then": null
         }
@@ -834,5 +834,5 @@ func TestQueryPlanValidateReservedIdAlias(t *testing.T) {
 }
 
 func TestQueryPlanValidateReservedTypenameAlias(t *testing.T) {
-	PlanTestFixture1.CheckError(t, "{ movies { __typename: title } }")
+	PlanTestFixture1.CheckError(t, "{ movies { _bramble__typename: title } }")
 }
