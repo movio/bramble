@@ -866,7 +866,7 @@ func unionAndTrimSelectionSetRec(objectTypename string, schema *ast.Schema, sele
 }
 
 func extractAndCastTypenameField(result map[string]interface{}) string {
-	typeNameInterface, ok := result["__typename"]
+	typeNameInterface, ok := result["_bramble__typename"]
 	if !ok {
 		return ""
 	}

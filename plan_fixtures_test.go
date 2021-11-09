@@ -1,18 +1,18 @@
 package bramble
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"sort"
 	"testing"
-	"context"
-	"fmt"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/99designs/gqlgen/graphql"
 	"github.com/vektah/gqlparser/v2"
 	"github.com/vektah/gqlparser/v2/ast"
-	"github.com/99designs/gqlgen/graphql"
 )
 
 type PlanTestFixture struct {
@@ -247,22 +247,21 @@ var PlanTestFixture6 = &PlanTestFixture{
 	}`,
 
 	Locations: map[string]string{
-		"Query.shop1":         "A",
-		"Shop.id":             "A",
-		"Shop.name":           "A",
-		"Shop.products":       "A",
-		"Product.name":        "B",
-		"Product.collection":  "B",
-		"Collection.name":     "C",
+		"Query.shop1":        "A",
+		"Shop.id":            "A",
+		"Shop.name":          "A",
+		"Shop.products":      "A",
+		"Product.name":       "B",
+		"Product.collection": "B",
+		"Collection.name":    "C",
 	},
 
 	IsBoundary: map[string]bool{
-		"Shop":        false,
-		"Product":     true,
-		"Collection":  true,
+		"Shop":       false,
+		"Product":    true,
+		"Collection": true,
 	},
 }
-
 
 func (f *PlanTestFixture) Plan(t *testing.T, query string) (*QueryPlan, error) {
 	t.Helper()
@@ -304,10 +303,10 @@ func (f *PlanTestFixture) CheckUnorderedRootFieldSelections(t *testing.T, query 
 		var foundSelection string
 		expectedSelection = fmt.Sprintf("{ %s }", expectedSelection)
 		for _, selection := range rootField.SelectionSet {
-		    if expectedSelection == formatSelectionSetSingleLine(ctx, nil, []ast.Selection{selection}) {
-		      foundSelection = expectedSelection
-		      break
-		    }
+			if expectedSelection == formatSelectionSetSingleLine(ctx, nil, []ast.Selection{selection}) {
+				foundSelection = expectedSelection
+				break
+			}
 		}
 		assert.Equal(t, expectedSelection, foundSelection)
 	}

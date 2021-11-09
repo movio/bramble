@@ -117,8 +117,8 @@ func createSteps(ctx *PlanningContext, insertionPoint []string, parentType strin
 }
 
 var reservedAliases = map[string]string{
-	"__typename":  "__typename",
-	"_bramble_id": "id",
+	"_bramble__typename": "__typename",
+	"_bramble_id":        "id",
 }
 
 func extractSelectionSet(ctx *PlanningContext, insertionPoint []string, parentType string, input ast.SelectionSet, location string) (ast.SelectionSet, []*QueryPlanStep, error) {
@@ -183,7 +183,7 @@ func extractSelectionSet(ctx *PlanningContext, insertionPoint []string, parentTy
 			if err != nil {
 				return nil, nil, err
 			}
-			selectionSet = append(selectionSet, &ast.Field{Alias: "__typename", Name: "__typename", Definition: &ast.FieldDefinition{Name: "__typename", Type: ast.NamedType("String", nil)}})
+			selectionSet = append(selectionSet, &ast.Field{Alias: "_bramble__typename", Name: "__typename", Definition: &ast.FieldDefinition{Name: "__typename", Type: ast.NamedType("String", nil)}})
 			inlineFragment := *selection
 			inlineFragment.SelectionSet = selectionSet
 			selectionSetResult = append(selectionSetResult, &inlineFragment)
@@ -199,7 +199,7 @@ func extractSelectionSet(ctx *PlanningContext, insertionPoint []string, parentTy
 			if err != nil {
 				return nil, nil, err
 			}
-			selectionSet = append(selectionSet, &ast.Field{Alias: "__typename", Name: "__typename", Definition: &ast.FieldDefinition{Name: "__typename", Type: ast.NamedType("String", nil)}})
+			selectionSet = append(selectionSet, &ast.Field{Alias: "_bramble__typename", Name: "__typename", Definition: &ast.FieldDefinition{Name: "__typename", Type: ast.NamedType("String", nil)}})
 			inlineFragment := ast.InlineFragment{
 				TypeCondition: selection.Definition.TypeCondition,
 				SelectionSet:  selectionSet,
@@ -264,7 +264,7 @@ func extractSelectionSet(ctx *PlanningContext, insertionPoint []string, parentTy
 			}
 		}
 		selectionSetResult = append(selectionSetResult, &ast.Field{
-			Alias:      "__typename",
+			Alias:      "_bramble__typename",
 			Name:       "__typename",
 			Definition: &ast.FieldDefinition{Name: "__typename", Type: ast.NamedType("String", nil)},
 		})
