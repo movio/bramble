@@ -602,7 +602,7 @@ func TestFederatedQueryFragmentSpreads(t *testing.T) {
 							"id": "100",
 							"name": "foo",
 							"gizmos": [{ "_bramble_id": "GIZMO1", "id": "GIZMO1" }],
-							"__typename": "GizmoImplementation"
+							"_bramble__typename": "GizmoImplementation"
 						}
 					}
 				}`))
@@ -614,7 +614,7 @@ func TestFederatedQueryFragmentSpreads(t *testing.T) {
 							"id": "100",
 							"name": "foo",
 							"gadgets": [{ "_bramble_id": "GADGET1", "id": "GADGET1" }],
-							"__typename": "GadgetImplementation"
+							"_bramble__typename": "GadgetImplementation"
 						}
 					}
 				}`))
@@ -672,7 +672,7 @@ func TestFederatedQueryFragmentSpreads(t *testing.T) {
 									{
 										"name": "James Bond",
 										"country": "UK",
-										"__typename": "Agent"
+										"_bramble__typename": "Agent"
 									}
 								]
 							}
@@ -1055,7 +1055,7 @@ func TestQueryExecutionNamespaceAndFragmentSpread(t *testing.T) {
 									"movies": [
 										{"title": "The Big Blue"}
 									],
-									"__typename": "Director"
+									"_bramble__typename": "Director"
 								}
 							}
 						}
@@ -2803,9 +2803,9 @@ func TestBubbleUpNullValuesInPlace(t *testing.T) {
 
 		resultJSON := `{
 			"gizmos": [
-				{ "id": "GIZMO1", "color": "RED", "__typename": "Gizmo" },
-				{ "id": "GIZMO2", "color": "GREEN", "__typename": "Gizmo" },
-				{ "id": "GIZMO3", "color": null, "__typename": "Gizmo" }
+				{ "id": "GIZMO1", "color": "RED", "_bramble__typename": "Gizmo" },
+				{ "id": "GIZMO2", "color": "GREEN", "_bramble__typename": "Gizmo" },
+				{ "id": "GIZMO3", "color": null, "_bramble__typename": "Gizmo" }
 			]
 		}`
 
@@ -2836,7 +2836,7 @@ func TestBubbleUpNullValuesInPlace(t *testing.T) {
 				Path:       ast.Path{ast.PathName("gizmos"), ast.PathIndex(2), ast.PathName("color")},
 				Extensions: nil,
 			}}), errs)
-		require.Equal(t, jsonToInterfaceMap(`{ "gizmos": [ { "id": "GIZMO1", "color": "RED", "__typename": "Gizmo" }, { "id": "GIZMO2", "color": "GREEN", "__typename": "Gizmo" }, null ]	}`), result)
+		require.Equal(t, jsonToInterfaceMap(`{ "gizmos": [ { "id": "GIZMO1", "color": "RED", "_bramble__typename": "Gizmo" }, { "id": "GIZMO2", "color": "GREEN", "_bramble__typename": "Gizmo" }, null ]	}`), result)
 	})
 
 	t.Run("works with inline fragments", func(t *testing.T) {
@@ -2859,9 +2859,9 @@ func TestBubbleUpNullValuesInPlace(t *testing.T) {
 
 		resultJSON := `{
 			"gizmos": [
-				{ "id": "GIZMO1", "color": "RED", "__typename": "Gizmo" },
-				{ "id": "GIZMO2", "color": "GREEN", "__typename": "Gizmo" },
-				{ "id": "GIZMO3", "color": null, "__typename": "Gizmo" }
+				{ "id": "GIZMO1", "color": "RED", "_bramble__typename": "Gizmo" },
+				{ "id": "GIZMO2", "color": "GREEN", "_bramble__typename": "Gizmo" },
+				{ "id": "GIZMO3", "color": null, "_bramble__typename": "Gizmo" }
 			]
 		}`
 
@@ -2889,7 +2889,7 @@ func TestBubbleUpNullValuesInPlace(t *testing.T) {
 				Path:       ast.Path{ast.PathName("gizmos"), ast.PathIndex(2), ast.PathName("color")},
 				Extensions: nil,
 			}}), errs)
-		require.Equal(t, jsonToInterfaceMap(`{ "gizmos": [ { "id": "GIZMO1", "color": "RED", "__typename": "Gizmo" }, { "id": "GIZMO2", "color": "GREEN", "__typename": "Gizmo" }, null ]	}`), result)
+		require.Equal(t, jsonToInterfaceMap(`{ "gizmos": [ { "id": "GIZMO1", "color": "RED", "_bramble__typename": "Gizmo" }, { "id": "GIZMO2", "color": "GREEN", "_bramble__typename": "Gizmo" }, null ]	}`), result)
 	})
 
 	t.Run("inline fragment inside interface", func(t *testing.T) {
@@ -2914,9 +2914,9 @@ func TestBubbleUpNullValuesInPlace(t *testing.T) {
 
 		resultJSON := `{
 			"critters": [
-				{ "id": "GIZMO1", "color": "RED", "__typename": "Gizmo" },
-				{ "id": "GREMLIN1", "name": "Spikey", "__typename": "Gremlin" },
-				{ "id": "GIZMO2", "color": null, "__typename": "Gizmo" }
+				{ "id": "GIZMO1", "color": "RED", "_bramble__typename": "Gizmo" },
+				{ "id": "GREMLIN1", "name": "Spikey", "_bramble__typename": "Gremlin" },
+				{ "id": "GIZMO2", "color": null, "_bramble__typename": "Gizmo" }
 			]
 		}`
 
@@ -2948,7 +2948,7 @@ func TestBubbleUpNullValuesInPlace(t *testing.T) {
 				Path:       ast.Path{ast.PathName("critters"), ast.PathIndex(2), ast.PathName("color")},
 				Extensions: nil,
 			}}), errs)
-		require.Equal(t, jsonToInterfaceMap(`{ "critters": [ { "id": "GIZMO1", "color": "RED", "__typename": "Gizmo"  }, { "id": "GREMLIN1", "name": "Spikey", "__typename": "Gremlin" }, null ]	}`), result)
+		require.Equal(t, jsonToInterfaceMap(`{ "critters": [ { "id": "GIZMO1", "color": "RED", "_bramble__typename": "Gizmo"  }, { "id": "GREMLIN1", "name": "Spikey", "_bramble__typename": "Gremlin" }, null ]	}`), result)
 	})
 
 	t.Run("fragment spread inside interface", func(t *testing.T) {
@@ -2973,9 +2973,9 @@ func TestBubbleUpNullValuesInPlace(t *testing.T) {
 
 		resultJSON := `{
 			"critters": [
-				{ "id": "GIZMO1", "color": "RED", "__typename": "Gizmo" },
-				{ "id": "GREMLIN1", "name": "Spikey", "__typename": "Gremlin" },
-				{ "id": "GIZMO2", "color": null, "__typename": "Gizmo" }
+				{ "id": "GIZMO1", "color": "RED", "_bramble__typename": "Gizmo" },
+				{ "id": "GREMLIN1", "name": "Spikey", "_bramble__typename": "Gremlin" },
+				{ "id": "GIZMO2", "color": null, "_bramble__typename": "Gizmo" }
 			]
 		}`
 
@@ -3011,7 +3011,7 @@ func TestBubbleUpNullValuesInPlace(t *testing.T) {
 				Path:       ast.Path{ast.PathName("critters"), ast.PathIndex(2), ast.PathName("color")},
 				Extensions: nil,
 			}}), errs)
-		require.Equal(t, jsonToInterfaceMap(`{ "critters": [ { "id": "GIZMO1", "color": "RED", "__typename": "Gizmo"  }, { "id": "GREMLIN1", "name": "Spikey", "__typename": "Gremlin" }, null ]	}`), result)
+		require.Equal(t, jsonToInterfaceMap(`{ "critters": [ { "id": "GIZMO1", "color": "RED", "_bramble__typename": "Gizmo"  }, { "id": "GREMLIN1", "name": "Spikey", "_bramble__typename": "Gremlin" }, null ]	}`), result)
 	})
 }
 
@@ -3216,10 +3216,10 @@ func TestFormatResponseBody(t *testing.T) {
 					"id": "OWNER1",
 					"fullName": "James Bond"
 				},
+				"_bramble__typename": "Gadget",
 				"__typename": "Gadget"
 			}
-		}
-	`)
+		}`)
 
 		schema := gqlparser.MustLoadSchema(&ast.Source{Name: "fixture", Input: ddl})
 
@@ -3290,6 +3290,7 @@ func TestFormatResponseBody(t *testing.T) {
 			"gizmo": {
 				"id": "GADGET1",
 				"name": "Gadget #1",
+				"_bramble__typename": "Gadget",
 				"__typename": "Gadget"
 			}
 		}
@@ -3362,7 +3363,8 @@ func TestFormatResponseBody(t *testing.T) {
 			"gizmo": {
 				"id": "GADGET1",
 				"name": "Gadget #1",
-				"__typename": "Gadget"
+				"__typename": "Gadget",
+				"_bramble__typename": "Gadget"
 			}
 		}
 	`)
@@ -3438,6 +3440,7 @@ func TestFormatResponseBody(t *testing.T) {
 				"id": "TOOL1",
 				"name": "Tool #1",
 				"category": "Screwdriver",
+				"_bramble__typename": "Tool",
 				"__typename": "Tool"
 			}
 		}
@@ -4715,9 +4718,9 @@ func TestQueryExecutionWithUnions(t *testing.T) {
 						w.Write([]byte(`{
 							"data": {
 								"foo": [
-									{ "name": "fido", "age": 4, "__typename": "Dog" },
-									{ "name": "felix", "age": 2, "__typename": "Cat" },
-									{ "age": 20, "name": "ka", "__typename": "Snake" }
+									{ "name": "fido", "age": 4, "_bramble__typename": "Dog" },
+									{ "name": "felix", "age": 2, "_bramble__typename": "Cat" },
+									{ "age": 20, "name": "ka", "_bramble__typename": "Snake" }
 								]
 							}
 						}
@@ -4730,7 +4733,7 @@ func TestQueryExecutionWithUnions(t *testing.T) {
 									"pet": {
 										"name": "felix",
 										"age": 2,
-										"__typename": "Cat"
+										"_bramble__typename": "Cat"
 									}
 								}
 							}
