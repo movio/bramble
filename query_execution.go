@@ -825,19 +825,22 @@ func formatResponseDataRec(schema *ast.Schema, selectionSet ast.SelectionSet, re
 //   2. if the target fragments are an implementation of an abstract type, we need to use the __typename from the response body to check which
 //   implementation was resolved. Any fragments that do not match are dropped from the selection set.
 func unionAndTrimSelectionSet(objectTypename string, schema *ast.Schema, selectionSet ast.SelectionSet) (ast.SelectionSet, error) {
-	return unionAndTrimSelectionSetRec(objectTypename, schema, selectionSet, map[string]bool{})
+	return unionAndTrimSelectionSetRec(objectTypename, schema, selectionSet, map[string]*ast.Field{})
 }
 
-func unionAndTrimSelectionSetRec(objectTypename string, schema *ast.Schema, selectionSet ast.SelectionSet, seenFields map[string]bool) (ast.SelectionSet, error) {
+func unionAndTrimSelectionSetRec(objectTypename string, schema *ast.Schema, selectionSet ast.SelectionSet, seenFields map[string]*ast.Field) (ast.SelectionSet, error) {
 	var filteredSelectionSet ast.SelectionSet
 	for _, selection := range selectionSet {
 		switch selection := selection.(type) {
 		case *ast.Field:
-			if seenFields[selection.Alias] {
-				continue
+			if seenField, ok := seenFields[selection.Alias]; ok {
+				if seenField.Name == selection.Name && seenField.SelectionSet != nil && selection.SelectionSet != nil {
+					seenField.SelectionSet = append(seenField.SelectionSet, selection.SelectionSet...)
+				}
+			} else {
+				seenFields[selection.Alias] = selection
+				filteredSelectionSet = append(filteredSelectionSet, selection)
 			}
-			seenFields[selection.Alias] = true
-			filteredSelectionSet = append(filteredSelectionSet, selection)
 		case *ast.InlineFragment:
 			fragment := selection
 			if fragment.ObjectDefinition.IsAbstractType() &&
