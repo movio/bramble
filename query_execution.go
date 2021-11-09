@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/vektah/gqlparser/v2/ast"
 	"github.com/vektah/gqlparser/v2/gqlerror"
@@ -34,7 +35,6 @@ type queryExecution struct {
 	graphqlClient  *GraphQLClient
 	boundaryFields BoundaryFieldsMap
 
-	mutex   sync.Mutex // protects requestCount
 	group   *errgroup.Group
 	results chan executionResult
 }
@@ -149,13 +149,10 @@ func (q *queryExecution) writeExecutionResult(step *QueryPlanStep, data interfac
 }
 
 func (q *queryExecution) executeChildStep(step *QueryPlanStep, boundaryIDs []string) error {
-	q.mutex.Lock()
-	q.requestCount += 1
-	if q.requestCount > q.maxRequest {
-		q.mutex.Unlock()
+	atomic.AddInt32(&q.requestCount, 1)
+	if atomic.LoadInt32(&q.requestCount) > q.maxRequest {
 		return fmt.Errorf("exceeded max requests of %v", q.maxRequest)
 	}
-	q.mutex.Unlock()
 
 	boundaryField, err := q.boundaryFields.Field(step.ServiceURL, step.ParentType)
 	if err != nil {
