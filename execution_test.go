@@ -2233,6 +2233,55 @@ func TestUnionAndTrimSelectionSet(t *testing.T) {
 		require.Equal(t, selectionSet, filtered)
 	})
 
+	t.Run("removes duplicate leaf values and merges composite scopes", func(t *testing.T) {
+		selectionSet := ast.SelectionSet{
+			&ast.Field{
+				Alias:            "name",
+				Name:             "name",
+				Definition:       schema.Types["Agent"].Fields.ForName("name"),
+				ObjectDefinition: schema.Types["Agent"],
+			},
+			&ast.Field{
+				Alias:            "name",
+				Name:             "name",
+				Definition:       schema.Types["Agent"].Fields.ForName("name"),
+				ObjectDefinition: schema.Types["Agent"],
+			},
+			&ast.Field{
+				Alias:            "country",
+				Name:             "country",
+				Definition:       schema.Types["Agent"].Fields.ForName("country"),
+				ObjectDefinition: schema.Types["Agent"],
+				SelectionSet: []ast.Selection{
+					&ast.Field{
+						Alias:            "id",
+						Name:             "id",
+						Definition:       schema.Types["Country"].Fields.ForName("id"),
+						ObjectDefinition: schema.Types["Country"],
+					},
+				},
+			},
+			&ast.Field{
+				Alias:            "country",
+				Name:             "country",
+				Definition:       schema.Types["Agent"].Fields.ForName("country"),
+				ObjectDefinition: schema.Types["Agent"],
+				SelectionSet: []ast.Selection{
+					&ast.Field{
+						Alias:            "name",
+						Name:             "name",
+						Definition:       schema.Types["Country"].Fields.ForName("name"),
+						ObjectDefinition: schema.Types["Country"],
+					},
+				},
+			},
+		}
+
+		filtered, err := unionAndTrimSelectionSet("", schema, selectionSet)
+		require.NoError(t, err)
+		require.Equal(t, formatSelectionSetSingleLine(ctx, schema, filtered), "{ name country { id name } }")
+	})
+
 	t.Run("removes field duplicates from inline fragment", func(t *testing.T) {
 		initialSelectionSet := ast.SelectionSet{
 			&ast.Field{
