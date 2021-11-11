@@ -59,7 +59,7 @@ func buildFieldURLMap(services ...*Service) FieldURLMap {
 	result := FieldURLMap{}
 	for _, rs := range services {
 		for _, t := range rs.Schema.Types {
-			if t.Kind != ast.Object || isGraphQLBuiltinName(t.Name) || t.Name == serviceObjectName {
+			if (t.Kind != ast.Object && t.Kind != ast.Interface) || isGraphQLBuiltinName(t.Name) || t.Name == serviceObjectName {
 				continue
 			}
 			for _, f := range mergeableFields(t) {
