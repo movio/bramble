@@ -8,6 +8,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/graph-gophers/graphql-go"
 	"github.com/graph-gophers/graphql-go/relay"
+	"log"
 )
 
 //go:embed schema.graphql
@@ -27,5 +28,6 @@ func main() {
 	r := mux.NewRouter()
 	r.Handle("/query", &relay.Handler{Schema: parsedSchema})
 
+	log.Printf("example graph-gophers-service running on http://localhost:%s/", port)
 	http.ListenAndServe(":"+port, r)
 }
