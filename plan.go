@@ -138,18 +138,8 @@ func extractSelectionSet(ctx *PlanningContext, insertionPoint []string, parentTy
 				continue
 			}
 			loc, err := ctx.Locations.URLFor(parentType, location, selection.Name)
-			if err != nil {
-				// namespace
-				subSS, steps, err := extractSelectionSet(ctx, append(insertionPoint, selection.Name), selection.Definition.Type.Name(), selection.SelectionSet, location)
-				if err != nil {
-					return nil, nil, err
-				}
-				selection.SelectionSet = subSS
-				selectionSetResult = append(selectionSetResult, selection)
-				childrenStepsResult = append(childrenStepsResult, steps...)
-				continue
-			}
-			if loc != location {
+			// Errors are returned for unmapped namespace/interface locations (needs refactor)
+			if err == nil && loc != location {
 				// field transitions to another service location
 				remoteSelections = append(remoteSelections, selection)
 			} else if selection.SelectionSet == nil {
@@ -157,7 +147,6 @@ func extractSelectionSet(ctx *PlanningContext, insertionPoint []string, parentTy
 				selectionSetResult = append(selectionSetResult, selection)
 			} else {
 				// field is a composite type in the current service
-				newField := *selection
 				selectionSet, childrenSteps, err := extractSelectionSet(
 					ctx,
 					append(insertionPoint, selection.Alias),
@@ -168,6 +157,7 @@ func extractSelectionSet(ctx *PlanningContext, insertionPoint []string, parentTy
 				if err != nil {
 					return nil, nil, err
 				}
+				newField := *selection
 				newField.SelectionSet = selectionSet
 				selectionSetResult = append(selectionSetResult, &newField)
 				childrenStepsResult = append(childrenStepsResult, childrenSteps...)
