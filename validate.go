@@ -354,6 +354,10 @@ func validateBoundaryFields(schema *ast.Schema) error {
 				return fmt.Errorf("declared duplicate query for boundary type %q", f.Type.Name())
 			}
 
+			if len(f.Arguments) != 1 {
+				return fmt.Errorf("boundary field %q expects exactly one argument", f.Name)
+			}
+
 			boundaryTypes[f.Type.Name()] = true
 		}
 	}

@@ -1498,7 +1498,7 @@ func TestBuildBoundaryQueryDocuments(t *testing.T) {
 		}
 	`
 	schema := gqlparser.MustLoadSchema(&ast.Source{Name: "fixture", Input: ddl})
-	boundaryField := BoundaryField{Field: "getOwners", Array: true}
+	boundaryField := BoundaryField{Field: "getOwners", Argument: "ids", Array: true}
 	ids := []string{"1", "2", "3"}
 	selectionSet := []ast.Selection{
 		&ast.Field{
@@ -1548,7 +1548,7 @@ func TestBuildNonArrayBoundaryQueryDocuments(t *testing.T) {
 		}
 	`
 	schema := gqlparser.MustLoadSchema(&ast.Source{Name: "fixture", Input: ddl})
-	boundaryField := BoundaryField{Field: "getOwner", Array: false}
+	boundaryField := BoundaryField{Field: "getOwner", Argument: "id", Array: false}
 	ids := []string{"1", "2", "3"}
 	selectionSet := []ast.Selection{
 		&ast.Field{
@@ -1598,7 +1598,7 @@ func TestBuildBatchedNonArrayBoundaryQueryDocuments(t *testing.T) {
 		}
 	`
 	schema := gqlparser.MustLoadSchema(&ast.Source{Name: "fixture", Input: ddl})
-	boundaryField := BoundaryField{Field: "getOwner", Array: false}
+	boundaryField := BoundaryField{Field: "getOwner", Argument: "id", Array: false}
 	ids := []string{"1", "2", "3"}
 	selectionSet := []ast.Selection{
 		&ast.Field{

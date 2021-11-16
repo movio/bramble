@@ -109,7 +109,7 @@ func buildBoundaryFieldsMap(services ...*Service) BoundaryFieldsMap {
 					array = true
 				}
 
-				result.RegisterField(rs.ServiceURL, typeName, f.Name, array)
+				result.RegisterField(rs.ServiceURL, typeName, f.Name, f.Arguments[0].Name, array)
 			}
 		}
 	}

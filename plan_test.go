@@ -805,8 +805,8 @@ func TestQueryPlanWithNestedNamespaces(t *testing.T) {
 
 func TestPrefersArrayBasedBoundaryLookups(t *testing.T) {
 	boundaryFieldMap := make(BoundaryFieldsMap)
-	boundaryFieldMap.RegisterField("service-a", "movie", "_movie", true)
-	boundaryFieldMap.RegisterField("service-a", "movie", "_movies", false)
+	boundaryFieldMap.RegisterField("service-a", "movie", "_movie", "id", true)
+	boundaryFieldMap.RegisterField("service-a", "movie", "_movies", "ids", false)
 
 	boundaryField, err := boundaryFieldMap.Field("service-a", "movie")
 	require.NoError(t, err)

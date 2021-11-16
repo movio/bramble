@@ -427,7 +427,7 @@ func buildBoundaryQueryDocuments(ctx context.Context, schema *ast.Schema, step *
 			qids = append(qids, fmt.Sprintf("%q", id))
 		}
 		idsQL := fmt.Sprintf("[%s]", strings.Join(qids, ", "))
-		return []string{fmt.Sprintf(`{ _result: %s(ids: %s) %s }`, parentTypeBoundaryField.Field, idsQL, selectionSetQL)}, nil
+		return []string{fmt.Sprintf(`{ _result: %s(%s: %s) %s }`, parentTypeBoundaryField.Field, parentTypeBoundaryField.Argument, idsQL, selectionSetQL)}, nil
 	}
 
 	var (
@@ -437,7 +437,7 @@ func buildBoundaryQueryDocuments(ctx context.Context, schema *ast.Schema, step *
 	for _, batch := range batchBy(ids, batchSize) {
 		var selections []string
 		for _, id := range batch {
-			selection := fmt.Sprintf("%s: %s(id: %q) %s", fmt.Sprintf("_%d", selectionIndex), parentTypeBoundaryField.Field, id, selectionSetQL)
+			selection := fmt.Sprintf("%s: %s(%s: %q) %s", fmt.Sprintf("_%d", selectionIndex), parentTypeBoundaryField.Field, parentTypeBoundaryField.Argument, id, selectionSetQL)
 			selections = append(selections, selection)
 			selectionIndex++
 		}
