@@ -448,6 +448,7 @@ func TestBuildFieldURLMapSingleSchema(t *testing.T) {
 		Location1: loc1,
 		Expected: FieldURLMap{
 			"Query.gizmo": loc1,
+			"Named.name":  loc1,
 			"Gizmo.id":    loc1,
 			"Gizmo.name":  loc1,
 		},
@@ -496,6 +497,8 @@ func TestBuildFieldURLMapTwoSchemasNoBoundaryType(t *testing.T) {
 			"Gizmo.name":    loc1,
 			"Gimmick.id":    loc2,
 			"Gimmick.size":  loc2,
+			"Named.name":    loc1,
+			"Sized.size":    loc2,
 		},
 	}
 	fixture.Check(t)
@@ -561,6 +564,9 @@ func TestBuildFieldURLMapTwoSchemasWithBoundaryType(t *testing.T) {
 			"Query.gizmo": loc1,
 			"Gizmo.name":  loc1,
 			"Gizmo.size":  loc2,
+			"Named.name":  loc1,
+			"Sized.size":  loc2,
+			"Node.id":     loc2,
 		},
 	}
 	fixture.Check(t)
