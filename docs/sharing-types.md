@@ -73,24 +73,28 @@ extend Query {
 For Bramble to be able to request an arbitrary boundary object, every service
 defining boundary types must also implement a boundary query for each
 boundary object.
-This query takes an id and returns the associated object.
+This query takes exactly one id argument and returns the associated object.
 
-There are no restrictions on the name of a boundary query, only the return
-type is used to determine the matching boundary object.
+There are no restrictions on the name of a boundary query or its argument,
+only the return type is used to determine the matching boundary object.
 
 **Array syntax**
 
-Alternatively it is possible to define the boundary query with an array syntax:
+When possible, it's better to batch records by defining the boundary query as an array:
 
 ```graphql
 extend Query {
-    movies(ids: [ID!]): [Movie]! @boundary
+    movies(ids: [ID!]!): [Movie]! @boundary
 }
 ```
 
-In that case Bramble can query multiple IDs in the same query instead of
-doing multiple queries. This can make services more performant in some cases by
-reducing the need for dataloaders and the query complexity.
+With this syntax, Bramble will query multiple IDs as a set instead of requesting
+each record individually. This can make services more performant by
+reducing the need for dataloaders and lowering the overall query complexity.
+
+There are again no restrictions on the name of the boundary query or its argument.
+The resulting array expects to be a _mapped set_ matching the input length and order,
+with any missing records padded by null values.
 
 _Bramble query with regular boundary query_
 

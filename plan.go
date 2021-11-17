@@ -376,6 +376,8 @@ func (m FieldURLMap) keyFor(parent string, field string) string {
 // BoundaryField contains the name and format for a boundary query
 type BoundaryField struct {
 	Field string
+	// Name of the received id argument
+	Argument string
 	// Whether the query is in the array format
 	Array bool
 }
@@ -384,7 +386,7 @@ type BoundaryField struct {
 type BoundaryFieldsMap map[string]map[string]BoundaryField
 
 // RegisterField registers a boundary field
-func (m BoundaryFieldsMap) RegisterField(serviceURL, typeName, field string, array bool) {
+func (m BoundaryFieldsMap) RegisterField(serviceURL, typeName string, field string, argument string, array bool) {
 	if _, ok := m[serviceURL]; !ok {
 		m[serviceURL] = make(map[string]BoundaryField)
 	}
@@ -395,7 +397,7 @@ func (m BoundaryFieldsMap) RegisterField(serviceURL, typeName, field string, arr
 		return
 	}
 
-	m[serviceURL][typeName] = BoundaryField{Field: field, Array: array}
+	m[serviceURL][typeName] = BoundaryField{Field: field, Argument: argument, Array: array}
 }
 
 // Query returns the boundary field for the given service and type

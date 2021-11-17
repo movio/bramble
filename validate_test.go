@@ -671,6 +671,34 @@ func TestSchemaValidateBoundaryFields(t *testing.T) {
 		}
 		`).assertInvalid(`declared duplicate query for boundary type "Foo"`, validateBoundaryFields)
 	})
+
+	t.Run("requires at least one arguments", func(t *testing.T) {
+		withSchema(t, `
+		directive @boundary on OBJECT | FIELD_DEFINITION
+
+		type Foo @boundary {
+			id: ID!
+		}
+
+		type Query {
+			foo: Foo @boundary
+		}
+		`).assertInvalid(`boundary field "foo" expects exactly one argument`, validateBoundaryFields)
+	})
+
+	t.Run("requires exactly one argument", func(t *testing.T) {
+		withSchema(t, `
+		directive @boundary on OBJECT | FIELD_DEFINITION
+
+		type Foo @boundary {
+			id: ID!
+		}
+
+		type Query {
+			foo(id: ID!, scope: String): Foo @boundary
+		}
+		`).assertInvalid(`boundary field "foo" expects exactly one argument`, validateBoundaryFields)
+	})
 }
 
 func TestSchemaValidateBoundaryObjectsFormat(t *testing.T) {
