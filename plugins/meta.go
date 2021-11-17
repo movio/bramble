@@ -183,20 +183,13 @@ func (r *metaPluginResolver) Schema() (*brambleSchema, error) {
 }
 
 func kindToStr(k ast.DefinitionKind) string {
-	switch k {
-	case ast.Enum:
-		return "enum"
-	case ast.InputObject:
+	if k == ast.InputObject {
 		return "input"
-	case ast.Object:
-		return "type"
-	case ast.Scalar:
-		return "scalar"
-	case ast.Union:
-		return "union"
-	default:
-		return ""
 	}
+	if k == ast.Object {
+		return "type"
+	}
+	return strings.ToLower(string(k))
 }
 
 func strToPtr(s string) *string {
