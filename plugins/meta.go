@@ -124,7 +124,7 @@ func (f brambleFields) Len() int {
 }
 
 func (f brambleFields) Less(i, j int) bool {
-	if f[i].Name == "id" {
+	if f[i].Name == bramble.IdFieldName {
 		return true
 	}
 	return f[i].Name < f[j].Name

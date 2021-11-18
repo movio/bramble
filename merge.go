@@ -409,13 +409,13 @@ func isNodeField(f *ast.FieldDefinition) bool {
 		return false
 	}
 	arg := f.Arguments[0]
-	return arg.Name == idFieldName &&
+	return arg.Name == IdFieldName &&
 		isIDType(arg.Type) &&
 		isNullableTypeNamed(f.Type, nodeInterfaceName)
 }
 
 func isIDField(f *ast.FieldDefinition) bool {
-	return f.Name == idFieldName && len(f.Arguments) == 0 && isIDType(f.Type)
+	return f.Name == IdFieldName && len(f.Arguments) == 0 && isIDType(f.Type)
 }
 
 func isServiceField(f *ast.FieldDefinition) bool {

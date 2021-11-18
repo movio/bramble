@@ -181,8 +181,8 @@ Object definitions that have the `@boundary` directive and that have the same na
 1. its description contains both `A` and `B`'s descriptions, separated with a blank line
 1. it has the `@boundary` directive and only that directive
 1. it implements all of `A` and `B`'s interfaces
-1. it has an `id: ID!` field
-1. it has all of `A` and `B`'s fields, none of which may overlap (except for `id: ID!`)
+1. it has an `id` field of type `ID!`, the name of which [may be customised](/configuration)
+1. it has all of `A` and `B`'s fields, none of which may overlap (except for the `id` field)
 1. its copied fields from `A` and `B` are not modified (type, arguments, description, etc.)
 
 ### Namespace Objects
@@ -204,8 +204,8 @@ The resulting object definition `M` from the merge of the object definitions `A`
 
 Bramble's field resolution semantics is quite easy to define, thanks to its simple design. From the section above you can see that the following is true:
 
-> **With the exception of namespaces and the `id` field in objects with the `@boundary` directive, every field in the merged schema is defined in exactly one federated service.**
+> **With the exception of namespaces and the `id` field of boundary objects, every field in the merged schema is defined in exactly one federated service.**
 
-As a consequence of the statement above, with the exception of the `id` field in objects with the `@boundary` directive, every field in the merged schema has exactly one resolver. Therefore, with the exception of the `id` fields in objects with the `@boundary` directive, the semantics of resolving fields in the merged schema is identical to that of a normal GraphQL schema. The resolvers are distributed among different services, but that is an implementation concern, that does not affect the resolution semantics. Of course, this semantics definition doesn't explain _how_ Bramble executes operations and is able to invoke remote resolvers; this is covered in the _"Algorithm Definitions"_ section.
+Because all fields in the graph are mutually exclusive (with the exception of boundary `id` fields which are mutually consistent), every field in the merged schema has exactly one resolver. Therefore, the semantics of resolving fields among merged schemas follows normal GraphQL patterns. Field resolvers are simply distributed among services, and the gateway handles routing field requests to their appropraite resolver locations.
 
-Finally, we need to define the resolution semantics of `id` fields in objects with the `@boundary` directive. First note that any service that defines the `@boundary` directive, must have a resolver for the `id` field. Also, in any query document, all such `id` fields will have a _parent field_ (i.e. it cannot be a root field). As observed before, that parent field's resolver is located in exactly one service, and that service must necessarily define the `@boundary` directive. The resolution semantics of the `id` fields in objects with the `@boundary` directive is the resolution semantics of the resolver for that `id` field in that service.
+All boundary object types across services must resolve an `id` field (or an [alternate key field name](/configuration) used across the graph). The resolved values of these key fields must be consistent across services, and will be used to cross-reference portions of a merged object.

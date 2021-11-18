@@ -883,3 +883,43 @@ func TestMergeRemovesCustomDirectives(t *testing.T) {
 	}
 	fixture.CheckSuccess(t)
 }
+
+func TestMergeWithAlternateId(t *testing.T) {
+	IdFieldName = "gid"
+	fixture := MergeTestFixture{
+		Input1: `
+			directive @boundary on OBJECT | FIELD_DEFINITION
+			type Dog @boundary {
+				gid: ID!
+				name: String
+			}
+			type Query {
+				dog(gid: ID!): Dog @boundary
+				doggie: Dog
+			}
+		`,
+		Input2: `
+			directive @boundary on OBJECT | FIELD_DEFINITION
+			type Dog @boundary {
+				gid: ID!
+				color: String
+			}
+			type Query {
+				dogs(gids: [ID!]!): [Dog]! @boundary
+			}
+		`,
+		Expected: `
+			directive @boundary on OBJECT | FIELD_DEFINITION
+			type Dog @boundary {
+				gid: ID!
+				color: String
+				name: String
+			}
+			type Query {
+				doggie: Dog
+			}
+		`,
+	}
+	fixture.CheckSuccess(t)
+	IdFieldName = "id" // reset!
+}

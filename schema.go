@@ -6,8 +6,9 @@ import (
 	"github.com/vektah/gqlparser/v2/ast"
 )
 
+var IdFieldName = "id"
+
 const (
-	idFieldName            = "id"
 	nodeRootFieldName      = "node"
 	nodeInterfaceName      = "Node"
 	serviceObjectName      = "Service"

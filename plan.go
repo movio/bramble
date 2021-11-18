@@ -118,7 +118,7 @@ func createSteps(ctx *PlanningContext, insertionPoint []string, parentType strin
 
 var reservedAliases = map[string]string{
 	"_bramble__typename": "__typename",
-	"_bramble_id":        "id",
+	"_bramble_id":        IdFieldName,
 }
 
 func extractSelectionSet(ctx *PlanningContext, insertionPoint []string, parentType string, input ast.SelectionSet, location string) (ast.SelectionSet, []*QueryPlanStep, error) {
@@ -133,7 +133,7 @@ func extractSelectionSet(ctx *PlanningContext, insertionPoint []string, parentTy
 					return nil, nil, gqlerror.Errorf("%s.%s: alias \"%s\" is reserved for system use", strings.Join(insertionPoint, "."), reservedAlias, reservedAlias)
 				}
 			}
-			if parentType != queryObjectName && parentType != mutationObjectName && ctx.IsBoundary[parentType] && selection.Name == "id" {
+			if parentType != queryObjectName && parentType != mutationObjectName && ctx.IsBoundary[parentType] && selection.Name == IdFieldName {
 				selectionSetResult = append(selectionSetResult, selection)
 				continue
 			}
@@ -242,10 +242,10 @@ func extractSelectionSet(ctx *PlanningContext, insertionPoint []string, parentTy
 				}
 				implementationType := ctx.Schema.Types[implementationName]
 
-				if idDef := implementationType.Fields.ForName("id"); idDef != nil {
+				if idDef := implementationType.Fields.ForName(IdFieldName); idDef != nil {
 					possibleId := &ast.InlineFragment{
 						TypeCondition:    implementationName,
-						SelectionSet:     []ast.Selection{&ast.Field{Alias: "_bramble_id", Name: "id", Definition: idDef}},
+						SelectionSet:     []ast.Selection{&ast.Field{Alias: "_bramble_id", Name: IdFieldName, Definition: idDef}},
 						ObjectDefinition: implementationType,
 					}
 					selectionSetResult = append(selectionSetResult, possibleId)
@@ -260,8 +260,8 @@ func extractSelectionSet(ctx *PlanningContext, insertionPoint []string, parentTy
 		})
 	} else if parentType != queryObjectName && parentType != mutationObjectName && ctx.IsBoundary[parentType] {
 		// Otherwise, add an id selection to all boundary types
-		if idDef := parentDef.Fields.ForName("id"); idDef != nil {
-			selectionSetResult = append(selectionSetResult, &ast.Field{Alias: "_bramble_id", Name: "id", Definition: idDef})
+		if idDef := parentDef.Fields.ForName(IdFieldName); idDef != nil {
+			selectionSetResult = append(selectionSetResult, &ast.Field{Alias: "_bramble_id", Name: IdFieldName, Definition: idDef})
 		}
 	}
 	return selectionSetResult, childrenStepsResult, nil
