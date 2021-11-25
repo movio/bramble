@@ -636,7 +636,7 @@ func TestSchemaValidateBoundaryFields(t *testing.T) {
 		type Query {
 			foo(ids: [ID!]): [Foo!] @boundary
 		}
-		`).assertInvalid(`invalid boundary query "foo": boundary array query must accept an argument of type "[ID!]!"`, validateBoundaryQueries)
+		`).assertInvalid(`invalid boundary query "foo": boundary list query must accept an argument of type "[ID!]!"`, validateBoundaryQueries)
 	})
 
 	t.Run("non-nullable boundary query result", func(t *testing.T) {
