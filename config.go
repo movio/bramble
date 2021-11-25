@@ -94,7 +94,7 @@ func (c *Config) Load() error {
 	}
 	c.Plugins = plugins
 
-	if c.IdFieldName != "" {
+	if strings.TrimSpace(c.IdFieldName) != "" {
 		IdFieldName = c.IdFieldName
 	}
 
