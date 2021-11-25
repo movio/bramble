@@ -415,7 +415,7 @@ func validateBoundaryQuery(f *ast.FieldDefinition) error {
 	if f.Arguments[0].Type.Elem != nil {
 		// array type check
 		if f.Arguments[0].Type.String() != "[ID!]!" {
-			return fmt.Errorf(`boundary array query must accept an argument of type "[ID!]!"`)
+			return fmt.Errorf(`boundary list query must accept an argument of type "[ID!]!"`)
 		}
 
 		if !f.Type.NonNull || f.Type.Elem == nil {
