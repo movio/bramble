@@ -55,21 +55,12 @@ go test ./...
 
 ## Comparison with other projects
 
-- [Apollo Server](https://www.apollographql.com/)
+Bramble provides a common-sense approach to GraphQL federation implemented in Golang. It assumes that subgraph fields are mutually exclusive, and that all boundary types join on a universal key. Compared with other projects:
 
-  While Apollo Server is a popular tool we felt is was not the right tool for us as:
+- [Apollo Federation](https://www.apollographql.com/) and [Golang port](https://github.com/jensneuse/graphql-go-tools): while quite popular, we felt the Apollo spec was more complex than necessary with its nuanced GraphQL SDL and specialized `_entities` query, and thus not the right fit for us.
 
-  - the federation specification is more complex than necessary
-  - it is written in NodeJS where we favour Go
+- [GraphQL Tools Stitching](https://www.graphql-tools.com/docs/schema-stitching/stitch-combining-schemas): while Stitching is similar in design to Bramble with self-contained subgraphs joined by basic queries, it offers more features than necessary at the cost of some performance overhead. It is also written in JavaScript where as we favour Golang.
 
-- [Nautilus](https://github.com/nautilus/gateway)
+- [Nautilus](https://github.com/nautilus/gateway): provided a lot of inspiration for Bramble, and has been improved upon with bug fixes and additional features (fine-grained permissions, namespaces, better plugins, configuration hot-reloading). Bramble is a recommended successor.
 
-  Nautilus provided a lot of inspiration for Bramble.
-
-  Although the approach to federation was initially similar, Bramble now uses
-  a different approach and supports for a few more things:
-  fine-grained permissions, namespaces, easy plugin configuration,
-  configuration hot-reloading...
-
-  Bramble is also a central piece of software for [Movio](https://movio.co)
-  products and thus is actively maintained and developed.
+Bramble is a central piece of software for [Movio](https://movio.co) products and thus is actively maintained and developed.

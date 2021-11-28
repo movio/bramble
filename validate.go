@@ -150,7 +150,7 @@ func validateNodeQuery(schema *ast.Schema) error {
 			return fmt.Errorf("the 'node' field of Query must take a single argument")
 		}
 		arg := f.Arguments[0]
-		if arg.Name != idFieldName {
+		if arg.Name != IdFieldName {
 			return fmt.Errorf("the 'node' field of Query must take a single argument called 'id'")
 		}
 		if !isIDType(arg.Type) {
@@ -176,7 +176,7 @@ func validateNodeInterface(schema *ast.Schema) error {
 			return fmt.Errorf("the Node interface should have exactly one field")
 		}
 		field := t.Fields[0]
-		if field.Name != idFieldName {
+		if field.Name != IdFieldName {
 			return fmt.Errorf("the Node interface should have a field called 'id'")
 		}
 		if !isIDType(field.Type) {
@@ -382,13 +382,13 @@ func validateBoundaryObjectsFormat(schema *ast.Schema) error {
 			continue
 		}
 
-		idField := t.Fields.ForName(idFieldName)
+		idField := t.Fields.ForName(IdFieldName)
 		if idField == nil {
-			return fmt.Errorf(`missing "id: ID!" field in boundary type %q`, t.Name)
+			return fmt.Errorf(`missing "%s: ID!" field in boundary type %q`, IdFieldName, t.Name)
 		}
 
 		if idField.Type.String() != "ID!" {
-			return fmt.Errorf(`id field should have type "ID!" in boundary type %q`, t.Name)
+			return fmt.Errorf(`%q field should have type "ID!" in boundary type %q`, IdFieldName, t.Name)
 		}
 	}
 
@@ -409,13 +409,13 @@ func validateBoundaryQueries(schema *ast.Schema) error {
 
 func validateBoundaryQuery(f *ast.FieldDefinition) error {
 	if len(f.Arguments) != 1 {
-		return fmt.Errorf(`boundary query must have a single "id: ID!" argument`)
+		return fmt.Errorf(`boundary query must have exactly one argument`)
 	}
 
 	if f.Arguments[0].Type.Elem != nil {
 		// array type check
-		if idsField := f.Arguments.ForName("ids"); idsField == nil || idsField.Type.String() != "[ID!]!" {
-			return fmt.Errorf(`boundary query must have a single "id: ID!" or list "ids: [ID!]!" argument`)
+		if f.Arguments[0].Type.String() != "[ID!]!" {
+			return fmt.Errorf(`boundary list query must accept an argument of type "[ID!]!"`)
 		}
 
 		if !f.Type.NonNull || f.Type.Elem == nil {
@@ -426,8 +426,8 @@ func validateBoundaryQuery(f *ast.FieldDefinition) error {
 	}
 
 	// regular type check
-	if idField := f.Arguments.ForName(idFieldName); idField == nil || idField.Type.String() != "ID!" {
-		return fmt.Errorf(`boundary query must have a single "id: ID!" argument`)
+	if f.Arguments[0].Type.String() != "ID!" {
+		return fmt.Errorf(`boundary query must accept an argument of type "ID!"`)
 	}
 
 	if f.Type.NonNull {

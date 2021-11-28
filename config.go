@@ -22,6 +22,7 @@ type PluginConfig struct {
 
 // Config contains the gateway configuration
 type Config struct {
+	IdFieldName            string    `json:"id-field-name"`
 	GatewayListenAddress   string    `json:"gateway-address"`
 	MetricsListenAddress   string    `json:"metrics-address"`
 	PrivateListenAddress   string    `json:"private-address"`
@@ -92,6 +93,10 @@ func (c *Config) Load() error {
 		plugins = append(plugins, c.Plugins...)
 	}
 	c.Plugins = plugins
+
+	if strings.TrimSpace(c.IdFieldName) != "" {
+		IdFieldName = c.IdFieldName
+	}
 
 	logLevel := os.Getenv("BRAMBLE_LOG_LEVEL")
 	if level, err := log.ParseLevel(logLevel); err == nil {

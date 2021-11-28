@@ -16,6 +16,7 @@ Sample configuration:
   "poll-interval": "5s",
   "max-requests-per-query": 50,
   "max-client-response-size": 1048576,
+  "id-field-name": "id",
   "plugins": [
     {
       "name": "admin-ui"
@@ -75,6 +76,8 @@ Sample configuration:
 - `max-service-response-size`: The max response size that Bramble can receive from federated services
   - Default: 1MB
   - Supports hot-reload: No
+
+- `id-field-name`: Optional customisation of the field name used to cross-reference boundary types. Defaults to `id`.
 
 - `plugins`: Optional list of plugins to enable. See [plugins](plugins.md) for plugins-specific config.
 
