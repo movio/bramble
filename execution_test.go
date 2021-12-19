@@ -1479,6 +1479,239 @@ func TestTrimInsertionPointForNestedBoundaryQuery(t *testing.T) {
 	require.Equal(t, expected, result)
 }
 
+func TestNestingNullableBoundaryTypes(t *testing.T) {
+	t.Run("nested boundary types are all null", func(t *testing.T) {
+		f := &queryExecutionFixture{
+			services: []testService{
+				{
+					schema: `directive @boundary on OBJECT | FIELD_DEFINITION
+						type Gizmo @boundary {
+							id: ID!
+						}
+						type Query {
+							tastyGizmos: [Gizmo!]!
+							gizmo(ids: [ID!]!): [Gizmo]! @boundary
+						}`,
+					handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+						w.Write([]byte(`
+							{
+								"data": {
+									"tastyGizmos": [
+										{
+											"_bramble_id": "beehasknees",
+											"id": "beehasknees"
+										},
+										{
+											"_bramble_id": "umlaut",
+											"id": "umlaut"
+										},
+										{
+											"_bramble_id": "probanana",
+											"id": "probanana"
+										}
+									]
+								}
+							}
+						`))
+					}),
+				},
+				{
+					schema: `directive @boundary on OBJECT | FIELD_DEFINITION
+						type Gizmo @boundary {
+							id: ID!
+							wizzle: Wizzle
+						}
+						type Wizzle @boundary {
+							id: ID!
+						}
+						type Query {
+							wizzles(ids: [ID!]): [Wizzle]! @boundary
+							gizmo(ids: [ID!]): [Gizmo]! @boundary
+						}`,
+					handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+						w.Write([]byte(`{
+						"data": {
+							"_result": [null, null, null]
+						}
+					}`))
+					}),
+				},
+				{
+					schema: `directive @boundary on OBJECT | FIELD_DEFINITION
+						type Wizzle @boundary {
+							id: ID!
+							bazingaFactor: Int
+						}
+						type Query {
+							wizzles(ids: [ID!]): [Wizzle]! @boundary
+						}`,
+					handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+						w.Write([]byte(`should not be called...`))
+					}),
+				},
+			},
+
+			query: `{
+				tastyGizmos {
+					id
+					wizzle {
+						id
+						bazingaFactor
+					}
+				}
+			}`,
+			expected: `{
+				"tastyGizmos": [
+					{
+						"id": "beehasknees",
+						"wizzle": null
+					},
+					{
+						"id": "umlaut",
+						"wizzle": null
+					},
+					{
+						"id": "probanana",
+						"wizzle": null
+					}
+				]
+			}`,
+		}
+
+		f.checkSuccess(t)
+	})
+
+	t.Run("nested boundary types sometimes null", func(t *testing.T) {
+		f := &queryExecutionFixture{
+			services: []testService{
+				{
+					schema: `directive @boundary on OBJECT | FIELD_DEFINITION
+						type Gizmo @boundary {
+							id: ID!
+						}
+						type Query {
+							tastyGizmos: [Gizmo!]!
+							gizmo(ids: [ID!]!): [Gizmo]! @boundary
+						}`,
+					handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+						w.Write([]byte(`
+							{
+								"data": {
+									"tastyGizmos": [
+										{
+											"_bramble_id": "beehasknees",
+											"id": "beehasknees"
+										},
+										{
+											"_bramble_id": "umlaut",
+											"id": "umlaut"
+										},
+										{
+											"_bramble_id": "probanana",
+											"id": "probanana"
+										}
+									]
+								}
+							}
+						`))
+					}),
+				},
+				{
+					schema: `directive @boundary on OBJECT | FIELD_DEFINITION
+						type Gizmo @boundary {
+							id: ID!
+							wizzle: Wizzle
+						}
+						type Wizzle @boundary {
+							id: ID!
+						}
+						type Query {
+							wizzles(ids: [ID!]): [Wizzle]! @boundary
+							gizmos(ids: [ID!]): [Gizmo]! @boundary
+						}`,
+					handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+						w.Write([]byte(`{
+						"data": {
+							"_result": [
+								null,
+								{
+									"_bramble_id": "umlaut",
+									"id": "umlaut",
+									"wizzle": null
+								},
+								{
+									"_bramble_id": "probanana",
+									"id": "probanana",
+									"wizzle": {
+										"_bramble_id": "bananawizzle",
+										"id": "bananawizzle"
+									}
+								}
+							]
+						}
+					}`))
+					}),
+				},
+				{
+					schema: `directive @boundary on OBJECT | FIELD_DEFINITION
+						type Wizzle @boundary {
+							id: ID!
+							bazingaFactor: Int
+						}
+						type Query {
+							wizzles(ids: [ID!]): [Wizzle]! @boundary
+						}`,
+					handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+						w.Write([]byte(`{
+						"data": {
+							"_result": [
+								{
+									"_bramble_id": "bananawizzle",
+									"id": "bananawizzle",
+									"bazingaFactor": 4
+								}
+							]
+						}
+					}`))
+					}),
+				},
+			},
+
+			query: `{
+				tastyGizmos {
+					id
+					wizzle {
+						id
+						bazingaFactor
+					}
+				}
+			}`,
+			expected: `{
+				"tastyGizmos": [
+					{
+						"id": "beehasknees",
+						"wizzle": null
+					},
+					{
+						"id": "umlaut",
+						"wizzle": null
+					},
+					{
+						"id": "probanana",
+						"wizzle": {
+							"id": "bananawizzle",
+							"bazingaFactor": 4
+						}
+					}
+				]
+			}`,
+		}
+
+		f.checkSuccess(t)
+	})
+
+}
+
 func TestBuildBoundaryQueryDocuments(t *testing.T) {
 	ddl := `
 		type Gizmo {
