@@ -172,13 +172,15 @@ func (q *queryExecution) executeChildStep(step *QueryPlanStep, boundaryIDs []str
 
 	q.writeExecutionResult(step, data, nil)
 
-	if len(data) > 0 {
+	nonNillBoundaryResults := extractNonNilBoundaryResults(data)
+
+	if len(nonNillBoundaryResults) > 0 {
 		for _, childStep := range step.Then {
-			boundaryResultInsertionPoint, err := trimInsertionPointForNestedBoundaryStep(data, childStep.InsertionPoint)
+			boundaryResultInsertionPoint, err := trimInsertionPointForNestedBoundaryStep(nonNillBoundaryResults, childStep.InsertionPoint)
 			if err != nil {
 				return err
 			}
-			boundaryIDs, err := extractAndDedupeBoundaryIDs(data, boundaryResultInsertionPoint)
+			boundaryIDs, err := extractAndDedupeBoundaryIDs(nonNillBoundaryResults, boundaryResultInsertionPoint)
 			if err != nil {
 				return err
 			}
@@ -193,6 +195,18 @@ func (q *queryExecution) executeChildStep(step *QueryPlanStep, boundaryIDs []str
 	}
 
 	return nil
+}
+
+func extractNonNilBoundaryResults(data []interface{}) []interface{} {
+	var nonNilResults []interface{}
+	for _, d := range data {
+		if d != nil {
+			nonNilResults = append(nonNilResults, d)
+		}
+
+	}
+
+	return nonNilResults
 }
 
 func (q *queryExecution) executeBoundaryQuery(documents []string, serviceURL string, boundaryFieldGetter BoundaryField) ([]interface{}, error) {
