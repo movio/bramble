@@ -5721,6 +5721,8 @@ func (f *queryExecutionFixture) run(t *testing.T) {
 		vars = map[string]interface{}{}
 	}
 	ctx := testContextWithVariables(vars, query.Operations[0])
+	ctx, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
 	if f.debug != nil {
 		ctx = context.WithValue(ctx, DebugKey, *f.debug)
 	}
