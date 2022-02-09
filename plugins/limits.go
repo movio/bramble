@@ -63,5 +63,5 @@ func (p *LimitsPlugin) ApplyMiddlewarePublicMux(h http.Handler) http.Handler {
 		r.Body = http.MaxBytesReader(w, r.Body, p.config.MaxRequestBytes)
 		h.ServeHTTP(w, r)
 	})
-	return http.TimeoutHandler(handler, p.config.maxResponseDuration, "failed to serve query in time")
+	return handler
 }
