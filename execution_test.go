@@ -1036,7 +1036,7 @@ func TestQueryExecutionServiceTimeout(t *testing.T) {
 				}`,
 				handler: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 
-					time.Sleep(time.Second)
+					time.Sleep(time.Millisecond)
 
 					response := jsonToInterfaceMap(`{
 						"data": {
@@ -5704,6 +5704,9 @@ func (f *queryExecutionFixture) setup(t *testing.T) (*ExecutableSchema, func()) 
 	es.BoundaryQueries = buildBoundaryFieldsMap(services...)
 	es.Locations = buildFieldURLMap(services...)
 	es.IsBoundary = buildIsBoundaryMap(services...)
+	if t.Name() == "TestQueryExecutionServiceTimeout" {
+		es.GraphqlClient.HTTPClient.Timeout = time.Millisecond
+	}
 
 	return es, func() {
 		for _, close := range serverCloses {
@@ -5721,8 +5724,6 @@ func (f *queryExecutionFixture) run(t *testing.T) {
 		vars = map[string]interface{}{}
 	}
 	ctx := testContextWithVariables(vars, query.Operations[0])
-	ctx, cancel := context.WithTimeout(ctx, time.Second)
-	defer cancel()
 	if f.debug != nil {
 		ctx = context.WithValue(ctx, DebugKey, *f.debug)
 	}
