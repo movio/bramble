@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -32,6 +33,20 @@ func TestGraphqlClient(t *testing.T) {
 		err := c.Request(context.Background(), srv.URL, &Request{}, &res)
 		assert.NoError(t, err)
 		assert.Equal(t, "value", res.Root.Test)
+	})
+
+	t.Run("with http client", func(t *testing.T) {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			time.Sleep(2 * time.Second)
+			w.Write([]byte(`{ "data": "custom http client" }`))
+		}))
+
+		httpClient := &http.Client{Timeout: 1 * time.Second}
+		c := NewClient(WithHTTPClient(httpClient))
+		var res interface{}
+		err := c.Request(context.Background(), srv.URL, &Request{}, &res)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "Client.Timeout exceeded while awaiting headers")
 	})
 
 	t.Run("with user agent", func(t *testing.T) {
