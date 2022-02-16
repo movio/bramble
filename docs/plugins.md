@@ -101,6 +101,26 @@ Set limits for response time and incoming requests size.
 }
 ```
 
+The limit for response time is applied to each sub-query. If a sub-query times out, it will return a null value with a corresponding error denoting the problematic selection set.
+
+e.g.
+
+```json
+{
+  "errors": {
+    "message": "error during request: Post \"http://localhost:8080/query\": context deadline exceeded",
+     "extensions": {
+        "selectionSet": "{ serviceB _bramble_id: id }"
+      },
+      ...
+  },
+  "data": {
+    "serviceA": "quick answer",
+    "serviceB": null
+  }
+}
+```
+
 ## Meta
 
 Adds meta-information to the graph.

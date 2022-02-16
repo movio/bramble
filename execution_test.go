@@ -9,8 +9,10 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/stretchr/testify/assert"
@@ -993,6 +995,96 @@ func TestQueryExecutionMultipleServices(t *testing.T) {
 	}
 
 	f.checkSuccess(t)
+}
+
+func TestQueryExecutionServiceTimeout(t *testing.T) {
+	f := &queryExecutionFixture{
+		services: []testService{
+			{
+				schema: `directive @boundary on OBJECT
+				type Movie @boundary {
+					id: ID!
+					title: String
+				}
+
+				type Query {
+					movie(id: ID!): Movie!
+				}`,
+				handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.Write([]byte(`{
+						"data": {
+							"movie": {
+								"_bramble_id": "1",
+								"id": "1",
+								"title": "Test title"
+							}
+						}
+					}
+					`))
+				}),
+			},
+			{
+				schema: `directive @boundary on OBJECT | FIELD_DEFINITION
+				type Movie @boundary {
+					id: ID!
+					release: Int
+					slowField: String
+				}
+
+				type Query {
+					movie(id: ID!): Movie! @boundary
+				}`,
+				handler: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+
+					time.Sleep(300 * time.Millisecond)
+
+					response := jsonToInterfaceMap(`{
+						"data": {
+							"_0": {
+								"_bramble_id": "1",
+								"id": "1",
+								"release": 2007,
+								"slowField": "very slow field"
+							}
+						}
+					}
+					`)
+					if err := json.NewEncoder(w).Encode(response); err != nil {
+						t.Errorf("Unexpected error %s", err)
+					}
+				}),
+			},
+		},
+		query: `{
+			movie(id: "1") {
+				id
+				title
+				slowField
+			}
+		}`,
+		expected: `{
+			"movie": {
+				"id": "1",
+				"title": "Test title",
+				"slowField": null
+			}
+		}`,
+		errors: gqlerror.List{
+			&gqlerror.Error{
+				Message: `error during request: Post \"http://127.0.0.1:\d{5}\": context deadline exceeded`,
+				Path:    ast.Path{ast.PathName("movie")},
+				Locations: []gqlerror.Location{
+					{Line: 5, Column: 5},
+				},
+				Extensions: map[string]interface{}{
+					"selectionSet": "{ slowField _bramble_id: id }",
+				},
+			},
+		},
+	}
+
+	f.run(t)
+	jsonEqWithOrder(t, f.expected, string(f.resp.Data))
 }
 
 func TestQueryExecutionNamespaceAndFragmentSpread(t *testing.T) {
@@ -5612,6 +5704,9 @@ func (f *queryExecutionFixture) setup(t *testing.T) (*ExecutableSchema, func()) 
 	es.BoundaryQueries = buildBoundaryFieldsMap(services...)
 	es.Locations = buildFieldURLMap(services...)
 	es.IsBoundary = buildIsBoundaryMap(services...)
+	if t.Name() == "TestQueryExecutionServiceTimeout" {
+		es.GraphqlClient.HTTPClient.Timeout = 200 * time.Millisecond
+	}
 
 	return es, func() {
 		for _, close := range serverCloses {
@@ -5642,6 +5737,10 @@ func (f *queryExecutionFixture) run(t *testing.T) {
 		require.Equal(t, len(f.errors), len(f.resp.Errors))
 		for i := range f.errors {
 			delete(f.resp.Errors[i].Extensions, "serviceUrl")
+			// Allow regular expressions in expected error messages
+			if r, err := regexp.Compile(f.errors[i].Message); err == nil && r.Match([]byte(f.resp.Errors.Error())) {
+				f.errors[i].Message = f.resp.Errors[i].Message
+			}
 			require.Equal(t, *f.errors[i], *f.resp.Errors[i])
 		}
 	}
