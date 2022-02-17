@@ -82,11 +82,7 @@ func (s *ExecutableSchema) UpdateSchema(forceRebuild bool) error {
 	promServiceUpdateError.Reset()
 
 	for url, s := range s.Services {
-		logger := log.WithFields(log.Fields{
-			"url":     url,
-			"version": s.Version,
-			"service": s.Name,
-		})
+		logger := log.WithField("url", url)
 		updated, err := s.Update()
 		if err != nil {
 			promServiceUpdateError.WithLabelValues(s.ServiceURL).Inc()
@@ -95,9 +91,13 @@ func (s *ExecutableSchema) UpdateSchema(forceRebuild bool) error {
 			// Ignore this service in this update
 			continue
 		}
+		logger = log.WithFields(log.Fields{
+			"version": s.Version,
+			"service": s.Name,
+		})
 
 		if updated {
-			logger.Info("service was upgraded")
+			logger.Info("service was updated")
 			updatedServices = append(updatedServices, s.Name)
 		}
 
