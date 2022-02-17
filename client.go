@@ -41,7 +41,7 @@ func NewClient(opts ...ClientOpt) *GraphQLClient {
 	return c
 }
 
-// WithHTTPClient set the http client used by the client.
+// WithHTTPClient sets a custom HTTP client to be used when making downstream queries.
 func WithHTTPClient(client *http.Client) ClientOpt {
 	return func(s *GraphQLClient) {
 		s.HTTPClient = client

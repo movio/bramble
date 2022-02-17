@@ -3,9 +3,10 @@ package bramble
 import (
 	"context"
 	"net/http"
+	"net/http/cookiejar"
 	"net/http/httptest"
+	"net/url"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -37,16 +38,29 @@ func TestGraphqlClient(t *testing.T) {
 
 	t.Run("with http client", func(t *testing.T) {
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			time.Sleep(2 * time.Second)
-			w.Write([]byte(`{ "data": "custom http client" }`))
+			cookie, err := r.Cookie("test_cookie")
+			require.NoError(t, err)
+			assert.Equal(t, "test_value", cookie.Value)
 		}))
 
-		httpClient := &http.Client{Timeout: 1 * time.Second}
+		jar, err := cookiejar.New(nil)
+		require.NoError(t, err)
+
+		serverURL, err := url.Parse(srv.URL)
+		require.NoError(t, err)
+
+		jar.SetCookies(serverURL, []*http.Cookie{
+			{
+
+				Name:  "test_cookie",
+				Value: "test_value",
+			},
+		})
+
+		httpClient := &http.Client{Jar: jar}
 		c := NewClient(WithHTTPClient(httpClient))
 		var res interface{}
-		err := c.Request(context.Background(), srv.URL, &Request{}, &res)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "Client.Timeout exceeded while awaiting headers")
+		_ = c.Request(context.Background(), srv.URL, &Request{}, &res)
 	})
 
 	t.Run("with user agent", func(t *testing.T) {
