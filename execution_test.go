@@ -2467,6 +2467,72 @@ func TestMergeExecutionResults(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, expected, mergedMap)
 	})
+
+	t.Run("merges with nil destination", func(t *testing.T) {
+		inputMapA := jsonToInterfaceMap(`{
+			"gizmo": {
+				"_bramble_id": "1",
+				"gadgets": [
+					[
+						{"_bramble_id": "GADGET1", "details": { "owner": {"_bramble_id": "OWNER1" }}}
+					],
+					[
+						{"_bramble_id": "GADGET2", "details": null}
+					]
+				]
+			}
+		}`)
+
+		resultA := executionResult{
+			ServiceURL:     "http://service-a",
+			InsertionPoint: []string{},
+			Data:           inputMapA,
+		}
+
+		inputMapB := jsonToInterfaceSlice(`[
+			{
+				"_bramble_id": "OWNER1",
+				"name": "Alice"
+			}
+		]`)
+
+		resultB := executionResult{
+			ServiceURL:     "http://service-b",
+			InsertionPoint: []string{"gizmo", "gadgets", "details", "owner"},
+			Data:           inputMapB,
+		}
+
+		mergedMap, err := mergeExecutionResults([]executionResult{resultA, resultB})
+
+		expected := jsonToInterfaceMap(`
+		{
+			"gizmo": {
+				"gadgets": [
+					[
+						{
+							"_bramble_id": "GADGET1",
+							"details": {
+								"owner": {
+									"_bramble_id": "OWNER1",
+									"name": "Alice"
+								}
+							}
+						}
+					],
+					[
+						{
+							"_bramble_id": "GADGET2",
+							"details": null
+						}
+					]
+				],
+				"_bramble_id": "1"
+			}
+		}`)
+
+		require.NoError(t, err)
+		require.Equal(t, expected, mergedMap)
+	})
 }
 
 func TestUnionAndTrimSelectionSet(t *testing.T) {

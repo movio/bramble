@@ -577,6 +577,9 @@ func mergeExecutionResultsRec(src interface{}, dst interface{}, insertionPoint [
 				return err
 			}
 		}
+	case nil:
+		// The destination is nil, so the src can not be merged
+		return nil
 	default:
 		return fmt.Errorf("mergeExecutionResultsRec: unxpected type '%T' for non top-level merge", ptr)
 	}
