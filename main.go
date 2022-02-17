@@ -16,7 +16,8 @@ import (
 // when building Bramble with custom plugins.
 func Main() {
 	var configFiles arrayFlags
-	flag.Var(&configFiles, "conf", "Config file (can appear multiple times)")
+	flag.Var(&configFiles, "config", "Config file (can appear multiple times)")
+	flag.Var(&configFiles, "conf", "deprecated, use -config instead")
 	flag.Parse()
 
 	log.SetFormatter(&log.JSONFormatter{TimestampFormat: time.RFC3339Nano})
