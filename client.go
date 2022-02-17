@@ -41,6 +41,13 @@ func NewClient(opts ...ClientOpt) *GraphQLClient {
 	return c
 }
 
+// WithHTTPClient sets a custom HTTP client to be used when making downstream queries.
+func WithHTTPClient(client *http.Client) ClientOpt {
+	return func(s *GraphQLClient) {
+		s.HTTPClient = client
+	}
+}
+
 // WithMaxResponseSize sets the max allowed response size. The client will only
 // read up to maxResponseSize and that size is exceeded an an error will be
 // returned.
