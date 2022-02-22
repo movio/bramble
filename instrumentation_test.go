@@ -15,8 +15,15 @@ func collectLogEvent(t *testing.T, f func()) map[string]interface{} {
 	t.Helper()
 	r, w := io.Pipe()
 	defer r.Close()
-	log.SetOutput(w)
-	log.SetFormatter(&log.JSONFormatter{})
+	logger := log.StandardLogger()
+	prevOut := logger.Out
+	prevFmt := logger.Formatter
+	logger.SetOutput(w)
+	logger.SetFormatter(&log.JSONFormatter{})
+	t.Cleanup(func() {
+		logger.SetOutput(prevOut)
+		logger.SetFormatter(prevFmt)
+	})
 
 	go func() {
 		defer w.Close()
