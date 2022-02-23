@@ -204,12 +204,6 @@ func (s *ExecutableSchema) ExecuteQuery(ctx context.Context) *graphql.Response {
 		}
 	}
 
-	for _, plugin := range s.plugins {
-		if err := plugin.ModifyExtensions(ctx, qe, extensions); err != nil {
-			AddField(ctx, fmt.Sprintf("%s-plugin-error", plugin.ID()), err.Error())
-		}
-	}
-
 	for _, result := range results {
 		errs = append(errs, result.Errors...)
 	}
