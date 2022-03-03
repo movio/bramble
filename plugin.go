@@ -1,7 +1,6 @@
 package bramble
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 
@@ -25,7 +24,6 @@ type Plugin interface {
 	GraphqlQueryPath() (bool, string)
 	ApplyMiddlewarePublicMux(http.Handler) http.Handler
 	ApplyMiddlewarePrivateMux(http.Handler) http.Handler
-	ModifyExtensions(ctx context.Context, e *queryExecution, extensions map[string]interface{}) error
 }
 
 // BasePlugin is an empty plugin. It can be embedded by any plugin as a way to avoid
@@ -59,11 +57,6 @@ func (p *BasePlugin) ApplyMiddlewarePublicMux(h http.Handler) http.Handler {
 // ApplyMiddlewarePrivateMux ...
 func (p *BasePlugin) ApplyMiddlewarePrivateMux(h http.Handler) http.Handler {
 	return h
-}
-
-// ModifyExtensions ...
-func (p *BasePlugin) ModifyExtensions(ctx context.Context, e *queryExecution, extensions map[string]interface{}) error {
-	return nil
 }
 
 var registeredPlugins = map[string]Plugin{}
