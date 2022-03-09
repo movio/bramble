@@ -2,6 +2,7 @@ package bramble
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"errors"
@@ -94,13 +95,24 @@ func (c *GraphQLClient) Request(ctx context.Context, url string, request *Reques
 	}
 	defer res.Body.Close()
 
+	var reader io.Reader
+	switch res.Header.Get("Content-Encoding") {
+	case "gzip":
+		reader, err = gzip.NewReader(res.Body)
+		if err != nil {
+			return fmt.Errorf("error at reading the compressed bytes: %w", err)
+		}
+	default:
+		reader = res.Body
+	}
+
 	maxResponseSize := c.MaxResponseSize
 	if maxResponseSize == 0 {
 		maxResponseSize = math.MaxInt64
 	}
 
 	limitReader := io.LimitedReader{
-		R: res.Body,
+		R: reader,
 		N: maxResponseSize,
 	}
 

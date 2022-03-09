@@ -1,6 +1,7 @@
 package bramble
 
 import (
+	"compress/gzip"
 	"context"
 	"net/http"
 	"net/http/cookiejar"
@@ -83,5 +84,31 @@ func TestGraphqlClient(t *testing.T) {
 		err := c.Request(context.Background(), srv.URL, &Request{}, &res)
 		require.Error(t, err)
 		assert.Equal(t, "response exceeded maximum size of 1 bytes", err.Error())
+	})
+
+	t.Run("compressed response", func(t *testing.T) {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Encoding", "gzip")
+			gz := gzip.NewWriter(w)
+			defer gz.Close()
+			gz.Write([]byte(`{
+				"data": {
+					"root": {
+						"test": "value"
+					}
+				}
+			}`))
+		}))
+
+		c := NewClient()
+		var res struct {
+			Root struct {
+				Test string
+			}
+		}
+
+		err := c.Request(context.Background(), srv.URL, &Request{Headers: map[string][]string{"Accept-Encoding": {"gzip"}}}, &res)
+		assert.NoError(t, err)
+		assert.Equal(t, "value", res.Root.Test)
 	})
 }
