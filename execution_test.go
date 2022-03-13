@@ -5765,7 +5765,7 @@ func (f *queryExecutionFixture) setup(t *testing.T) (*ExecutableSchema, func()) 
 
 	f.mergedSchema = merged
 
-	es := newExecutableSchema(nil, 50, nil, services...)
+	es := NewExecutableSchema(nil, 50, nil, services...)
 	es.MergedSchema = merged
 	es.BoundaryQueries = buildBoundaryFieldsMap(services...)
 	es.Locations = buildFieldURLMap(services...)

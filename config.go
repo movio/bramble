@@ -272,7 +272,7 @@ func (c *Config) Init() error {
 		queryClientOptions = append(queryClientOptions, WithHTTPClient(c.QueryHTTPClient))
 	}
 	queryClient := NewClient(queryClientOptions...)
-	es := newExecutableSchema(c.plugins, c.MaxRequestsPerQuery, queryClient, services...)
+	es := NewExecutableSchema(c.plugins, c.MaxRequestsPerQuery, queryClient, services...)
 	err = es.UpdateSchema(true)
 	if err != nil {
 		return err

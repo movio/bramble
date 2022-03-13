@@ -12,7 +12,7 @@ func TestFederatedQuery(t *testing.T) {
 	gizmoService := testsrv.NewGizmoService()
 	gadgetService := testsrv.NewGadgetService()
 
-	executableSchema := newExecutableSchema(nil, 10, nil, NewService(gizmoService.URL), NewService(gadgetService.URL))
+	executableSchema := NewExecutableSchema(nil, 10, nil, NewService(gizmoService.URL), NewService(gadgetService.URL))
 
 	require.NoError(t, executableSchema.UpdateSchema(true))
 
@@ -43,7 +43,7 @@ func TestFederatedQueryWithMultipleFragmentSpreads(t *testing.T) {
 	gizmoService := testsrv.NewGizmoService()
 	gadgetService := testsrv.NewGadgetService()
 
-	executableSchema := newExecutableSchema(nil, 10, nil, NewService(gizmoService.URL), NewService(gadgetService.URL))
+	executableSchema := NewExecutableSchema(nil, 10, nil, NewService(gizmoService.URL), NewService(gadgetService.URL))
 
 	require.NoError(t, executableSchema.UpdateSchema(true))
 
