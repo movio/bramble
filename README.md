@@ -27,7 +27,12 @@ It is also stateless and scales very easily.
 
 ## Future work/not currently supported
 
-There is currently no support for subscriptions.
+There is currently no support for:
+ 
+  - Subscriptions
+  - Shared unions, interfaces, and input objects across services
+
+Check FAQ for details: https://movio.github.io/bramble/#/federation?id=restriction-on-subscription
 
 ## Contributing
 
