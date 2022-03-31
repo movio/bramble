@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/vektah/gqlparser/v2"
 	"github.com/vektah/gqlparser/v2/ast"
 )
@@ -89,7 +90,7 @@ func loadAndFormatSchema(input string) string {
 func mustMergeSchemas(t *testing.T, sources ...*ast.Schema) *ast.Schema {
 	t.Helper()
 	s, err := MergeSchemas(sources...)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	return s
 }
 
