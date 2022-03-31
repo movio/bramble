@@ -30,7 +30,7 @@ It is also stateless and scales very easily.
 There is currently no support for:
  
   - Subscriptions
-  - Shared unions, interfaces, and input objects across services
+  - Shared unions, interfaces, scalars, enums or inputs across services
 
 Check FAQ for details: https://movio.github.io/bramble/#/federation?id=restriction-on-subscription
 
