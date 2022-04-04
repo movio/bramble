@@ -228,6 +228,9 @@ func extractSelectionSet(ctx *PlanningContext, insertionPoint []string, parentTy
 	}
 
 	parentDef := ctx.Schema.Types[parentType]
+	if parentDef == nil {
+		return nil, nil, fmt.Errorf("definition is nil for parentType %v", parentType)
+	}
 	if parentDef.IsAbstractType() {
 		// For abstract types, add an id fragment for all possible boundary
 		// implementations. This assures that abstract boundaries always return
