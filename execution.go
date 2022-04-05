@@ -136,37 +136,27 @@ func (s *ExecutableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 func (s *ExecutableSchema) ExecuteQuery(ctx context.Context) *graphql.Response {
 	start := time.Now()
 
-	opctx := graphql.GetOperationContext(ctx)
-	op := opctx.Operation
+	operationCtx := graphql.GetOperationContext(ctx)
+	operation := operationCtx.Operation
+	variables := operationCtx.Variables
 
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
-	variables := map[string]interface{}{}
-	if graphql.HasOperationContext(ctx) {
-		reqctx := graphql.GetOperationContext(ctx)
-		if reqctx != nil {
-			variables = reqctx.Variables
-		}
-	}
-
 	// The op passed in is a cached value
 	// so it must be copied before modification
-	op = s.evaluateSkipAndInclude(variables, op)
+	operation = s.evaluateSkipAndInclude(variables, operation)
+	filteredSchema := s.MergedSchema
 
 	var errs gqlerror.List
 	perms, hasPerms := GetPermissionsFromContext(ctx)
 	if hasPerms {
-		errs = perms.FilterAuthorizedFields(op)
-	}
-
-	filteredSchema := s.MergedSchema
-	if hasPerms {
 		filteredSchema = perms.FilterSchema(s.MergedSchema)
+		errs = perms.FilterAuthorizedFields(operation)
 	}
 
 	plan, err := Plan(&PlanningContext{
-		Operation:  op,
+		Operation:  operation,
 		Schema:     s.Schema(),
 		Locations:  s.Locations,
 		IsBoundary: s.IsBoundary,
@@ -177,8 +167,8 @@ func (s *ExecutableSchema) ExecuteQuery(ctx context.Context) *graphql.Response {
 		return graphql.ErrorResponse(ctx, err.Error())
 	}
 
-	AddField(ctx, "operation.name", op.Name)
-	AddField(ctx, "operation.type", op.Operation)
+	AddField(ctx, "operation.name", operation.Name)
+	AddField(ctx, "operation.type", operation.Operation)
 
 	qe := newQueryExecution(ctx, s.GraphqlClient, s.Schema(), s.BoundaryQueries, int32(s.MaxRequestsPerQuery))
 	results, executeErrs := qe.Execute(plan)
@@ -194,7 +184,7 @@ func (s *ExecutableSchema) ExecuteQuery(ctx context.Context) *graphql.Response {
 	extensions := make(map[string]interface{})
 	if debugInfo, ok := ctx.Value(DebugKey).(DebugInfo); ok {
 		if debugInfo.Query {
-			extensions["query"] = op
+			extensions["query"] = operation
 		}
 		if debugInfo.Variables {
 			extensions["variables"] = variables
@@ -208,7 +198,7 @@ func (s *ExecutableSchema) ExecuteQuery(ctx context.Context) *graphql.Response {
 		errs = append(errs, result.Errors...)
 	}
 
-	introspectionData := s.resolveIntrospectionFields(ctx, op.SelectionSet, filteredSchema)
+	introspectionData := s.resolveIntrospectionFields(ctx, operation.SelectionSet, filteredSchema)
 	if len(introspectionData) > 0 {
 		results = append([]executionResult{
 			{
@@ -229,7 +219,7 @@ func (s *ExecutableSchema) ExecuteQuery(ctx context.Context) *graphql.Response {
 	}
 	timings["merge"] = time.Since(mergeStart).Round(time.Millisecond).String()
 
-	bubbleErrs, err := bubbleUpNullValuesInPlace(qe.schema, op.SelectionSet, mergedResult)
+	bubbleErrs, err := bubbleUpNullValuesInPlace(qe.schema, operation.SelectionSet, mergedResult)
 	if err == errNullBubbledToRoot {
 		mergedResult = nil
 	} else if err != nil {
@@ -243,7 +233,7 @@ func (s *ExecutableSchema) ExecuteQuery(ctx context.Context) *graphql.Response {
 	errs = append(errs, bubbleErrs...)
 
 	formattingStart := time.Now()
-	formattedResponse, err := formatResponseData(qe.schema, op.SelectionSet, mergedResult)
+	formattedResponse, err := formatResponseData(qe.schema, operation.SelectionSet, mergedResult)
 	if err != nil {
 		errs = append(errs, &gqlerror.Error{Message: err.Error()})
 		AddField(ctx, "errors", errs)
