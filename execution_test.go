@@ -23,6 +23,40 @@ import (
 	"github.com/vektah/gqlparser/v2/gqlerror"
 )
 
+func TestHonorsPermissions(t *testing.T) {
+	schema := `
+	type Cinema {
+		id: ID!
+		name: String!
+	}
+
+	type Query {
+		cinema(id: ID!): Cinema!
+	}`
+
+	mergedSchema, err := MergeSchemas(gqlparser.MustLoadSchema(&ast.Source{Name: "fixture", Input: schema}))
+	require.NoError(t, err)
+
+	es := ExecutableSchema{
+		MergedSchema: mergedSchema,
+	}
+
+	query := gqlparser.MustLoadQuery(es.MergedSchema, `{
+		cinema(id: "Cinema") {
+			name
+		}
+	}`)
+	ctx := testContextWithNoPermissions(query.Operations[0])
+	resp := es.ExecuteQuery(ctx)
+
+	permissionsError := &gqlerror.Error{
+		Message: "user do not have permission to access field query.cinema",
+	}
+
+	require.Contains(t, resp.Errors, permissionsError)
+	require.Nil(t, resp.Data)
+}
+
 func TestIntrospectionQuery(t *testing.T) {
 	schema := `
 	union MovieOrCinema = Movie | Cinema
@@ -5881,6 +5915,17 @@ func testContextWithoutVariables(op *ast.OperationDefinition) context.Context {
 		AllowedRootQueryFields:        AllowedFields{AllowAll: true},
 		AllowedRootMutationFields:     AllowedFields{AllowAll: true},
 		AllowedRootSubscriptionFields: AllowedFields{AllowAll: true},
+	})
+}
+
+func testContextWithNoPermissions(op *ast.OperationDefinition) context.Context {
+	return AddPermissionsToContext(graphql.WithOperationContext(context.Background(), &graphql.OperationContext{
+		Variables: map[string]interface{}{},
+		Operation: op,
+	}), OperationPermissions{
+		AllowedRootQueryFields:        AllowedFields{},
+		AllowedRootMutationFields:     AllowedFields{},
+		AllowedRootSubscriptionFields: AllowedFields{},
 	})
 }
 

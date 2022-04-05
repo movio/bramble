@@ -157,7 +157,7 @@ func (s *ExecutableSchema) ExecuteQuery(ctx context.Context) *graphql.Response {
 
 	plan, err := Plan(&PlanningContext{
 		Operation:  operation,
-		Schema:     s.Schema(),
+		Schema:     filteredSchema,
 		Locations:  s.Locations,
 		IsBoundary: s.IsBoundary,
 		Services:   s.Services,
@@ -170,7 +170,7 @@ func (s *ExecutableSchema) ExecuteQuery(ctx context.Context) *graphql.Response {
 	AddField(ctx, "operation.name", operation.Name)
 	AddField(ctx, "operation.type", operation.Operation)
 
-	qe := newQueryExecution(ctx, s.GraphqlClient, s.Schema(), s.BoundaryQueries, int32(s.MaxRequestsPerQuery))
+	qe := newQueryExecution(ctx, s.GraphqlClient, filteredSchema, s.BoundaryQueries, int32(s.MaxRequestsPerQuery))
 	results, executeErrs := qe.Execute(plan)
 	if len(executeErrs) > 0 {
 		return &graphql.Response{
@@ -219,7 +219,7 @@ func (s *ExecutableSchema) ExecuteQuery(ctx context.Context) *graphql.Response {
 	}
 	timings["merge"] = time.Since(mergeStart).Round(time.Millisecond).String()
 
-	bubbleErrs, err := bubbleUpNullValuesInPlace(qe.schema, operation.SelectionSet, mergedResult)
+	bubbleErrs, err := bubbleUpNullValuesInPlace(filteredSchema, operation.SelectionSet, mergedResult)
 	if err == errNullBubbledToRoot {
 		mergedResult = nil
 	} else if err != nil {
@@ -233,7 +233,7 @@ func (s *ExecutableSchema) ExecuteQuery(ctx context.Context) *graphql.Response {
 	errs = append(errs, bubbleErrs...)
 
 	formattingStart := time.Now()
-	formattedResponse, err := formatResponseData(qe.schema, operation.SelectionSet, mergedResult)
+	formattedResponse, err := formatResponseData(filteredSchema, operation.SelectionSet, mergedResult)
 	if err != nil {
 		errs = append(errs, &gqlerror.Error{Message: err.Error()})
 		AddField(ctx, "errors", errs)
