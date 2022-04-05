@@ -134,11 +134,12 @@ func (s *ExecutableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 }
 
 func (s *ExecutableSchema) ExecuteQuery(ctx context.Context) *graphql.Response {
-	start := time.Now()
-
 	operationCtx := graphql.GetOperationContext(ctx)
 	operation := operationCtx.Operation
 	variables := operationCtx.Variables
+
+	AddField(ctx, "operation.name", operation.Name)
+	AddField(ctx, "operation.type", operation.Operation)
 
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
@@ -167,21 +168,8 @@ func (s *ExecutableSchema) ExecuteQuery(ctx context.Context) *graphql.Response {
 		return graphql.ErrorResponse(ctx, err.Error())
 	}
 
-	AddField(ctx, "operation.name", operation.Name)
-	AddField(ctx, "operation.type", operation.Operation)
-
-	qe := newQueryExecution(ctx, s.GraphqlClient, filteredSchema, s.BoundaryQueries, int32(s.MaxRequestsPerQuery))
-	results, executeErrs := qe.Execute(plan)
-	if len(executeErrs) > 0 {
-		return &graphql.Response{
-			Errors: executeErrs,
-		}
-	}
-
-	timings := make(map[string]interface{})
-	timings["execution"] = time.Since(start).Round(time.Millisecond).String()
-
 	extensions := make(map[string]interface{})
+	timings := make(map[string]interface{})
 	if debugInfo, ok := ctx.Value(DebugKey).(DebugInfo); ok {
 		if debugInfo.Query {
 			extensions["query"] = operation
@@ -191,6 +179,23 @@ func (s *ExecutableSchema) ExecuteQuery(ctx context.Context) *graphql.Response {
 		}
 		if debugInfo.Plan {
 			extensions["plan"] = plan
+		}
+		if debugInfo.Timing {
+			extensions["timings"] = timings
+		}
+	}
+
+	for name, value := range extensions {
+		graphql.RegisterExtension(ctx, name, value)
+	}
+
+	executionStart := time.Now()
+
+	qe := newQueryExecution(ctx, s.GraphqlClient, filteredSchema, s.BoundaryQueries, int32(s.MaxRequestsPerQuery))
+	results, executeErrs := qe.Execute(plan)
+	if len(executeErrs) > 0 {
+		return &graphql.Response{
+			Errors: executeErrs,
 		}
 	}
 
@@ -208,6 +213,8 @@ func (s *ExecutableSchema) ExecuteQuery(ctx context.Context) *graphql.Response {
 		}, results...)
 	}
 
+	timings["execution"] = time.Since(executionStart).Round(time.Millisecond).String()
+
 	mergeStart := time.Now()
 	mergedResult, err := mergeExecutionResults(results)
 	if err != nil {
@@ -217,7 +224,6 @@ func (s *ExecutableSchema) ExecuteQuery(ctx context.Context) *graphql.Response {
 			Errors: errs,
 		}
 	}
-	timings["merge"] = time.Since(mergeStart).Round(time.Millisecond).String()
 
 	bubbleErrs, err := bubbleUpNullValuesInPlace(filteredSchema, operation.SelectionSet, mergedResult)
 	if err == errNullBubbledToRoot {
@@ -231,6 +237,7 @@ func (s *ExecutableSchema) ExecuteQuery(ctx context.Context) *graphql.Response {
 	}
 
 	errs = append(errs, bubbleErrs...)
+	timings["merge"] = time.Since(mergeStart).Round(time.Millisecond).String()
 
 	formattingStart := time.Now()
 	formattedResponse, err := formatResponseData(filteredSchema, operation.SelectionSet, mergedResult)
@@ -242,16 +249,6 @@ func (s *ExecutableSchema) ExecuteQuery(ctx context.Context) *graphql.Response {
 		}
 	}
 	timings["format"] = time.Since(formattingStart).Round(time.Millisecond).String()
-
-	if debugInfo, ok := ctx.Value(DebugKey).(DebugInfo); ok {
-		if debugInfo.Timing {
-			extensions["timing"] = timings
-		}
-	}
-
-	for name, value := range extensions {
-		graphql.RegisterExtension(ctx, name, value)
-	}
 
 	if len(errs) > 0 {
 		AddField(ctx, "errors", errs)
