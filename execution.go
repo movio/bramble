@@ -203,7 +203,7 @@ func (s *ExecutableSchema) ExecuteQuery(ctx context.Context) *graphql.Response {
 		errs = append(errs, result.Errors...)
 	}
 
-	introspectionData := s.resolveIntrospectionFields(ctx, operation.SelectionSet, filteredSchema)
+	introspectionData := resolveIntrospectionFields(ctx, operation.SelectionSet, filteredSchema)
 	if len(introspectionData) > 0 {
 		results = append([]executionResult{
 			{
@@ -264,22 +264,22 @@ func (s *ExecutableSchema) Complexity(typeName, fieldName string, childComplexit
 	return 0, false
 }
 
-func (s *ExecutableSchema) resolveIntrospectionFields(ctx context.Context, selectionSet ast.SelectionSet, filteredSchema *ast.Schema) map[string]interface{} {
+func resolveIntrospectionFields(ctx context.Context, selectionSet ast.SelectionSet, filteredSchema *ast.Schema) map[string]interface{} {
 	introspectionResult := make(map[string]interface{})
 	for _, f := range selectionSetToFields(selectionSet) {
 		switch f.Name {
 		case "__type":
 			name := f.Arguments.ForName("name").Value.Raw
-			introspectionResult[f.Alias] = s.resolveType(ctx, filteredSchema, &ast.Type{NamedType: name}, f.SelectionSet)
+			introspectionResult[f.Alias] = resolveType(ctx, filteredSchema, &ast.Type{NamedType: name}, f.SelectionSet)
 		case "__schema":
-			introspectionResult[f.Alias] = s.resolveSchema(ctx, filteredSchema, f.SelectionSet)
+			introspectionResult[f.Alias] = resolveSchema(ctx, filteredSchema, f.SelectionSet)
 		}
 	}
 
 	return introspectionResult
 }
 
-func (s *ExecutableSchema) resolveSchema(ctx context.Context, schema *ast.Schema, selectionSet ast.SelectionSet) map[string]interface{} {
+func resolveSchema(ctx context.Context, schema *ast.Schema, selectionSet ast.SelectionSet) map[string]interface{} {
 	result := make(map[string]interface{})
 
 	for _, f := range selectionSetToFields(selectionSet) {
@@ -287,19 +287,19 @@ func (s *ExecutableSchema) resolveSchema(ctx context.Context, schema *ast.Schema
 		case "types":
 			types := []map[string]interface{}{}
 			for _, t := range schema.Types {
-				types = append(types, s.resolveType(ctx, schema, &ast.Type{NamedType: t.Name}, f.SelectionSet))
+				types = append(types, resolveType(ctx, schema, &ast.Type{NamedType: t.Name}, f.SelectionSet))
 			}
 			result[f.Alias] = types
 		case "queryType":
-			result[f.Alias] = s.resolveType(ctx, schema, &ast.Type{NamedType: "Query"}, f.SelectionSet)
+			result[f.Alias] = resolveType(ctx, schema, &ast.Type{NamedType: "Query"}, f.SelectionSet)
 		case "mutationType":
-			result[f.Alias] = s.resolveType(ctx, schema, &ast.Type{NamedType: "Mutation"}, f.SelectionSet)
+			result[f.Alias] = resolveType(ctx, schema, &ast.Type{NamedType: "Mutation"}, f.SelectionSet)
 		case "subscriptionType":
-			result[f.Alias] = s.resolveType(ctx, schema, &ast.Type{NamedType: "Subscription"}, f.SelectionSet)
+			result[f.Alias] = resolveType(ctx, schema, &ast.Type{NamedType: "Subscription"}, f.SelectionSet)
 		case "directives":
 			directives := []map[string]interface{}{}
-			for _, d := range s.Schema().Directives {
-				directives = append(directives, s.resolveDirective(ctx, schema, d, f.SelectionSet))
+			for _, d := range schema.Directives {
+				directives = append(directives, resolveDirective(ctx, schema, d, f.SelectionSet))
 			}
 			result[f.Alias] = directives
 		}
@@ -308,7 +308,7 @@ func (s *ExecutableSchema) resolveSchema(ctx context.Context, schema *ast.Schema
 	return result
 }
 
-func (s *ExecutableSchema) resolveType(ctx context.Context, schema *ast.Schema, typ *ast.Type, selectionSet ast.SelectionSet) map[string]interface{} {
+func resolveType(ctx context.Context, schema *ast.Schema, typ *ast.Type, selectionSet ast.SelectionSet) map[string]interface{} {
 	if typ == nil {
 		return nil
 	}
@@ -324,7 +324,7 @@ func (s *ExecutableSchema) resolveType(ctx context.Context, schema *ast.Schema, 
 			case "kind":
 				result[f.Alias] = "NON_NULL"
 			case "ofType":
-				result[f.Alias] = s.resolveType(ctx, schema, &ast.Type{
+				result[f.Alias] = resolveType(ctx, schema, &ast.Type{
 					NamedType: typ.NamedType,
 					Elem:      typ.Elem,
 					NonNull:   false,
@@ -342,7 +342,7 @@ func (s *ExecutableSchema) resolveType(ctx context.Context, schema *ast.Schema, 
 			case "kind":
 				result[f.Alias] = "LIST"
 			case "ofType":
-				result[f.Alias] = s.resolveType(ctx, schema, typ.Elem, f.SelectionSet)
+				result[f.Alias] = resolveType(ctx, schema, typ.Elem, f.SelectionSet)
 			default:
 				result[f.Alias] = nil
 			}
@@ -384,7 +384,7 @@ func (s *ExecutableSchema) resolveType(ctx context.Context, schema *ast.Schema, 
 						continue
 					}
 				}
-				fields = append(fields, s.resolveField(ctx, schema, fi, f.SelectionSet))
+				fields = append(fields, resolveField(ctx, schema, fi, f.SelectionSet))
 			}
 			result[f.Alias] = fields
 		case "description":
@@ -392,14 +392,14 @@ func (s *ExecutableSchema) resolveType(ctx context.Context, schema *ast.Schema, 
 		case "interfaces":
 			interfaces := []map[string]interface{}{}
 			for _, i := range namedType.Interfaces {
-				interfaces = append(interfaces, s.resolveType(ctx, schema, &ast.Type{NamedType: i}, f.SelectionSet))
+				interfaces = append(interfaces, resolveType(ctx, schema, &ast.Type{NamedType: i}, f.SelectionSet))
 			}
 			result[f.Alias] = interfaces
 		case "possibleTypes":
 			if len(namedType.Types) > 0 {
 				types := []map[string]interface{}{}
 				for _, t := range namedType.Types {
-					types = append(types, s.resolveType(ctx, schema, &ast.Type{NamedType: t}, f.SelectionSet))
+					types = append(types, resolveType(ctx, schema, &ast.Type{NamedType: t}, f.SelectionSet))
 				}
 				result[f.Alias] = types
 			} else {
@@ -421,7 +421,7 @@ func (s *ExecutableSchema) resolveType(ctx context.Context, schema *ast.Schema, 
 						continue
 					}
 				}
-				enums = append(enums, s.resolveEnumValue(e, f.SelectionSet))
+				enums = append(enums, resolveEnumValue(e, f.SelectionSet))
 			}
 			result[f.Alias] = enums
 		case "inputFields":
@@ -429,7 +429,7 @@ func (s *ExecutableSchema) resolveType(ctx context.Context, schema *ast.Schema, 
 			for _, fi := range namedType.Fields {
 				// call resolveField instead of resolveInputValue because it has
 				// the right type and is a superset of it
-				inputFields = append(inputFields, s.resolveField(ctx, schema, fi, f.SelectionSet))
+				inputFields = append(inputFields, resolveField(ctx, schema, fi, f.SelectionSet))
 			}
 			result[f.Alias] = inputFields
 		default:
@@ -440,7 +440,7 @@ func (s *ExecutableSchema) resolveType(ctx context.Context, schema *ast.Schema, 
 	return result
 }
 
-func (s *ExecutableSchema) resolveField(ctx context.Context, schema *ast.Schema, field *ast.FieldDefinition, selectionSet ast.SelectionSet) map[string]interface{} {
+func resolveField(ctx context.Context, schema *ast.Schema, field *ast.FieldDefinition, selectionSet ast.SelectionSet) map[string]interface{} {
 	result := make(map[string]interface{})
 
 	deprecated, deprecatedReason := hasDeprecatedDirective(field.Directives)
@@ -454,11 +454,11 @@ func (s *ExecutableSchema) resolveField(ctx context.Context, schema *ast.Schema,
 		case "args":
 			args := []map[string]interface{}{}
 			for _, arg := range field.Arguments {
-				args = append(args, s.resolveInputValue(ctx, schema, arg, f.SelectionSet))
+				args = append(args, resolveInputValue(ctx, schema, arg, f.SelectionSet))
 			}
 			result[f.Alias] = args
 		case "type":
-			result[f.Alias] = s.resolveType(ctx, schema, field.Type, f.SelectionSet)
+			result[f.Alias] = resolveType(ctx, schema, field.Type, f.SelectionSet)
 		case "isDeprecated":
 			result[f.Alias] = deprecated
 		case "deprecationReason":
@@ -469,7 +469,7 @@ func (s *ExecutableSchema) resolveField(ctx context.Context, schema *ast.Schema,
 	return result
 }
 
-func (s *ExecutableSchema) resolveInputValue(ctx context.Context, schema *ast.Schema, arg *ast.ArgumentDefinition, selectionSet ast.SelectionSet) map[string]interface{} {
+func resolveInputValue(ctx context.Context, schema *ast.Schema, arg *ast.ArgumentDefinition, selectionSet ast.SelectionSet) map[string]interface{} {
 	result := make(map[string]interface{})
 
 	for _, f := range selectionSetToFields(selectionSet) {
@@ -479,7 +479,7 @@ func (s *ExecutableSchema) resolveInputValue(ctx context.Context, schema *ast.Sc
 		case "description":
 			result[f.Alias] = arg.Description
 		case "type":
-			result[f.Alias] = s.resolveType(ctx, schema, arg.Type, f.SelectionSet)
+			result[f.Alias] = resolveType(ctx, schema, arg.Type, f.SelectionSet)
 		case "defaultValue":
 			if arg.DefaultValue != nil {
 				result[f.Alias] = arg.DefaultValue.String()
@@ -492,7 +492,7 @@ func (s *ExecutableSchema) resolveInputValue(ctx context.Context, schema *ast.Sc
 	return result
 }
 
-func (s *ExecutableSchema) resolveEnumValue(enum *ast.EnumValueDefinition, selectionSet ast.SelectionSet) map[string]interface{} {
+func resolveEnumValue(enum *ast.EnumValueDefinition, selectionSet ast.SelectionSet) map[string]interface{} {
 	result := make(map[string]interface{})
 
 	deprecated, deprecatedReason := hasDeprecatedDirective(enum.Directives)
@@ -513,7 +513,7 @@ func (s *ExecutableSchema) resolveEnumValue(enum *ast.EnumValueDefinition, selec
 	return result
 }
 
-func (s *ExecutableSchema) resolveDirective(ctx context.Context, schema *ast.Schema, directive *ast.DirectiveDefinition, selectionSet ast.SelectionSet) map[string]interface{} {
+func resolveDirective(ctx context.Context, schema *ast.Schema, directive *ast.DirectiveDefinition, selectionSet ast.SelectionSet) map[string]interface{} {
 	result := make(map[string]interface{})
 
 	for _, f := range selectionSetToFields(selectionSet) {
@@ -527,7 +527,7 @@ func (s *ExecutableSchema) resolveDirective(ctx context.Context, schema *ast.Sch
 		case "args":
 			args := []map[string]interface{}{}
 			for _, arg := range directive.Arguments {
-				args = append(args, s.resolveInputValue(ctx, schema, arg, f.SelectionSet))
+				args = append(args, resolveInputValue(ctx, schema, arg, f.SelectionSet))
 			}
 			result[f.Alias] = args
 		}
