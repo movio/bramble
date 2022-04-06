@@ -1,0 +1,48 @@
+version: "3"
+services:
+  gqlgen-server:
+    build:
+      context: examples/gqlgen-service
+    healthcheck:
+      test: curl --fail http://localhost:8080/health || exit 1
+      interval: 5s
+      timeout: 1s
+      retries: 5
+    expose:
+      - 8080
+  gophers-server:
+    healthcheck:
+      test: curl --fail http://localhost:8080/health || exit 1
+      interval: 5s
+      timeout: 1s
+      retries: 5
+    build:
+      context: examples/graph-gophers-service
+    expose:
+      - 8080
+  nodejs-server:
+    healthcheck:
+      test: curl --fail http://localhost:8080/health || exit 1
+      interval: 5s
+      timeout: 1s
+      retries: 5
+    build:
+      context: examples/nodejs-service
+    expose:
+      - 8080
+  gateway:
+    build:
+      context: .
+    volumes:
+      - ./examples/example-config.json:/config.json
+    ports:
+      - 8082:8082
+      - 8083:8083
+      - 8084:8084
+    depends_on:
+      gqlgen-server:
+        condition: service_healthy
+      gophers-server:
+        condition: service_healthy
+      nodejs-server:
+        condition: service_healthy
