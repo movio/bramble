@@ -1,5 +1,5 @@
 var express = require("express");
-var express_graphql = require("express-graphql");
+var { graphqlHTTP } = require('express-graphql');
 var { buildSchema } = require("graphql");
 var fs = require("fs").promises;
 
@@ -29,13 +29,17 @@ async function setup() {
 
   let app = express();
   app.use(
-    "/",
-    express_graphql({
+    "/query",
+    graphqlHTTP({
       schema: schema,
       rootValue: resolver,
       graphiql: true,
     })
   );
+
+  app.use('/health', (req, res) => {
+    res.send('OK')
+  });
 
   return app;
 }

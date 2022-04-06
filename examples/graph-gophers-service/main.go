@@ -2,6 +2,7 @@ package main
 
 import (
 	_ "embed"
+	"fmt"
 	"net/http"
 	"os"
 
@@ -27,6 +28,9 @@ func main() {
 
 	r := mux.NewRouter()
 	r.Handle("/query", &relay.Handler{Schema: parsedSchema})
+	r.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, "OK")
+	})
 
 	log.Printf("example graph-gophers-service running on http://localhost:%s/", port)
 	http.ListenAndServe(":"+port, r)

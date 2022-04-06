@@ -3,6 +3,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"math/rand"
 	"net/http"
@@ -32,6 +33,9 @@ func main() {
 		return next(ctx)
 	}
 	http.Handle("/query", handler.GraphQL(NewExecutableSchema(c)))
+	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, "OK")
+	})
 
 	log.Printf("example gqlgen-service running on http://localhost:%s/", port)
 	log.Fatal(http.ListenAndServe(":"+port, nil))

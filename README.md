@@ -27,7 +27,12 @@ It is also stateless and scales very easily.
 
 ## Future work/not currently supported
 
-There is currently no support for subscriptions.
+There is currently no support for:
+ 
+  - Subscriptions
+  - Shared unions, interfaces, scalars, enums or inputs across services
+
+Check FAQ for details: https://movio.github.io/bramble/#/federation?id=restriction-on-subscription
 
 ## Contributing
 
@@ -57,6 +62,26 @@ To run the tests:
 
 ```bash
 go test ./...
+```
+
+# Running locally
+
+There is a [docker-compose](./docker-compose.yaml) file that will run bramble and three [example](./examples) services.
+
+```
+docker-compose up
+```
+
+The gateway will then be hosted on `http://localhost:8082/query`, be sure to point a GraphQL client to this address.
+
+```graphql
+{
+  randomFoo {
+    nodejs
+    graphGophers
+    gqlgen
+  }
+}
 ```
 
 ## Comparison with other projects
