@@ -240,14 +240,7 @@ func (s *ExecutableSchema) ExecuteQuery(ctx context.Context) *graphql.Response {
 	timings["merge"] = time.Since(mergeStart).Round(time.Millisecond).String()
 
 	formattingStart := time.Now()
-	formattedResponse, err := formatResponseData(filteredSchema, operation.SelectionSet, mergedResult)
-	if err != nil {
-		errs = append(errs, &gqlerror.Error{Message: err.Error()})
-		AddField(ctx, "errors", errs)
-		return &graphql.Response{
-			Errors: errs,
-		}
-	}
+	formattedResponse := formatResponseData(filteredSchema, operation.SelectionSet, mergedResult)
 	timings["format"] = time.Since(formattingStart).Round(time.Millisecond).String()
 
 	if len(errs) > 0 {

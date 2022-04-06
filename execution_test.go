@@ -2653,8 +2653,7 @@ func TestUnionAndTrimSelectionSet(t *testing.T) {
 			},
 		}
 
-		filtered, err := unionAndTrimSelectionSet("", schema, selectionSet)
-		require.NoError(t, err)
+		filtered := unionAndTrimSelectionSet("", schema, selectionSet)
 		require.Equal(t, selectionSet, filtered)
 	})
 
@@ -2702,8 +2701,7 @@ func TestUnionAndTrimSelectionSet(t *testing.T) {
 			},
 		}
 
-		filtered, err := unionAndTrimSelectionSet("", schema, selectionSet)
-		require.NoError(t, err)
+		filtered := unionAndTrimSelectionSet("", schema, selectionSet)
 		require.Equal(t, formatSelectionSetSingleLine(ctx, schema, filtered), "{ name country { id name } }")
 	})
 
@@ -2790,8 +2788,7 @@ func TestUnionAndTrimSelectionSet(t *testing.T) {
 			},
 		}
 
-		filtered, err := unionAndTrimSelectionSet("GizmoImplementation", schema, initialSelectionSet)
-		require.NoError(t, err)
+		filtered := unionAndTrimSelectionSet("GizmoImplementation", schema, initialSelectionSet)
 		require.Equal(t, formatSelectionSetSingleLine(ctx, schema, expected), formatSelectionSetSingleLine(ctx, schema, filtered))
 	})
 
@@ -2844,8 +2841,7 @@ func TestUnionAndTrimSelectionSet(t *testing.T) {
 			},
 		}
 
-		filtered, err := unionAndTrimSelectionSet("GizmoImplementation", schema, initialSelectionSet)
-		require.NoError(t, err)
+		filtered := unionAndTrimSelectionSet("GizmoImplementation", schema, initialSelectionSet)
 		require.Equal(t, formatSelectionSetSingleLine(ctx, schema, expected), formatSelectionSetSingleLine(ctx, schema, filtered))
 	})
 
@@ -2910,8 +2906,7 @@ func TestUnionAndTrimSelectionSet(t *testing.T) {
 			},
 		}
 
-		filtered, err := unionAndTrimSelectionSet("GizmoImplementation", schema, initialSelectionSet)
-		require.NoError(t, err)
+		filtered := unionAndTrimSelectionSet("GizmoImplementation", schema, initialSelectionSet)
 		require.Equal(t, formatSelectionSetSingleLine(ctx, schema, expected), formatSelectionSetSingleLine(ctx, schema, filtered))
 	})
 
@@ -2958,8 +2953,7 @@ func TestUnionAndTrimSelectionSet(t *testing.T) {
 			},
 		}
 
-		filtered, err := unionAndTrimSelectionSet("Gadget", schema, initialSelectionSet)
-		require.NoError(t, err)
+		filtered := unionAndTrimSelectionSet("Gadget", schema, initialSelectionSet)
 		require.Equal(t, formatSelectionSetSingleLine(ctx, schema, expected), formatSelectionSetSingleLine(ctx, schema, filtered))
 	})
 }
@@ -3541,8 +3535,7 @@ func TestFormatResponseBody(t *testing.T) {
 			}`
 
 		document := gqlparser.MustLoadQuery(schema, query)
-		bodyJSON, err := formatResponseData(schema, document.Operations[0].SelectionSet, result)
-		require.NoError(t, err)
+		bodyJSON := formatResponseData(schema, document.Operations[0].SelectionSet, result)
 		require.JSONEq(t, expectedJSON, string(bodyJSON))
 	})
 
@@ -3598,8 +3591,7 @@ func TestFormatResponseBody(t *testing.T) {
 			}`
 
 		document := gqlparser.MustLoadQuery(schema, query)
-		bodyJSON, err := formatResponseData(schema, document.Operations[0].SelectionSet, result)
-		require.NoError(t, err)
+		bodyJSON := formatResponseData(schema, document.Operations[0].SelectionSet, result)
 		require.JSONEq(t, expectedJSON, string(bodyJSON))
 	})
 
@@ -3654,8 +3646,7 @@ func TestFormatResponseBody(t *testing.T) {
 			}`
 
 		document := gqlparser.MustLoadQuery(schema, query)
-		bodyJSON, err := formatResponseData(schema, document.Operations[0].SelectionSet, result)
-		require.NoError(t, err)
+		bodyJSON := formatResponseData(schema, document.Operations[0].SelectionSet, result)
 		require.JSONEq(t, expectedJSON, string(bodyJSON))
 	})
 
@@ -3732,8 +3723,7 @@ func TestFormatResponseBody(t *testing.T) {
 		}`
 
 		document := gqlparser.MustLoadQuery(schema, query)
-		bodyJSON, err := formatResponseData(schema, document.Operations[0].SelectionSet, result)
-		require.NoError(t, err)
+		bodyJSON := formatResponseData(schema, document.Operations[0].SelectionSet, result)
 		require.JSONEq(t, expectedJSON, string(bodyJSON))
 	})
 
@@ -3799,8 +3789,7 @@ func TestFormatResponseBody(t *testing.T) {
 		}`
 
 		document := gqlparser.MustLoadQuery(schema, query)
-		bodyJSON, err := formatResponseData(schema, document.Operations[0].SelectionSet, result)
-		require.NoError(t, err)
+		bodyJSON := formatResponseData(schema, document.Operations[0].SelectionSet, result)
 		require.JSONEq(t, expectedJSON, string(bodyJSON))
 	})
 
@@ -3875,8 +3864,7 @@ func TestFormatResponseBody(t *testing.T) {
 		}`
 
 		document := gqlparser.MustLoadQuery(schema, query)
-		bodyJSON, err := formatResponseData(schema, document.Operations[0].SelectionSet, result)
-		require.NoError(t, err)
+		bodyJSON := formatResponseData(schema, document.Operations[0].SelectionSet, result)
 		require.JSONEq(t, expectedJSON, string(bodyJSON))
 	})
 
@@ -3953,8 +3941,7 @@ func TestFormatResponseBody(t *testing.T) {
 		}`
 
 		document := gqlparser.MustLoadQuery(schema, query)
-		bodyJSON, err := formatResponseData(schema, document.Operations[0].SelectionSet, result)
-		require.NoError(t, err)
+		bodyJSON := formatResponseData(schema, document.Operations[0].SelectionSet, result)
 		require.JSONEq(t, expectedJSON, string(bodyJSON))
 	})
 }
