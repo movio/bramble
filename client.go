@@ -27,9 +27,12 @@ type ClientOpt func(*GraphQLClient)
 
 // NewClient creates a new GraphQLClient from the given options.
 func NewClient(opts ...ClientOpt) *GraphQLClient {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.IdleConnTimeout = 4 * time.Second
 	c := &GraphQLClient{
 		HTTPClient: &http.Client{
-			Timeout: 5 * time.Second,
+			Timeout:   5 * time.Second,
+			Transport: transport,
 		},
 		MaxResponseSize: 1024 * 1024,
 	}
