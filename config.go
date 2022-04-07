@@ -222,7 +222,7 @@ func GetConfig(configFiles []string) (*Config, error) {
 		PrivatePort:            8083,
 		MetricsPort:            9009,
 		LogLevel:               log.DebugLevel,
-		PollInterval:           "5s",
+		PollInterval:           "10s",
 		MaxRequestsPerQuery:    50,
 		MaxServiceResponseSize: 1024 * 1024,
 
