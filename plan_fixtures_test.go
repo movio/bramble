@@ -263,6 +263,39 @@ var PlanTestFixture6 = &PlanTestFixture{
 	},
 }
 
+var PlanTestFixture7 = &PlanTestFixture{
+	Schema: `
+		directive @boundary on OBJECT
+
+		interface Node {
+			id: ID!
+		}
+
+		type Dog {
+			name: String!
+			breed: Breed!
+		}
+		type Breed {
+			name: String!
+			origin: String!
+		}
+		union Animal = Dog
+
+		type Query {
+			animals: [Animal]!
+		}
+	`,
+
+	Locations: map[string]string{
+		"Query.animals": "A",
+		"Dog.name":      "A",
+		"Breed.name":    "B",
+		"Breed.origin":  "C",
+	},
+
+	IsBoundary: map[string]bool{},
+}
+
 func (f *PlanTestFixture) Plan(t *testing.T, query string) (*QueryPlan, error) {
 	t.Helper()
 	schema := gqlparser.MustLoadSchema(&ast.Source{Name: "fixture", Input: f.Schema})
@@ -310,6 +343,25 @@ func (f *PlanTestFixture) CheckUnorderedRootFieldSelections(t *testing.T, query 
 		}
 		assert.Equal(t, expectedSelection, foundSelection)
 	}
+}
+
+func (f *PlanTestFixture) CheckNilPointer(t *testing.T, query string) {
+	t.Helper()
+	schema := gqlparser.MustLoadSchema(&ast.Source{Name: "fixture", Input: f.Schema})
+	operation := gqlparser.MustLoadQuery(schema, query)
+	require.Len(t, operation.Operations, 1, "bad test: query must be a single operation")
+
+	// Force the schema query definition to be nil to simulate a down service
+	schema.Types[queryObjectName] = nil
+
+	_, err := Plan(&PlanningContext{operation.Operations[0], schema, f.Locations, f.IsBoundary, map[string]*Service{
+		"A": {Name: "A", ServiceURL: "A"},
+		"B": {Name: "B", ServiceURL: "B"},
+		"C": {Name: "C", ServiceURL: "C"},
+	}})
+
+	expectedErrorMsg := "definition is nil for parentType Query"
+	require.EqualErrorf(t, err, expectedErrorMsg, "Error should be: %v, got: %v", expectedErrorMsg, err)
 }
 
 type ByServiceURL []*QueryPlanStep
