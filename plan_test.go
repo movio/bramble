@@ -836,3 +836,19 @@ func TestQueryPlanValidateReservedIdAlias(t *testing.T) {
 func TestQueryPlanValidateReservedTypenameAlias(t *testing.T) {
 	PlanTestFixture1.CheckError(t, "{ movies { _bramble__typename: title } }")
 }
+
+func TestExtractSelectionSetNilParentDefinition(t *testing.T) {
+	query := `
+	query {
+		animals {
+			... on Dog {
+				name
+				breed {
+					name
+					origin
+				}
+			}
+		}
+	}`
+	PlanTestFixture7.CheckNilPointer(t, query)
+}
