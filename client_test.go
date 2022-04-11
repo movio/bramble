@@ -36,6 +36,23 @@ func TestGraphqlClient(t *testing.T) {
 		assert.Equal(t, "value", res.Root.Test)
 	})
 
+	t.Run("without keep-alive", func(t *testing.T) {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, "close", r.Header.Get("Connection"))
+			w.Write([]byte(`{
+				"data": {
+					"root": {
+						"test": "value"
+					}
+				}
+			}`))
+		}))
+
+		c := NewClientWithoutKeepAlive()
+		err := c.Request(context.Background(), srv.URL, &Request{}, nil)
+		assert.NoError(t, err)
+	})
+
 	t.Run("with http client", func(t *testing.T) {
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			cookie, err := r.Cookie("test_cookie")

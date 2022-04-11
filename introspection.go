@@ -24,7 +24,7 @@ type Service struct {
 func NewService(serviceURL string) *Service {
 	s := &Service{
 		ServiceURL: serviceURL,
-		client:     NewClient(WithUserAgent(GenerateUserAgent("update"))),
+		client:     NewClientWithoutKeepAlive(WithUserAgent(GenerateUserAgent("update"))),
 	}
 	return s
 }
