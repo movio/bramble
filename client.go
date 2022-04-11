@@ -41,6 +41,24 @@ func NewClient(opts ...ClientOpt) *GraphQLClient {
 	return c
 }
 
+func NewClientWithoutKeepAlive(opts ...ClientOpt) *GraphQLClient {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.DisableKeepAlives = true
+	c := &GraphQLClient{
+		HTTPClient: &http.Client{
+			Timeout:   5 * time.Second,
+			Transport: transport,
+		},
+		MaxResponseSize: 1024 * 1024,
+	}
+
+	for _, opt := range opts {
+		opt(c)
+	}
+
+	return c
+}
+
 // WithHTTPClient sets a custom HTTP client to be used when making downstream queries.
 func WithHTTPClient(client *http.Client) ClientOpt {
 	return func(s *GraphQLClient) {
