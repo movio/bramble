@@ -421,7 +421,7 @@ func TestFilterSchema(t *testing.T) {
 		`), formatSchema(filteredSchema))
 	})
 
-	t.Run(`union`, func(t *testing.T) {
+	t.Run(`union, allow all`, func(t *testing.T) {
 		perms := OperationPermissions{
 			AllowedRootQueryFields: AllowedFields{AllowedSubfields: map[string]AllowedFields{
 				"somethingRandom": {
@@ -446,6 +446,35 @@ func TestFilterSchema(t *testing.T) {
 				title: String
 				release: Year
 				compTitles: [Movie]
+			}
+
+			type Query {
+				somethingRandom: MovieOrCinema!
+			}
+		`), formatSchema(filteredSchema))
+	})
+
+	t.Run(`union`, func(t *testing.T) {
+		perms := OperationPermissions{
+			AllowedRootQueryFields: AllowedFields{AllowedSubfields: map[string]AllowedFields{
+				"somethingRandom": {
+					AllowedSubfields: map[string]AllowedFields{
+						"id": {},
+					},
+				},
+			},
+			},
+		}
+		filteredSchema := perms.FilterSchema(schema)
+		assert.Equal(t, loadAndFormatSchema(`
+			union MovieOrCinema = Movie | Cinema
+
+			type Cinema {
+				id: ID!
+			}
+
+			type Movie {
+				id: ID!
 			}
 
 			type Query {

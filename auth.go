@@ -180,7 +180,7 @@ func filterDefinition(sourceSchema *ast.Schema, visited map[string]bool, types m
 				// Node interface is not defined in the merged schema
 				continue
 			}
-			if typ.Kind == ast.Interface {
+			if typ.IsAbstractType() {
 				for _, pt := range sourceSchema.PossibleTypes[typ.Name] {
 					types[pt.Name] = pt
 					_ = filterDefinition(sourceSchema, visited, types, pt, AllowedFields{AllowAll: true})
@@ -192,12 +192,6 @@ func filterDefinition(sourceSchema *ast.Schema, visited map[string]bool, types m
 				_ = filterDefinition(sourceSchema, visited, types, sourceSchema.Types[a.Type.Name()], AllowedFields{AllowAll: true})
 			}
 			_ = filterDefinition(sourceSchema, visited, types, sourceSchema.Types[typeName], AllowedFields{AllowAll: true})
-		}
-
-		// unions
-		for _, t := range def.Types {
-			types[t] = sourceSchema.Types[t]
-			_ = filterDefinition(sourceSchema, visited, types, sourceSchema.Types[t], AllowedFields{AllowAll: true})
 		}
 
 		return &resDef
@@ -212,8 +206,8 @@ func filterDefinition(sourceSchema *ast.Schema, visited map[string]bool, types m
 				// Node interface is not defined in the merged schema
 				continue
 			}
-			// if the type is an interface we filter all the possible types
-			if typ.Kind == ast.Interface {
+			// if the type is abstract we filter all the possible types
+			if typ.IsAbstractType() {
 				for _, pt := range sourceSchema.PossibleTypes[typ.Name] {
 					newTypeDef := filterDefinition(sourceSchema, visited, types, pt, allowedSubFields)
 					if typeDef, ok := types[pt.Name]; ok {
