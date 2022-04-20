@@ -347,6 +347,31 @@ func TestIntrospectionQuery(t *testing.T) {
 		`, string(resp.Data))
 	})
 
+	t.Run("interface", func(t *testing.T) {
+		query := gqlparser.MustLoadQuery(es.MergedSchema, `
+		{
+			__type(name: "Person") {
+				possibleTypes {
+					name
+				}
+			}
+		}
+		`)
+		ctx := testContextWithoutVariables(query.Operations[0])
+		resp := es.ExecuteQuery(ctx)
+		require.JSONEq(t, `
+		{
+			"__type": {
+				"possibleTypes": [
+				{
+					"name": "Cast"
+				}
+				]
+			}
+		}
+		`, string(resp.Data))
+	})
+
 	t.Run("type referenced only through an interface", func(t *testing.T) {
 		query := gqlparser.MustLoadQuery(es.MergedSchema, `{
 			__type(name: "Cast") {

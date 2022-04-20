@@ -396,14 +396,14 @@ func resolveType(ctx context.Context, schema *ast.Schema, typ *ast.Type, selecti
 			}
 			result[f.Alias] = interfaces
 		case "possibleTypes":
-			if len(namedType.Types) > 0 {
+			if namedType.Kind != ast.Interface && namedType.Kind != ast.Union {
+				result[f.Alias] = nil
+			} else {
 				types := []map[string]interface{}{}
-				for _, t := range namedType.Types {
-					types = append(types, resolveType(ctx, schema, &ast.Type{NamedType: t}, f.SelectionSet))
+				for _, t := range schema.PossibleTypes[namedType.Name] {
+					types = append(types, resolveType(ctx, schema, &ast.Type{NamedType: t.Name}, f.SelectionSet))
 				}
 				result[f.Alias] = types
-			} else {
-				result[f.Alias] = nil
 			}
 		case "enumValues":
 			includeDeprecated := false
@@ -425,13 +425,17 @@ func resolveType(ctx context.Context, schema *ast.Schema, typ *ast.Type, selecti
 			}
 			result[f.Alias] = enums
 		case "inputFields":
-			inputFields := []map[string]interface{}{}
-			for _, fi := range namedType.Fields {
-				// call resolveField instead of resolveInputValue because it has
-				// the right type and is a superset of it
-				inputFields = append(inputFields, resolveField(ctx, schema, fi, f.SelectionSet))
+			if namedType.Kind == ast.InputObject {
+				inputFields := []map[string]interface{}{}
+				for _, fi := range namedType.Fields {
+					// call resolveField instead of resolveInputValue because it has
+					// the right type and is a superset of it
+					inputFields = append(inputFields, resolveField(ctx, schema, fi, f.SelectionSet))
+				}
+				result[f.Alias] = inputFields
+			} else {
+				result[f.Alias] = nil
 			}
-			result[f.Alias] = inputFields
 		default:
 			result[f.Alias] = nil
 		}
