@@ -52,7 +52,7 @@ func TestGatewayQuery(t *testing.T) {
 			assert.Equal(t, "Bramble/dev (query)", r.Header.Get("User-Agent"))
 		}
 	}))
-	client := NewClient(WithUserAgent(GenerateUserAgent("query")))
+	client := NewClient([]Plugin{}, WithUserAgent(GenerateUserAgent("query")))
 	executableSchema := NewExecutableSchema(nil, 50, client, NewService(server.URL))
 	err := executableSchema.UpdateSchema(true)
 	require.NoError(t, err)

@@ -21,7 +21,7 @@ func NewExecutableSchema(plugins []Plugin, maxRequestsPerQuery int64, client *Gr
 	}
 
 	if client == nil {
-		client = NewClient()
+		client = NewClient(plugins)
 	}
 
 	return &ExecutableSchema{

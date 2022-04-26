@@ -24,7 +24,7 @@ func TestGraphqlClient(t *testing.T) {
 			}`))
 		}))
 
-		c := NewClient()
+		c := NewClient([]Plugin{})
 		var res struct {
 			Root struct {
 				Test string
@@ -75,7 +75,7 @@ func TestGraphqlClient(t *testing.T) {
 		})
 
 		httpClient := &http.Client{Jar: jar}
-		c := NewClient(WithHTTPClient(httpClient))
+		c := NewClient([]Plugin{}, WithHTTPClient(httpClient))
 		var res interface{}
 		_ = c.Request(context.Background(), srv.URL, &Request{}, &res)
 	})
@@ -85,7 +85,7 @@ func TestGraphqlClient(t *testing.T) {
 			assert.Equal(t, "My User Agent", r.Header.Get("User-Agent"))
 		}))
 
-		c := NewClient(WithUserAgent("My User Agent"))
+		c := NewClient([]Plugin{}, WithUserAgent("My User Agent"))
 		var res interface{}
 		_ = c.Request(context.Background(), srv.URL, &Request{}, &res)
 	})
@@ -95,7 +95,7 @@ func TestGraphqlClient(t *testing.T) {
 			w.Write([]byte(`{ "data": "long response" }`))
 		}))
 
-		c := NewClient(WithMaxResponseSize(1))
+		c := NewClient([]Plugin{}, WithMaxResponseSize(1))
 		var res interface{}
 		err := c.Request(context.Background(), srv.URL, &Request{}, &res)
 		require.Error(t, err)

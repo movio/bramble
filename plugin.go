@@ -24,6 +24,7 @@ type Plugin interface {
 	GraphqlQueryPath() (bool, string)
 	ApplyMiddlewarePublicMux(http.Handler) http.Handler
 	ApplyMiddlewarePrivateMux(http.Handler) http.Handler
+	WrapGraphQLClientTransport(http.RoundTripper) http.RoundTripper
 }
 
 // BasePlugin is an empty plugin. It can be embedded by any plugin as a way to avoid
@@ -57,6 +58,11 @@ func (p *BasePlugin) ApplyMiddlewarePublicMux(h http.Handler) http.Handler {
 // ApplyMiddlewarePrivateMux ...
 func (p *BasePlugin) ApplyMiddlewarePrivateMux(h http.Handler) http.Handler {
 	return h
+}
+
+// WrapGraphQLClientTransport wraps the http.RoundTripper used for GraphQL requests.
+func (p *BasePlugin) WrapGraphQLClientTransport(transport http.RoundTripper) http.RoundTripper {
+	return transport
 }
 
 var registeredPlugins = map[string]Plugin{}
