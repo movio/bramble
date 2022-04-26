@@ -984,6 +984,59 @@ func TestFederatedQueryFragmentSpreads(t *testing.T) {
 		f.checkSuccess(t)
 	})
 
+	t.Run("with multiple top level fragment spreads (gadget implementation)", func(t *testing.T) {
+		f := &queryExecutionFixture{
+			services: []testService{serviceA, serviceB},
+			query: `
+			query Foo {
+				snapshot(id: "GADGET1") {
+					id
+					name
+					... GadgetFragment
+					... GizmoFragment
+				}
+			}
+
+			fragment GadgetFragment on GadgetImplementation {
+				gadgets {
+					id
+					name
+					agents {
+						name
+						... on Agent {
+							country
+						}
+					}
+				}
+			}
+
+			fragment GizmoFragment on GizmoImplementation {
+				gizmos {
+					id
+					name
+				}
+			}`,
+			expected: `
+			{
+				"snapshot": {
+					"id": "100",
+					"name": "foo",
+					"gadgets": [
+						{
+							"id": "GADGET1",
+							"name": "Gadget #1",
+							"agents": [
+								{"name": "James Bond", "country": "UK"}
+							]
+						}
+					]
+				}
+			}`,
+		}
+
+		f.checkSuccess(t)
+	})
+
 }
 
 func TestQueryExecutionMultipleServices(t *testing.T) {
