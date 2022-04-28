@@ -690,7 +690,7 @@ func (s *ExecutableSchema) evaluateSkipAndIncludeRec(vars map[string]interface{}
 					Name:             selection.Name,
 					Directives:       removeSkipAndInclude(selection.Directives),
 					Position:         selection.Position,
-					ObjectDefinition: selection.Definition.Definition,
+					ObjectDefinition: selection.ObjectDefinition,
 					Definition: &ast.FragmentDefinition{
 						Name:               selection.Definition.Name,
 						VariableDefinition: selection.Definition.VariableDefinition,

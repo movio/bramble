@@ -843,7 +843,7 @@ func unionAndTrimSelectionSetRec(objectTypename string, schema *ast.Schema, sele
 			fragment := selection
 			if fragment.ObjectDefinition.IsAbstractType() &&
 				fragmentImplementsAbstractType(schema, fragment.ObjectDefinition.Name, fragment.TypeCondition) &&
-				objectTypenameMatchesDifferentFragment(objectTypename, fragment) {
+				objectTypenameMatchesDifferentFragment(objectTypename, fragment.TypeCondition) {
 				continue
 			}
 
@@ -853,7 +853,18 @@ func unionAndTrimSelectionSetRec(objectTypename string, schema *ast.Schema, sele
 				filteredSelectionSet = append(filteredSelectionSet, selection)
 			}
 		case *ast.FragmentSpread:
-			filteredSelectionSet = append(filteredSelectionSet, selection)
+			fragment := selection
+			if fragment.ObjectDefinition.IsAbstractType() &&
+				fragmentImplementsAbstractType(schema, fragment.ObjectDefinition.Name, fragment.Definition.TypeCondition) &&
+				objectTypenameMatchesDifferentFragment(objectTypename, fragment.Definition.TypeCondition) {
+				continue
+			}
+
+			filteredSelections := unionAndTrimSelectionSetRec(objectTypename, schema, fragment.Definition.SelectionSet, seenFields)
+			if len(filteredSelections) > 0 {
+				fragment.Definition.SelectionSet = filteredSelections
+				filteredSelectionSet = append(filteredSelectionSet, selection)
+			}
 		}
 	}
 
@@ -869,6 +880,6 @@ func extractAndCastTypenameField(result map[string]interface{}) string {
 	return typeNameInterface.(string)
 }
 
-func objectTypenameMatchesDifferentFragment(typename string, fragment *ast.InlineFragment) bool {
-	return fragment.TypeCondition != typename
+func objectTypenameMatchesDifferentFragment(typename, fragmentTypeCondition string) bool {
+	return fragmentTypeCondition != typename
 }
