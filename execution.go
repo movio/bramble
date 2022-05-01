@@ -138,6 +138,10 @@ func (s *ExecutableSchema) ExecuteQuery(ctx context.Context) *graphql.Response {
 	operation := operationCtx.Operation
 	variables := operationCtx.Variables
 
+	for _, plugin := range s.plugins {
+		plugin.InterceptRequest(ctx, operation.Name, operationCtx.RawQuery, variables)
+	}
+
 	AddField(ctx, "operation.name", operation.Name)
 	AddField(ctx, "operation.type", operation.Operation)
 
