@@ -1,6 +1,7 @@
 package bramble
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 
@@ -24,6 +25,9 @@ type Plugin interface {
 	GraphqlQueryPath() (bool, string)
 	ApplyMiddlewarePublicMux(http.Handler) http.Handler
 	ApplyMiddlewarePrivateMux(http.Handler) http.Handler
+	WrapGraphQLClientTransport(http.RoundTripper) http.RoundTripper
+
+	InterceptRequest(ctx context.Context, operationName, rawQuery string, variables map[string]interface{})
 }
 
 // BasePlugin is an empty plugin. It can be embedded by any plugin as a way to avoid
@@ -49,6 +53,11 @@ func (p *BasePlugin) GraphqlQueryPath() (bool, string) {
 	return false, ""
 }
 
+// InterceptRequest is called before bramble starts executing a request.
+// It can be used to inspect the unmarshalled GraphQL request bramble receives.
+func (p *BasePlugin) InterceptRequest(ctx context.Context, operationName, rawQuery string, variables map[string]interface{}) {
+}
+
 // ApplyMiddlewarePublicMux ...
 func (p *BasePlugin) ApplyMiddlewarePublicMux(h http.Handler) http.Handler {
 	return h
@@ -57,6 +66,11 @@ func (p *BasePlugin) ApplyMiddlewarePublicMux(h http.Handler) http.Handler {
 // ApplyMiddlewarePrivateMux ...
 func (p *BasePlugin) ApplyMiddlewarePrivateMux(h http.Handler) http.Handler {
 	return h
+}
+
+// WrapGraphQLClientTransport wraps the http.RoundTripper used for GraphQL requests.
+func (p *BasePlugin) WrapGraphQLClientTransport(transport http.RoundTripper) http.RoundTripper {
+	return transport
 }
 
 var registeredPlugins = map[string]Plugin{}

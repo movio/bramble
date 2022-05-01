@@ -27,6 +27,10 @@ type ClientOpt func(*GraphQLClient)
 
 // NewClient creates a new GraphQLClient from the given options.
 func NewClient(opts ...ClientOpt) *GraphQLClient {
+	return NewClientWithPlugins(nil, opts...)
+}
+
+func NewClientWithPlugins(plugins []Plugin, opts ...ClientOpt) *GraphQLClient {
 	c := &GraphQLClient{
 		HTTPClient: &http.Client{
 			Timeout: 5 * time.Second,
@@ -38,6 +42,9 @@ func NewClient(opts ...ClientOpt) *GraphQLClient {
 		opt(c)
 	}
 
+	for _, plugin := range plugins {
+		c.HTTPClient.Transport = plugin.WrapGraphQLClientTransport(c.HTTPClient.Transport)
+	}
 	return c
 }
 
