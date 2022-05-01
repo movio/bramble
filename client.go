@@ -26,7 +26,11 @@ type GraphQLClient struct {
 type ClientOpt func(*GraphQLClient)
 
 // NewClient creates a new GraphQLClient from the given options.
-func NewClient(plugins []Plugin, opts ...ClientOpt) *GraphQLClient {
+func NewClient(opts ...ClientOpt) *GraphQLClient {
+	return NewClientWithPlugins(nil, opts...)
+}
+
+func NewClientWithPlugins(plugins []Plugin, opts ...ClientOpt) *GraphQLClient {
 	c := &GraphQLClient{
 		HTTPClient: &http.Client{
 			Timeout: 5 * time.Second,
