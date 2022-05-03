@@ -831,23 +831,25 @@ func eliminateUnwantedFragments(responseObjectTypeName string, schema *ast.Schem
 	var filteredSelectionSet ast.SelectionSet
 
 	for _, selection := range selectionSet {
+		var (
+			fragmentObjectDefinition *ast.Definition
+			fragmentTypeCondition    string
+		)
 		switch selection := selection.(type) {
 		case *ast.Field:
 			filteredSelectionSet = append(filteredSelectionSet, selection)
 
 		case *ast.InlineFragment:
-			fragment := selection
-			if shouldEliminateFragment(responseObjectTypeName, schema, fragment.ObjectDefinition, fragment.TypeCondition) {
-				continue
-			}
-			filteredSelectionSet = append(filteredSelectionSet, fragment)
+			fragmentObjectDefinition = selection.ObjectDefinition
+			fragmentTypeCondition = selection.TypeCondition
 
 		case *ast.FragmentSpread:
-			fragment := selection
-			if shouldEliminateFragment(responseObjectTypeName, schema, fragment.ObjectDefinition, fragment.Definition.TypeCondition) {
-				continue
-			}
-			filteredSelectionSet = append(filteredSelectionSet, fragment)
+			fragmentObjectDefinition = selection.ObjectDefinition
+			fragmentTypeCondition = selection.Definition.TypeCondition
+		}
+
+		if fragmentObjectDefinition != nil && includeFragment(responseObjectTypeName, schema, fragmentObjectDefinition, fragmentTypeCondition) {
+			filteredSelectionSet = append(filteredSelectionSet, selection)
 		}
 	}
 
@@ -855,13 +857,10 @@ func eliminateUnwantedFragments(responseObjectTypeName string, schema *ast.Schem
 
 }
 
-func shouldEliminateFragment(responseObjectTypeName string, schema *ast.Schema, objectDefinition *ast.Definition, typeCondition string) bool {
-	if objectDefinition.IsAbstractType() &&
+func includeFragment(responseObjectTypeName string, schema *ast.Schema, objectDefinition *ast.Definition, typeCondition string) bool {
+	return !(objectDefinition.IsAbstractType() &&
 		fragmentImplementsAbstractType(schema, objectDefinition.Name, typeCondition) &&
-		objectTypenameMatchesDifferentFragment(responseObjectTypeName, typeCondition) {
-		return true
-	}
-	return false
+		objectTypenameMatchesDifferentFragment(responseObjectTypeName, typeCondition))
 }
 
 func mergeWithTopLevelFragmentFields(selectionSet ast.SelectionSet) ast.SelectionSet {
