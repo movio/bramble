@@ -822,41 +822,46 @@ func formatResponseDataRec(schema *ast.Schema, selectionSet ast.SelectionSet, re
 //   1. the selection set of the target fragment has to be unioned with the selection set at the level for which the target fragment is referenced
 //   2. if the target fragments are an implementation of an abstract type, we need to use the __typename from the response body to check which
 //   implementation was resolved. Any fragments that do not match are dropped from the selection set.
-func unionAndTrimSelectionSet(objectTypename string, schema *ast.Schema, selectionSet ast.SelectionSet) ast.SelectionSet {
-	filteredSelectionSet := eliminateUnwantedFragments(objectTypename, schema, selectionSet)
-	return mergeSelectionSetWithTopLevelFragments(filteredSelectionSet)
+func unionAndTrimSelectionSet(responseObjectTypeName string, schema *ast.Schema, selectionSet ast.SelectionSet) ast.SelectionSet {
+	filteredSelectionSet := eliminateUnwantedFragments(responseObjectTypeName, schema, selectionSet)
+	return mergeWithTopLevelFragmentFields(filteredSelectionSet)
 }
 
-func eliminateUnwantedFragments(objectTypename string, schema *ast.Schema, selectionSet ast.SelectionSet) ast.SelectionSet {
+func eliminateUnwantedFragments(responseObjectTypeName string, schema *ast.Schema, selectionSet ast.SelectionSet) ast.SelectionSet {
 	var filteredSelectionSet ast.SelectionSet
 
 	for _, selection := range selectionSet {
 		switch selection := selection.(type) {
 		case *ast.Field:
 			filteredSelectionSet = append(filteredSelectionSet, selection)
+
 		case *ast.InlineFragment:
 			fragment := selection
-			if fragment.ObjectDefinition.IsAbstractType() &&
-				fragmentImplementsAbstractType(schema, fragment.ObjectDefinition.Name, fragment.TypeCondition) &&
-				objectTypenameMatchesDifferentFragment(objectTypename, fragment.TypeCondition) {
+			if shouldEliminateFragment(responseObjectTypeName, schema, fragment.ObjectDefinition, fragment.TypeCondition) {
 				continue
 			}
-
 			filteredSelectionSet = append(filteredSelectionSet, fragment)
+
 		case *ast.FragmentSpread:
 			fragment := selection
-
-			if fragment.ObjectDefinition.IsAbstractType() &&
-				fragmentImplementsAbstractType(schema, fragment.ObjectDefinition.Name, fragment.Definition.TypeCondition) &&
-				objectTypenameMatchesDifferentFragment(objectTypename, fragment.Definition.TypeCondition) {
+			if shouldEliminateFragment(responseObjectTypeName, schema, fragment.ObjectDefinition, fragment.Definition.TypeCondition) {
 				continue
 			}
-
 			filteredSelectionSet = append(filteredSelectionSet, fragment)
 		}
 	}
 
 	return filteredSelectionSet
+
+}
+
+func shouldEliminateFragment(responseObjectTypeName string, schema *ast.Schema, objectDefinition *ast.Definition, typeCondition string) bool {
+	if objectDefinition.IsAbstractType() &&
+		fragmentImplementsAbstractType(schema, objectDefinition.Name, typeCondition) &&
+		objectTypenameMatchesDifferentFragment(responseObjectTypeName, typeCondition) {
+		return true
+	}
+	return false
 }
 
 func mergeWithTopLevelFragmentFields(selectionSet ast.SelectionSet) ast.SelectionSet {
