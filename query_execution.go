@@ -823,22 +823,17 @@ func formatResponseDataRec(schema *ast.Schema, selectionSet ast.SelectionSet, re
 //   2. if the target fragments are an implementation of an abstract type, we need to use the __typename from the response body to check which
 //   implementation was resolved. Any fragments that do not match are dropped from the selection set.
 func unionAndTrimSelectionSet(objectTypename string, schema *ast.Schema, selectionSet ast.SelectionSet) ast.SelectionSet {
-	return unionAndTrimSelectionSetRec(objectTypename, schema, selectionSet, map[string]*ast.Field{})
+	filteredSelectionSet := eliminateUnwantedFragments(objectTypename, schema, selectionSet)
+	return mergeSelectionSetWithTopLevelFragments(filteredSelectionSet)
 }
 
-func unionAndTrimSelectionSetRec(objectTypename string, schema *ast.Schema, selectionSet ast.SelectionSet, seenFields map[string]*ast.Field) ast.SelectionSet {
+func eliminateUnwantedFragments(objectTypename string, schema *ast.Schema, selectionSet ast.SelectionSet) ast.SelectionSet {
 	var filteredSelectionSet ast.SelectionSet
+
 	for _, selection := range selectionSet {
 		switch selection := selection.(type) {
 		case *ast.Field:
-			if seenField, ok := seenFields[selection.Alias]; ok {
-				if seenField.Name == selection.Name && seenField.SelectionSet != nil && selection.SelectionSet != nil {
-					seenField.SelectionSet = append(seenField.SelectionSet, selection.SelectionSet...)
-				}
-			} else {
-				seenFields[selection.Alias] = selection
-				filteredSelectionSet = append(filteredSelectionSet, selection)
-			}
+			filteredSelectionSet = append(filteredSelectionSet, selection)
 		case *ast.InlineFragment:
 			fragment := selection
 			if fragment.ObjectDefinition.IsAbstractType() &&
@@ -847,24 +842,100 @@ func unionAndTrimSelectionSetRec(objectTypename string, schema *ast.Schema, sele
 				continue
 			}
 
-			filteredSelections := unionAndTrimSelectionSetRec(objectTypename, schema, fragment.SelectionSet, seenFields)
-			if len(filteredSelections) > 0 {
-				fragment.SelectionSet = filteredSelections
-				filteredSelectionSet = append(filteredSelectionSet, selection)
-			}
+			filteredSelectionSet = append(filteredSelectionSet, fragment)
 		case *ast.FragmentSpread:
 			fragment := selection
+
 			if fragment.ObjectDefinition.IsAbstractType() &&
 				fragmentImplementsAbstractType(schema, fragment.ObjectDefinition.Name, fragment.Definition.TypeCondition) &&
 				objectTypenameMatchesDifferentFragment(objectTypename, fragment.Definition.TypeCondition) {
 				continue
 			}
 
-			filteredSelections := unionAndTrimSelectionSetRec(objectTypename, schema, fragment.Definition.SelectionSet, seenFields)
-			if len(filteredSelections) > 0 {
-				fragment.Definition.SelectionSet = filteredSelections
+			filteredSelectionSet = append(filteredSelectionSet, fragment)
+		}
+	}
+
+	return filteredSelectionSet
+}
+
+func mergeWithTopLevelFragmentFields(selectionSet ast.SelectionSet) ast.SelectionSet {
+	merged := newSelectionSetMerger()
+
+	for _, selection := range selectionSet {
+		switch selection := selection.(type) {
+		case *ast.Field:
+			merged.addField(selection)
+		case *ast.InlineFragment:
+			fragment := selection
+			merged.addInlineFragment(fragment)
+		case *ast.FragmentSpread:
+			fragment := selection
+			merged.addFragmentSpread(fragment)
+		}
+	}
+
+	return merged.selectionSet
+}
+
+type selectionSetMerger struct {
+	selectionSet ast.SelectionSet
+	seenFields   map[string]*ast.Field
+}
+
+func newSelectionSetMerger() *selectionSetMerger {
+	return &selectionSetMerger{
+		selectionSet: []ast.Selection{},
+		seenFields:   make(map[string]*ast.Field),
+	}
+}
+
+func (s *selectionSetMerger) addField(field *ast.Field) {
+	shouldAppend := s.shouldAppendField(field)
+	if shouldAppend {
+		s.selectionSet = append(s.selectionSet, field)
+	}
+}
+
+func (s *selectionSetMerger) shouldAppendField(field *ast.Field) bool {
+	if seenField, ok := s.seenFields[field.Alias]; ok {
+		if seenField.Name == field.Name && seenField.SelectionSet != nil && field.SelectionSet != nil {
+			seenField.SelectionSet = append(seenField.SelectionSet, field.SelectionSet...)
+		}
+		return false
+	} else {
+		s.seenFields[field.Alias] = field
+		return true
+	}
+}
+
+func (s *selectionSetMerger) addInlineFragment(fragment *ast.InlineFragment) {
+	dedupedSelectionSet := s.dedupeFragmentSelectionSet(fragment.SelectionSet)
+	if len(dedupedSelectionSet) > 0 {
+		fragment.SelectionSet = dedupedSelectionSet
+		s.selectionSet = append(s.selectionSet, fragment)
+	}
+}
+
+func (s *selectionSetMerger) addFragmentSpread(fragment *ast.FragmentSpread) {
+	dedupedSelectionSet := s.dedupeFragmentSelectionSet(fragment.Definition.SelectionSet)
+	if len(dedupedSelectionSet) > 0 {
+		fragment.Definition.SelectionSet = dedupedSelectionSet
+		s.selectionSet = append(s.selectionSet, fragment)
+	}
+}
+
+func (s *selectionSetMerger) dedupeFragmentSelectionSet(selectionSet ast.SelectionSet) ast.SelectionSet {
+	var filteredSelectionSet ast.SelectionSet
+	for _, selection := range selectionSet {
+		switch selection := selection.(type) {
+		case *ast.Field:
+			shouldAppend := s.shouldAppendField(selection)
+			if shouldAppend {
 				filteredSelectionSet = append(filteredSelectionSet, selection)
 			}
+		case *ast.InlineFragment, *ast.FragmentSpread:
+			filteredSelectionSet = append(filteredSelectionSet, selection)
 		}
 	}
 
