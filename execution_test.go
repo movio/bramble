@@ -652,6 +652,7 @@ func TestFederatedQueryFragmentSpreads(t *testing.T) {
 
 		type Query {
 			snapshot(id: ID!): Snapshot!
+			snapshots: [Snapshot!]!
 		}`,
 		handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			body, _ := io.ReadAll(r.Body)
@@ -667,7 +668,7 @@ func TestFederatedQueryFragmentSpreads(t *testing.T) {
 						}
 					}
 				}`))
-			} else {
+			} else if strings.Contains(string(body), "GADGET1") {
 				w.Write([]byte(`
 				{
 					"data": {
@@ -677,6 +678,27 @@ func TestFederatedQueryFragmentSpreads(t *testing.T) {
 							"gadgets": [{ "_bramble_id": "GADGET1", "id": "GADGET1" }],
 							"_bramble__typename": "GadgetImplementation"
 						}
+					}
+				}`))
+
+			} else {
+				w.Write([]byte(`
+				{
+					"data": {
+						"snapshots": [
+							{
+								"id": "100",
+								"name": "foo",
+								"gadgets": [{ "_bramble_id": "GADGET1", "id": "GADGET1" }],
+								"_bramble__typename": "GadgetImplementation"
+							},
+							{
+								"id": "100",
+								"name": "foo",
+								"gizmos": [{ "_bramble_id": "GIZMO1", "id": "GIZMO1" }],
+								"_bramble__typename": "GizmoImplementation"
+							}
+						]
 					}
 				}`))
 
@@ -1037,6 +1059,49 @@ func TestFederatedQueryFragmentSpreads(t *testing.T) {
 		f.checkSuccess(t)
 	})
 
+	t.Run("with nested abstract fragment spreads", func(t *testing.T) {
+		f := &queryExecutionFixture{
+			services: []testService{serviceA, serviceB},
+			query: `
+			query Foo {
+				snapshots {
+					...SnapshotFragment
+				}
+			}
+
+			fragment SnapshotFragment on Snapshot {
+				id
+				name
+				... on GadgetImplementation {
+					gadgets {
+						id
+						name
+					}
+				}
+			}`,
+			expected: `
+			{
+				"snapshots": [
+					{
+						"id": "100",
+						"name": "foo",
+						"gadgets": [
+							{
+								"id": "GADGET1",
+								"name": "Gadget #1"
+							}
+						]
+					},
+					{
+						"id": "100",
+						"name": "foo"
+					}
+				]
+			}`,
+		}
+
+		f.checkSuccess(t)
+	})
 }
 
 func TestQueryExecutionMultipleServices(t *testing.T) {

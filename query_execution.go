@@ -822,49 +822,124 @@ func formatResponseDataRec(schema *ast.Schema, selectionSet ast.SelectionSet, re
 //   1. the selection set of the target fragment has to be unioned with the selection set at the level for which the target fragment is referenced
 //   2. if the target fragments are an implementation of an abstract type, we need to use the __typename from the response body to check which
 //   implementation was resolved. Any fragments that do not match are dropped from the selection set.
-func unionAndTrimSelectionSet(objectTypename string, schema *ast.Schema, selectionSet ast.SelectionSet) ast.SelectionSet {
-	return unionAndTrimSelectionSetRec(objectTypename, schema, selectionSet, map[string]*ast.Field{})
+func unionAndTrimSelectionSet(responseObjectTypeName string, schema *ast.Schema, selectionSet ast.SelectionSet) ast.SelectionSet {
+	filteredSelectionSet := eliminateUnwantedFragments(responseObjectTypeName, schema, selectionSet)
+	return mergeWithTopLevelFragmentFields(filteredSelectionSet)
 }
 
-func unionAndTrimSelectionSetRec(objectTypename string, schema *ast.Schema, selectionSet ast.SelectionSet, seenFields map[string]*ast.Field) ast.SelectionSet {
+func eliminateUnwantedFragments(responseObjectTypeName string, schema *ast.Schema, selectionSet ast.SelectionSet) ast.SelectionSet {
+	var filteredSelectionSet ast.SelectionSet
+
+	for _, selection := range selectionSet {
+		var (
+			fragmentObjectDefinition *ast.Definition
+			fragmentTypeCondition    string
+		)
+		switch selection := selection.(type) {
+		case *ast.Field:
+			filteredSelectionSet = append(filteredSelectionSet, selection)
+
+		case *ast.InlineFragment:
+			fragmentObjectDefinition = selection.ObjectDefinition
+			fragmentTypeCondition = selection.TypeCondition
+
+		case *ast.FragmentSpread:
+			fragmentObjectDefinition = selection.ObjectDefinition
+			fragmentTypeCondition = selection.Definition.TypeCondition
+		}
+
+		if fragmentObjectDefinition != nil && includeFragment(responseObjectTypeName, schema, fragmentObjectDefinition, fragmentTypeCondition) {
+			filteredSelectionSet = append(filteredSelectionSet, selection)
+		}
+	}
+
+	return filteredSelectionSet
+
+}
+
+func includeFragment(responseObjectTypeName string, schema *ast.Schema, objectDefinition *ast.Definition, typeCondition string) bool {
+	return !(objectDefinition.IsAbstractType() &&
+		fragmentImplementsAbstractType(schema, objectDefinition.Name, typeCondition) &&
+		objectTypenameMatchesDifferentFragment(responseObjectTypeName, typeCondition))
+}
+
+func mergeWithTopLevelFragmentFields(selectionSet ast.SelectionSet) ast.SelectionSet {
+	merged := newSelectionSetMerger()
+
+	for _, selection := range selectionSet {
+		switch selection := selection.(type) {
+		case *ast.Field:
+			merged.addField(selection)
+		case *ast.InlineFragment:
+			fragment := selection
+			merged.addInlineFragment(fragment)
+		case *ast.FragmentSpread:
+			fragment := selection
+			merged.addFragmentSpread(fragment)
+		}
+	}
+
+	return merged.selectionSet
+}
+
+type selectionSetMerger struct {
+	selectionSet ast.SelectionSet
+	seenFields   map[string]*ast.Field
+}
+
+func newSelectionSetMerger() *selectionSetMerger {
+	return &selectionSetMerger{
+		selectionSet: []ast.Selection{},
+		seenFields:   make(map[string]*ast.Field),
+	}
+}
+
+func (s *selectionSetMerger) addField(field *ast.Field) {
+	shouldAppend := s.shouldAppendField(field)
+	if shouldAppend {
+		s.selectionSet = append(s.selectionSet, field)
+	}
+}
+
+func (s *selectionSetMerger) shouldAppendField(field *ast.Field) bool {
+	if seenField, ok := s.seenFields[field.Alias]; ok {
+		if seenField.Name == field.Name && seenField.SelectionSet != nil && field.SelectionSet != nil {
+			seenField.SelectionSet = append(seenField.SelectionSet, field.SelectionSet...)
+		}
+		return false
+	} else {
+		s.seenFields[field.Alias] = field
+		return true
+	}
+}
+
+func (s *selectionSetMerger) addInlineFragment(fragment *ast.InlineFragment) {
+	dedupedSelectionSet := s.dedupeFragmentSelectionSet(fragment.SelectionSet)
+	if len(dedupedSelectionSet) > 0 {
+		fragment.SelectionSet = dedupedSelectionSet
+		s.selectionSet = append(s.selectionSet, fragment)
+	}
+}
+
+func (s *selectionSetMerger) addFragmentSpread(fragment *ast.FragmentSpread) {
+	dedupedSelectionSet := s.dedupeFragmentSelectionSet(fragment.Definition.SelectionSet)
+	if len(dedupedSelectionSet) > 0 {
+		fragment.Definition.SelectionSet = dedupedSelectionSet
+		s.selectionSet = append(s.selectionSet, fragment)
+	}
+}
+
+func (s *selectionSetMerger) dedupeFragmentSelectionSet(selectionSet ast.SelectionSet) ast.SelectionSet {
 	var filteredSelectionSet ast.SelectionSet
 	for _, selection := range selectionSet {
 		switch selection := selection.(type) {
 		case *ast.Field:
-			if seenField, ok := seenFields[selection.Alias]; ok {
-				if seenField.Name == selection.Name && seenField.SelectionSet != nil && selection.SelectionSet != nil {
-					seenField.SelectionSet = append(seenField.SelectionSet, selection.SelectionSet...)
-				}
-			} else {
-				seenFields[selection.Alias] = selection
+			shouldAppend := s.shouldAppendField(selection)
+			if shouldAppend {
 				filteredSelectionSet = append(filteredSelectionSet, selection)
 			}
-		case *ast.InlineFragment:
-			fragment := selection
-			if fragment.ObjectDefinition.IsAbstractType() &&
-				fragmentImplementsAbstractType(schema, fragment.ObjectDefinition.Name, fragment.TypeCondition) &&
-				objectTypenameMatchesDifferentFragment(objectTypename, fragment.TypeCondition) {
-				continue
-			}
-
-			filteredSelections := unionAndTrimSelectionSetRec(objectTypename, schema, fragment.SelectionSet, seenFields)
-			if len(filteredSelections) > 0 {
-				fragment.SelectionSet = filteredSelections
-				filteredSelectionSet = append(filteredSelectionSet, selection)
-			}
-		case *ast.FragmentSpread:
-			fragment := selection
-			if fragment.ObjectDefinition.IsAbstractType() &&
-				fragmentImplementsAbstractType(schema, fragment.ObjectDefinition.Name, fragment.Definition.TypeCondition) &&
-				objectTypenameMatchesDifferentFragment(objectTypename, fragment.Definition.TypeCondition) {
-				continue
-			}
-
-			filteredSelections := unionAndTrimSelectionSetRec(objectTypename, schema, fragment.Definition.SelectionSet, seenFields)
-			if len(filteredSelections) > 0 {
-				fragment.Definition.SelectionSet = filteredSelections
-				filteredSelectionSet = append(filteredSelectionSet, selection)
-			}
+		case *ast.InlineFragment, *ast.FragmentSpread:
+			filteredSelectionSet = append(filteredSelectionSet, selection)
 		}
 	}
 
