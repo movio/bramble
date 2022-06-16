@@ -1,739 +1,960 @@
 package bramble
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"log"
+	"sort"
+	"strings"
 	"sync"
-	"time"
+	"sync/atomic"
 
-	"github.com/99designs/gqlgen/graphql"
-	log "github.com/sirupsen/logrus"
 	"github.com/vektah/gqlparser/v2/ast"
 	"github.com/vektah/gqlparser/v2/gqlerror"
+	"golang.org/x/sync/errgroup"
 )
 
-func NewExecutableSchema(plugins []Plugin, maxRequestsPerQuery int64, client *GraphQLClient, services ...*Service) *ExecutableSchema {
-	serviceMap := make(map[string]*Service)
+var (
+	errNullBubbledToRoot = errors.New("bubbleUpNullValuesInPlace: null bubbled up to root")
+)
 
-	for _, s := range services {
-		serviceMap[s.ServiceURL] = s
-	}
+type executionResult struct {
+	ServiceURL     string
+	InsertionPoint []string
+	Data           interface{}
+	Errors         gqlerror.List
+}
 
-	if client == nil {
-		client = NewClientWithPlugins(plugins)
-	}
+type queryExecution struct {
+	ctx            context.Context
+	schema         *ast.Schema
+	requestCount   int32
+	maxRequest     int32
+	graphqlClient  *GraphQLClient
+	boundaryFields BoundaryFieldsMap
 
-	return &ExecutableSchema{
-		Services: serviceMap,
+	group   *errgroup.Group
+	results chan executionResult
+}
 
-		GraphqlClient:       client,
-		plugins:             plugins,
-		MaxRequestsPerQuery: maxRequestsPerQuery,
+func newQueryExecution(ctx context.Context, client *GraphQLClient, schema *ast.Schema, boundaryFields BoundaryFieldsMap, maxRequest int32) *queryExecution {
+	group, ctx := errgroup.WithContext(ctx)
+	return &queryExecution{
+		ctx:            ctx,
+		schema:         schema,
+		graphqlClient:  client,
+		boundaryFields: boundaryFields,
+		maxRequest:     maxRequest,
+		group:          group,
+		results:        make(chan executionResult),
 	}
 }
 
-// ExecutableSchema contains all the necessary information to execute queries
-type ExecutableSchema struct {
-	MergedSchema        *ast.Schema
-	Locations           FieldURLMap
-	IsBoundary          map[string]bool
-	Services            map[string]*Service
-	BoundaryQueries     BoundaryFieldsMap
-	GraphqlClient       *GraphQLClient
-	MaxRequestsPerQuery int64
+func (q *queryExecution) Execute(queryPlan *QueryPlan) ([]executionResult, gqlerror.List) {
+	wg := &sync.WaitGroup{}
+	results := []executionResult{}
 
-	mutex   sync.RWMutex
-	plugins []Plugin
-}
-
-// UpdateServiceList replaces the list of services with the provided one and
-// update the schema.
-func (s *ExecutableSchema) UpdateServiceList(services []string) error {
-	newServices := make(map[string]*Service)
-	for _, svcURL := range services {
-		if svc, ok := s.Services[svcURL]; ok {
-			newServices[svcURL] = svc
-		} else {
-			newServices[svcURL] = NewService(svcURL)
-		}
-	}
-	s.Services = newServices
-
-	return s.UpdateSchema(true)
-}
-
-// UpdateSchema updates the schema from every service and then update the merged
-// schema.
-func (s *ExecutableSchema) UpdateSchema(forceRebuild bool) error {
-	var services []*Service
-	var schemas []*ast.Schema
-	var updatedServices []string
-	var invalidSchema bool
-
-	defer func() {
-		if invalidSchema {
-			promInvalidSchema.Set(1)
-		} else {
-			promInvalidSchema.Set(0)
-		}
-	}()
-
-	promServiceUpdateError.Reset()
-
-	for url, s := range s.Services {
-		logger := log.WithField("url", url)
-		updated, err := s.Update()
-		if err != nil {
-			promServiceUpdateError.WithLabelValues(s.ServiceURL).Inc()
-			invalidSchema, forceRebuild = true, true
-			logger.WithError(err).Error("unable to update service")
-			// Ignore this service in this update
+	for _, step := range queryPlan.RootSteps {
+		if step.ServiceURL == internalServiceName {
+			r, err := executeBrambleStep(step)
+			if err != nil {
+				return nil, q.createGQLErrors(step, err)
+			}
+			results = append(results, *r)
 			continue
 		}
-		logger = log.WithFields(log.Fields{
-			"version": s.Version,
-			"service": s.Name,
+
+		step := step
+		q.group.Go(func() error {
+			return q.executeRootStep(step)
 		})
-
-		if updated {
-			logger.Info("service was updated")
-			updatedServices = append(updatedServices, s.Name)
-		}
-
-		services = append(services, s)
-		schemas = append(schemas, s.Schema)
 	}
 
-	if len(updatedServices) > 0 || forceRebuild {
-		log.Info("rebuilding merged schema")
-		schema, err := MergeSchemas(schemas...)
+	wg.Add(1)
+	go func() {
+		for result := range q.results {
+			results = append(results, result)
+		}
+		wg.Done()
+	}()
+
+	if err := q.group.Wait(); err != nil {
+		return nil, gqlerror.List{
+			&gqlerror.Error{
+				Message: err.Error(),
+			},
+		}
+	}
+	close(q.results)
+	wg.Wait()
+	return results, nil
+}
+
+func (q *queryExecution) executeRootStep(step *QueryPlanStep) error {
+	var document string
+
+	switch operationType := step.ParentType; operationType {
+	case queryObjectName, mutationObjectName:
+		document = strings.ToLower(operationType) + formatSelectionSet(q.ctx, q.schema, step.SelectionSet)
+	default:
+		return errors.New("expected mutation or query root step")
+	}
+
+	var data map[string]interface{}
+
+	err := q.executeDocument(document, step.ServiceURL, &data)
+	if err != nil {
+		q.writeExecutionResult(step, data, err)
+		return nil
+	}
+
+	q.writeExecutionResult(step, data, nil)
+
+	for _, childStep := range step.Then {
+		boundaryIDs, err := extractAndDedupeBoundaryIDs(data, childStep.InsertionPoint)
 		if err != nil {
-			invalidSchema = true
-			return fmt.Errorf("update of service %v caused schema error: %w", updatedServices, err)
+			return err
+		}
+		if len(boundaryIDs) == 0 {
+			continue
 		}
 
-		boundaryQueries := buildBoundaryFieldsMap(services...)
-		locations := buildFieldURLMap(services...)
-		isBoundary := buildIsBoundaryMap(services...)
+		childStep := childStep
+		q.group.Go(func() error {
+			return q.executeChildStep(childStep, boundaryIDs)
+		})
+	}
+	return nil
+}
 
-		s.mutex.Lock()
-		s.Locations = locations
-		s.IsBoundary = isBoundary
-		s.MergedSchema = schema
-		s.BoundaryQueries = boundaryQueries
-		s.mutex.Unlock()
+func (q *queryExecution) executeDocument(document string, serviceURL string, response interface{}) error {
+	req := NewRequest(document).
+		WithHeaders(GetOutgoingRequestHeadersFromContext(q.ctx))
+	return q.graphqlClient.Request(q.ctx, serviceURL, req, &response)
+}
+
+func (q *queryExecution) writeExecutionResult(step *QueryPlanStep, data interface{}, err error) {
+	result := executionResult{
+		ServiceURL:     step.ServiceURL,
+		InsertionPoint: step.InsertionPoint,
+		Data:           data,
+	}
+	if err != nil {
+		result.Errors = q.createGQLErrors(step, err)
+	}
+
+	q.results <- result
+}
+
+func (q *queryExecution) executeChildStep(step *QueryPlanStep, boundaryIDs []string) error {
+	atomic.AddInt32(&q.requestCount, 1)
+	if atomic.LoadInt32(&q.requestCount) > q.maxRequest {
+		return fmt.Errorf("exceeded max requests of %v", q.maxRequest)
+	}
+
+	boundaryField, err := q.boundaryFields.Field(step.ServiceURL, step.ParentType)
+	if err != nil {
+		return err
+	}
+
+	documents, err := buildBoundaryQueryDocuments(q.ctx, q.schema, step, boundaryIDs, boundaryField, 50)
+	if err != nil {
+		return err
+	}
+
+	data, err := q.executeBoundaryQuery(documents, step.ServiceURL, boundaryField)
+	if err != nil {
+		q.writeExecutionResult(step, data, err)
+		return nil
+	}
+
+	q.writeExecutionResult(step, data, nil)
+
+	nonNillBoundaryResults := extractNonNilBoundaryResults(data)
+
+	if len(nonNillBoundaryResults) > 0 {
+		for _, childStep := range step.Then {
+			boundaryResultInsertionPoint, err := trimInsertionPointForNestedBoundaryStep(nonNillBoundaryResults, childStep.InsertionPoint)
+			if err != nil {
+				return err
+			}
+			boundaryIDs, err := extractAndDedupeBoundaryIDs(nonNillBoundaryResults, boundaryResultInsertionPoint)
+			if err != nil {
+				return err
+			}
+			if len(boundaryIDs) == 0 {
+				continue
+			}
+			childStep := childStep
+			q.group.Go(func() error {
+				return q.executeChildStep(childStep, boundaryIDs)
+			})
+		}
 	}
 
 	return nil
 }
 
-// Exec returns the query execution handler
-func (s *ExecutableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
-	return s.ExecuteQuery
+func extractNonNilBoundaryResults(data []interface{}) []interface{} {
+	var nonNilResults []interface{}
+	for _, d := range data {
+		if d != nil {
+			nonNilResults = append(nonNilResults, d)
+		}
+
+	}
+
+	return nonNilResults
 }
 
-func (s *ExecutableSchema) ExecuteQuery(ctx context.Context) *graphql.Response {
-	operationCtx := graphql.GetOperationContext(ctx)
-	operation := operationCtx.Operation
-	variables := operationCtx.Variables
-
-	for _, plugin := range s.plugins {
-		plugin.InterceptRequest(ctx, operation.Name, operationCtx.RawQuery, variables)
+func (q *queryExecution) executeBoundaryQuery(documents []string, serviceURL string, boundaryFieldGetter BoundaryField) ([]interface{}, error) {
+	output := make([]interface{}, 0)
+	if !boundaryFieldGetter.Array {
+		for _, document := range documents {
+			partialData := make(map[string]interface{})
+			err := q.executeDocument(document, serviceURL, &partialData)
+			if err != nil {
+				return nil, err
+			}
+			for _, value := range partialData {
+				output = append(output, value)
+			}
+		}
+		return output, nil
 	}
 
-	AddField(ctx, "operation.name", operation.Name)
-	AddField(ctx, "operation.type", operation.Operation)
-
-	s.mutex.RLock()
-	defer s.mutex.RUnlock()
-
-	// The op passed in is a cached value
-	// so it must be copied before modification
-	operation = s.evaluateSkipAndInclude(variables, operation)
-	filteredSchema := s.MergedSchema
-
-	var errs gqlerror.List
-	perms, hasPerms := GetPermissionsFromContext(ctx)
-	if hasPerms {
-		filteredSchema = perms.FilterSchema(s.MergedSchema)
-		errs = perms.FilterAuthorizedFields(operation)
+	if len(documents) != 1 {
+		return nil, errors.New("there should only be a single document for array boundary field lookups")
 	}
 
-	plan, err := Plan(&PlanningContext{
-		Operation:  operation,
-		Schema:     filteredSchema,
-		Locations:  s.Locations,
-		IsBoundary: s.IsBoundary,
-		Services:   s.Services,
-	})
+	data := struct {
+		Result []interface{} `json:"_result"`
+	}{}
 
-	if err != nil {
-		return graphql.ErrorResponse(ctx, err.Error())
+	err := q.executeDocument(documents[0], serviceURL, &data)
+	return data.Result, err
+}
+
+func (q *queryExecution) createGQLErrors(step *QueryPlanStep, err error) gqlerror.List {
+	var path ast.Path
+	for _, p := range step.InsertionPoint {
+		path = append(path, ast.PathName(p))
 	}
 
-	extensions := make(map[string]interface{})
-	timings := make(map[string]interface{})
-	if debugInfo, ok := ctx.Value(DebugKey).(DebugInfo); ok {
-		if debugInfo.Query {
-			extensions["query"] = operation
+	var locs []gqlerror.Location
+	for _, f := range selectionSetToFields(step.SelectionSet) {
+		pos := f.GetPosition()
+		if pos == nil {
+			continue
 		}
-		if debugInfo.Variables {
-			extensions["variables"] = variables
-		}
-		if debugInfo.Plan {
-			extensions["plan"] = plan
-		}
-		if debugInfo.Timing {
-			extensions["timings"] = timings
+		locs = append(locs, gqlerror.Location{Line: pos.Line, Column: pos.Column})
+
+		// if the field has a selection set it's part of the path
+		if len(f.SelectionSet) > 0 {
+			path = append(path, ast.PathName(f.Alias))
 		}
 	}
 
-	for name, value := range extensions {
-		graphql.RegisterExtension(ctx, name, value)
-	}
+	var gqlErr GraphqlErrors
+	var outputErrs gqlerror.List
+	if errors.As(err, &gqlErr) {
+		for _, ge := range gqlErr {
+			extensions := ge.Extensions
+			if extensions == nil {
+				extensions = make(map[string]interface{})
+			}
+			extensions["selectionSet"] = formatSelectionSetSingleLine(q.ctx, q.schema, step.SelectionSet)
+			extensions["serviceName"] = step.ServiceName
+			extensions["serviceUrl"] = step.ServiceURL
 
-	executionStart := time.Now()
-
-	qe := newQueryExecution(ctx, s.GraphqlClient, filteredSchema, s.BoundaryQueries, int32(s.MaxRequestsPerQuery))
-	results, executeErrs := qe.Execute(plan)
-	if len(executeErrs) > 0 {
-		return &graphql.Response{
-			Errors: executeErrs,
+			outputErrs = append(outputErrs, &gqlerror.Error{
+				Message:    ge.Message,
+				Path:       path,
+				Locations:  locs,
+				Extensions: extensions,
+			})
 		}
-	}
-
-	for _, result := range results {
-		errs = append(errs, result.Errors...)
-	}
-
-	introspectionData := resolveIntrospectionFields(ctx, operation.SelectionSet, filteredSchema)
-	if len(introspectionData) > 0 {
-		results = append([]executionResult{
-			{
-				ServiceURL: internalServiceName,
-				Data:       introspectionData,
+		return outputErrs
+	} else {
+		outputErrs = append(outputErrs, &gqlerror.Error{
+			Message:   err.Error(),
+			Path:      path,
+			Locations: locs,
+			Extensions: map[string]interface{}{
+				"selectionSet": formatSelectionSetSingleLine(q.ctx, q.schema, step.SelectionSet),
 			},
-		}, results...)
+		})
 	}
 
-	timings["execution"] = time.Since(executionStart).Round(time.Millisecond).String()
-
-	mergeStart := time.Now()
-	mergedResult, err := mergeExecutionResults(results)
-	if err != nil {
-		errs = append(errs, &gqlerror.Error{Message: err.Error()})
-		AddField(ctx, "errors", errs)
-		return &graphql.Response{
-			Errors: errs,
-		}
-	}
-
-	bubbleErrs, err := bubbleUpNullValuesInPlace(filteredSchema, operation.SelectionSet, mergedResult)
-	if err == errNullBubbledToRoot {
-		mergedResult = nil
-	} else if err != nil {
-		errs = append(errs, &gqlerror.Error{Message: err.Error()})
-		AddField(ctx, "errors", errs)
-		return &graphql.Response{
-			Errors: errs,
-		}
-	}
-
-	errs = append(errs, bubbleErrs...)
-	timings["merge"] = time.Since(mergeStart).Round(time.Millisecond).String()
-
-	formattingStart := time.Now()
-	formattedResponse := formatResponseData(filteredSchema, operation.SelectionSet, mergedResult)
-	timings["format"] = time.Since(formattingStart).Round(time.Millisecond).String()
-
-	if len(errs) > 0 {
-		AddField(ctx, "errors", errs)
-	}
-
-	return &graphql.Response{
-		Data:   formattedResponse,
-		Errors: errs,
-	}
+	return outputErrs
 }
 
-// Schema returns the merged schema
-func (s *ExecutableSchema) Schema() *ast.Schema {
-	return s.MergedSchema
-}
-
-// Complexity returns the query complexity (unimplemented)
-func (s *ExecutableSchema) Complexity(typeName, fieldName string, childComplexity int, args map[string]interface{}) (int, bool) {
-	// FIXME: TBD
-	return 0, false
-}
-
-func resolveIntrospectionFields(ctx context.Context, selectionSet ast.SelectionSet, filteredSchema *ast.Schema) map[string]interface{} {
-	introspectionResult := make(map[string]interface{})
-	for _, f := range selectionSetToFields(selectionSet) {
-		switch f.Name {
-		case "__type":
-			name := f.Arguments.ForName("name").Value.Raw
-			introspectionResult[f.Alias] = resolveType(ctx, filteredSchema, &ast.Type{NamedType: name}, f.SelectionSet)
-		case "__schema":
-			introspectionResult[f.Alias] = resolveSchema(ctx, filteredSchema, f.SelectionSet)
-		}
+// The insertionPoint represents the level a piece of data should be inserted at, relative to the root of the root step's data.
+// However results from a boundary query only contain a portion of that tree. For example, you could
+// have insertionPoint: ["foo", "bar", "movies", "movie", "compTitles"], with the below example as the boundary result we're
+// crawling for ids:
+// [
+// 	 {
+//     "_bramble_id": "MOVIE1",
+//     "compTitles": [
+//       {
+//   	   "_bramble_id": "1"
+// 		 }
+//	   ]
+//   }
+// ]
+//
+// We therefore cannot use the insertionPoint as is in order to extract the boundary ids for the next child step.
+// This function trims the insertionPoint up until we find a key that exists in both the boundary result and insertionPoint.
+// When a match is found, the remainder of the insertionPoint is used, which in this case is only ["compTitles"].
+// This logic is only needed when we are already in a child step, which itself contains it's own child steps.
+func trimInsertionPointForNestedBoundaryStep(data []interface{}, childInsertionPoint []string) ([]string, error) {
+	if len(data) < 1 {
+		return nil, fmt.Errorf("no boundary results to process")
 	}
 
-	return introspectionResult
-}
-
-func resolveSchema(ctx context.Context, schema *ast.Schema, selectionSet ast.SelectionSet) map[string]interface{} {
-	result := make(map[string]interface{})
-
-	for _, f := range selectionSetToFields(selectionSet) {
-		switch f.Name {
-		case "types":
-			types := []map[string]interface{}{}
-			for _, t := range schema.Types {
-				types = append(types, resolveType(ctx, schema, &ast.Type{NamedType: t.Name}, f.SelectionSet))
-			}
-			result[f.Alias] = types
-		case "queryType":
-			result[f.Alias] = resolveType(ctx, schema, &ast.Type{NamedType: "Query"}, f.SelectionSet)
-		case "mutationType":
-			result[f.Alias] = resolveType(ctx, schema, &ast.Type{NamedType: "Mutation"}, f.SelectionSet)
-		case "subscriptionType":
-			result[f.Alias] = resolveType(ctx, schema, &ast.Type{NamedType: "Subscription"}, f.SelectionSet)
-		case "directives":
-			directives := []map[string]interface{}{}
-			for _, d := range schema.Directives {
-				directives = append(directives, resolveDirective(ctx, schema, d, f.SelectionSet))
-			}
-			result[f.Alias] = directives
-		}
-	}
-
-	return result
-}
-
-func resolveType(ctx context.Context, schema *ast.Schema, typ *ast.Type, selectionSet ast.SelectionSet) map[string]interface{} {
-	if typ == nil {
-		return nil
-	}
-
-	result := make(map[string]interface{})
-
-	// If the type is NON_NULL or LIST then use that first (in that order), then
-	// recursively call in "ofType"
-
-	if typ.NonNull {
-		for _, f := range selectionSetToFields(selectionSet) {
-			switch f.Name {
-			case "kind":
-				result[f.Alias] = "NON_NULL"
-			case "ofType":
-				result[f.Alias] = resolveType(ctx, schema, &ast.Type{
-					NamedType: typ.NamedType,
-					Elem:      typ.Elem,
-					NonNull:   false,
-				}, f.SelectionSet)
-			default:
-				result[f.Alias] = nil
-			}
-		}
-		return result
-	}
-
-	if typ.Elem != nil {
-		for _, f := range selectionSetToFields(selectionSet) {
-			switch f.Name {
-			case "kind":
-				result[f.Alias] = "LIST"
-			case "ofType":
-				result[f.Alias] = resolveType(ctx, schema, typ.Elem, f.SelectionSet)
-			default:
-				result[f.Alias] = nil
-			}
-		}
-		return result
-	}
-
-	namedType, ok := schema.Types[typ.NamedType]
+	firstBoundaryResult, ok := data[0].(map[string]interface{})
 	if !ok {
-		return nil
+		return nil, fmt.Errorf("a single boundary result should be a map[string]interface{}")
 	}
-	var variables map[string]interface{}
-	reqctx := graphql.GetOperationContext(ctx)
-	if reqctx != nil {
-		variables = reqctx.Variables
+	for i, point := range childInsertionPoint {
+		_, ok := firstBoundaryResult[point]
+		if ok {
+			return childInsertionPoint[i:], nil
+		}
 	}
-	for _, f := range selectionSetToFields(selectionSet) {
-		switch f.Name {
-		case "kind":
-			result[f.Alias] = namedType.Kind
-		case "name":
-			result[f.Alias] = namedType.Name
-		case "fields":
-			includeDeprecated := false
-			if deprecatedArg := f.Arguments.ForName("includeDeprecated"); deprecatedArg != nil {
-				v, err := deprecatedArg.Value.Value(variables)
-				if err == nil {
-					includeDeprecated, _ = v.(bool)
-				}
+	return nil, fmt.Errorf("could not find any insertion points inside boundary data")
+}
+
+func executeBrambleStep(queryPlanStep *QueryPlanStep) (*executionResult, error) {
+	result, err := buildTypenameResponseMap(queryPlanStep.SelectionSet, queryPlanStep.ParentType)
+	if err != nil {
+		return nil, err
+	}
+
+	return &executionResult{
+		ServiceURL:     internalServiceName,
+		InsertionPoint: []string{},
+		Data:           result,
+	}, nil
+}
+
+func buildTypenameResponseMap(selectionSet ast.SelectionSet, parentTypeName string) (map[string]interface{}, error) {
+	result := make(map[string]interface{})
+	for _, field := range selectionSetToFields(selectionSet) {
+		if field.SelectionSet != nil {
+			if field.Definition.Type.NamedType == "" {
+				return nil, fmt.Errorf("buildTypenameResponseMap: expected named type")
 			}
 
-			fields := []map[string]interface{}{}
-			for _, fi := range namedType.Fields {
-				if isGraphQLBuiltinName(fi.Name) {
-					continue
-				}
-				if !includeDeprecated {
-					if deprecated, _ := hasDeprecatedDirective(fi.Directives); deprecated {
-						continue
-					}
-				}
-				fields = append(fields, resolveField(ctx, schema, fi, f.SelectionSet))
+			var err error
+			result[field.Alias], err = buildTypenameResponseMap(field.SelectionSet, field.Definition.Type.Name())
+			if err != nil {
+				return nil, err
 			}
-			result[f.Alias] = fields
-		case "description":
-			result[f.Alias] = namedType.Description
-		case "interfaces":
-			interfaces := []map[string]interface{}{}
-			for _, i := range namedType.Interfaces {
-				interfaces = append(interfaces, resolveType(ctx, schema, &ast.Type{NamedType: i}, f.SelectionSet))
+		} else {
+			if field.Name != "__typename" {
+				return nil, fmt.Errorf("buildTypenameResponseMap: expected __typename")
 			}
-			result[f.Alias] = interfaces
-		case "possibleTypes":
-			if namedType.Kind != ast.Interface && namedType.Kind != ast.Union {
-				result[f.Alias] = nil
-			} else {
-				types := []map[string]interface{}{}
-				for _, t := range schema.PossibleTypes[namedType.Name] {
-					types = append(types, resolveType(ctx, schema, &ast.Type{NamedType: t.Name}, f.SelectionSet))
-				}
-				result[f.Alias] = types
-			}
-		case "enumValues":
-			includeDeprecated := false
-			if deprecatedArg := f.Arguments.ForName("includeDeprecated"); deprecatedArg != nil {
-				v, err := deprecatedArg.Value.Value(variables)
-				if err == nil {
-					includeDeprecated, _ = v.(bool)
-				}
-			}
+			result[field.Alias] = parentTypeName
+		}
+	}
+	return result, nil
+}
 
-			enums := []map[string]interface{}{}
-			for _, e := range namedType.EnumValues {
-				if !includeDeprecated {
-					if deprecated, _ := hasDeprecatedDirective(e.Directives); deprecated {
-						continue
+func fragmentImplementsAbstractType(schema *ast.Schema, abstractObjectTypename, fragmentTypeDefinition string) bool {
+	for _, def := range schema.Implements[fragmentTypeDefinition] {
+		if def.Name == abstractObjectTypename {
+			return true
+		}
+	}
+	return false
+}
+
+func extractAndDedupeBoundaryIDs(data interface{}, insertionPoint []string) ([]string, error) {
+	boundaryIDs, err := extractBoundaryIDs(data, insertionPoint)
+	if err != nil {
+		return nil, err
+	}
+	dedupeMap := make(map[string]struct{}, len(boundaryIDs))
+	for _, boundaryID := range boundaryIDs {
+		dedupeMap[boundaryID] = struct{}{}
+	}
+
+	deduped := make([]string, 0, len(boundaryIDs))
+	for id := range dedupeMap {
+		deduped = append(deduped, id)
+	}
+
+	return sort.StringSlice(deduped), nil
+}
+
+func extractBoundaryIDs(data interface{}, insertionPoint []string) ([]string, error) {
+	ptr := data
+	if ptr == nil {
+		return nil, nil
+	}
+	if len(insertionPoint) == 0 {
+		switch ptr := ptr.(type) {
+		case map[string]interface{}:
+			id, err := boundaryIDFromMap(ptr)
+			return []string{id}, err
+		case []interface{}:
+			result := []string{}
+			for _, innerPtr := range ptr {
+				ids, err := extractBoundaryIDs(innerPtr, insertionPoint)
+				if err != nil {
+					return nil, err
+				}
+				result = append(result, ids...)
+			}
+			return result, nil
+		default:
+			return nil, fmt.Errorf("extractBoundaryIDs: unexpected type: %T", ptr)
+		}
+	}
+	switch ptr := ptr.(type) {
+	case map[string]interface{}:
+		return extractBoundaryIDs(ptr[insertionPoint[0]], insertionPoint[1:])
+	case []interface{}:
+		result := []string{}
+		for _, innerPtr := range ptr {
+			ids, err := extractBoundaryIDs(innerPtr, insertionPoint)
+			if err != nil {
+				return nil, err
+			}
+			result = append(result, ids...)
+		}
+		return result, nil
+	default:
+		return nil, fmt.Errorf("extractBoundaryIDs: unexpected type: %T", ptr)
+	}
+}
+
+func buildBoundaryQueryDocuments(ctx context.Context, schema *ast.Schema, step *QueryPlanStep, ids []string, parentTypeBoundaryField BoundaryField, batchSize int) ([]string, error) {
+	selectionSetQL := formatSelectionSetSingleLine(ctx, schema, step.SelectionSet)
+	if parentTypeBoundaryField.Array {
+		qids := []string{}
+		for _, id := range ids {
+			qids = append(qids, fmt.Sprintf("%q", id))
+		}
+		idsQL := fmt.Sprintf("[%s]", strings.Join(qids, ", "))
+		return []string{fmt.Sprintf(`{ _result: %s(%s: %s) %s }`, parentTypeBoundaryField.Field, parentTypeBoundaryField.Argument, idsQL, selectionSetQL)}, nil
+	}
+
+	var (
+		documents      []string
+		selectionIndex int
+	)
+	for _, batch := range batchBy(ids, batchSize) {
+		var selections []string
+		for _, id := range batch {
+			selection := fmt.Sprintf("%s: %s(%s: %q) %s", fmt.Sprintf("_%d", selectionIndex), parentTypeBoundaryField.Field, parentTypeBoundaryField.Argument, id, selectionSetQL)
+			selections = append(selections, selection)
+			selectionIndex++
+		}
+		document := "{ " + strings.Join(selections, " ") + " }"
+		documents = append(documents, document)
+	}
+
+	return documents, nil
+}
+
+func batchBy(items []string, batchSize int) (batches [][]string) {
+	for batchSize < len(items) {
+		items, batches = items[batchSize:], append(batches, items[0:batchSize:batchSize])
+	}
+
+	return append(batches, items)
+}
+
+func mergeExecutionResults(results []executionResult) (map[string]interface{}, error) {
+	if len(results) == 0 {
+		return nil, errors.New("mergeExecutionResults: nothing to merge")
+	}
+
+	if len(results) == 1 {
+		data := results[0].Data
+		if data == nil {
+			return nil, nil
+		}
+
+		dataMap, ok := data.(map[string]interface{})
+		if !ok {
+			return nil, fmt.Errorf("a complete graphql response should be map[string]interface{}, got %T", results[0].Data)
+		}
+		return dataMap, nil
+	}
+
+	data := results[0].Data
+	for _, result := range results[1:] {
+		if err := mergeExecutionResultsRec(result.Data, data, result.InsertionPoint); err != nil {
+			return nil, err
+		}
+	}
+
+	dataMap, ok := data.(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("merged execution results should be map[string]interface{}, got %T", data)
+	}
+
+	return dataMap, nil
+}
+
+func mergeExecutionResultsRec(src interface{}, dst interface{}, insertionPoint []string) error {
+	// base case
+	if len(insertionPoint) == 0 {
+		switch ptr := dst.(type) {
+		case nil:
+			return nil
+		case map[string]interface{}:
+			switch src := src.(type) {
+			// base case for root step merging
+			case map[string]interface{}:
+				mergeMaps(ptr, src)
+
+			// base case for children step merging
+			case []interface{}:
+				boundaryResults, err := getBoundaryFieldResults(src)
+				if err != nil {
+					return err
+				}
+
+				dstID, err := boundaryIDFromMap(ptr)
+				if err != nil {
+					return err
+				}
+
+				for _, result := range boundaryResults {
+					srcID, err := boundaryIDFromMap(result)
+					if err != nil {
+						return err
+					}
+					if srcID == dstID {
+						for k, v := range result {
+							if k == "_bramble_id" {
+								continue
+							}
+
+							ptr[k] = v
+						}
 					}
 				}
-				enums = append(enums, resolveEnumValue(e, f.SelectionSet))
+
 			}
-			result[f.Alias] = enums
-		case "inputFields":
-			if namedType.Kind == ast.InputObject {
-				inputFields := []map[string]interface{}{}
-				for _, fi := range namedType.Fields {
-					// call resolveField instead of resolveInputValue because it has
-					// the right type and is a superset of it
-					inputFields = append(inputFields, resolveField(ctx, schema, fi, f.SelectionSet))
+		case []interface{}:
+			for _, innerPtr := range ptr {
+				if err := mergeExecutionResultsRec(src, innerPtr, insertionPoint); err != nil {
+					return err
 				}
-				result[f.Alias] = inputFields
-			} else {
-				result[f.Alias] = nil
 			}
 		default:
-			result[f.Alias] = nil
+			return fmt.Errorf("mergeExecutionResultsRec: unxpected type '%T' for top-level merge", ptr)
 		}
-	}
-
-	return result
-}
-
-func resolveField(ctx context.Context, schema *ast.Schema, field *ast.FieldDefinition, selectionSet ast.SelectionSet) map[string]interface{} {
-	result := make(map[string]interface{})
-
-	deprecated, deprecatedReason := hasDeprecatedDirective(field.Directives)
-
-	for _, f := range selectionSetToFields(selectionSet) {
-		switch f.Name {
-		case "name":
-			result[f.Alias] = field.Name
-		case "description":
-			result[f.Alias] = field.Description
-		case "args":
-			args := []map[string]interface{}{}
-			for _, arg := range field.Arguments {
-				args = append(args, resolveInputValue(ctx, schema, arg, f.SelectionSet))
-			}
-			result[f.Alias] = args
-		case "type":
-			result[f.Alias] = resolveType(ctx, schema, field.Type, f.SelectionSet)
-		case "isDeprecated":
-			result[f.Alias] = deprecated
-		case "deprecationReason":
-			result[f.Alias] = deprecatedReason
-		}
-	}
-
-	return result
-}
-
-func resolveInputValue(ctx context.Context, schema *ast.Schema, arg *ast.ArgumentDefinition, selectionSet ast.SelectionSet) map[string]interface{} {
-	result := make(map[string]interface{})
-
-	for _, f := range selectionSetToFields(selectionSet) {
-		switch f.Name {
-		case "name":
-			result[f.Alias] = arg.Name
-		case "description":
-			result[f.Alias] = arg.Description
-		case "type":
-			result[f.Alias] = resolveType(ctx, schema, arg.Type, f.SelectionSet)
-		case "defaultValue":
-			if arg.DefaultValue != nil {
-				result[f.Alias] = arg.DefaultValue.String()
-			} else {
-				result[f.Alias] = nil
-			}
-		}
-	}
-
-	return result
-}
-
-func resolveEnumValue(enum *ast.EnumValueDefinition, selectionSet ast.SelectionSet) map[string]interface{} {
-	result := make(map[string]interface{})
-
-	deprecated, deprecatedReason := hasDeprecatedDirective(enum.Directives)
-
-	for _, f := range selectionSetToFields(selectionSet) {
-		switch f.Name {
-		case "name":
-			result[f.Alias] = enum.Name
-		case "description":
-			result[f.Alias] = enum.Description
-		case "isDeprecated":
-			result[f.Alias] = deprecated
-		case "deprecationReason":
-			result[f.Alias] = deprecatedReason
-		}
-	}
-
-	return result
-}
-
-func resolveDirective(ctx context.Context, schema *ast.Schema, directive *ast.DirectiveDefinition, selectionSet ast.SelectionSet) map[string]interface{} {
-	result := make(map[string]interface{})
-
-	for _, f := range selectionSetToFields(selectionSet) {
-		switch f.Name {
-		case "name":
-			result[f.Alias] = directive.Name
-		case "description":
-			result[f.Alias] = directive.Description
-		case "locations":
-			result[f.Alias] = directive.Locations
-		case "args":
-			args := []map[string]interface{}{}
-			for _, arg := range directive.Arguments {
-				args = append(args, resolveInputValue(ctx, schema, arg, f.SelectionSet))
-			}
-			result[f.Alias] = args
-		}
-	}
-
-	return result
-}
-
-func selectionSetToFields(selectionSet ast.SelectionSet) []*ast.Field {
-	var result []*ast.Field
-	for _, s := range selectionSet {
-		switch s := s.(type) {
-		case *ast.Field:
-			result = append(result, s)
-		case *ast.FragmentSpread:
-			result = append(result, selectionSetToFields(s.Definition.SelectionSet)...)
-		case *ast.InlineFragment:
-			result = append(result, selectionSetToFields(s.SelectionSet)...)
-		}
-	}
-
-	return result
-}
-
-func hasDeprecatedDirective(directives ast.DirectiveList) (bool, *string) {
-	for _, d := range directives {
-		if d.Name == "deprecated" {
-			var reason string
-			reasonArg := d.Arguments.ForName("reason")
-			if reasonArg != nil {
-				reason = reasonArg.Value.Raw
-			}
-			return true, &reason
-		}
-	}
-
-	return false, nil
-}
-
-func jsonMapToInterfaceMap(m map[string]json.RawMessage) map[string]interface{} {
-	res := make(map[string]interface{}, len(m))
-	for k, v := range m {
-		res[k] = v
-	}
-
-	return res
-}
-
-// mergeMaps merge dst into src, unmarshalling json.RawMessages when necessary
-func mergeMaps(dst, src map[string]interface{}) {
-	for k, v := range dst {
-		if b, ok := src[k]; ok {
-			// The value is in both maps, we need to merge them.
-			// If any of the 2 values is a json.RawMessage, unmarshal it first
-
-			var aValue map[string]interface{}
-			var bValue map[string]interface{}
-
-			switch value := v.(type) {
-			case json.RawMessage:
-				// we want to unmarshal only what's necessary, so unmarshal only
-				// one level of the result
-				var m map[string]json.RawMessage
-				_ = json.Unmarshal([]byte(value), &m)
-				aValue = jsonMapToInterfaceMap(m)
-				dst[k] = aValue
-			case map[string]interface{}:
-				aValue = value
-			default:
-				panic("invalid merge")
-			}
-
-			switch value := b.(type) {
-			case json.RawMessage:
-				var m map[string]json.RawMessage
-				_ = json.Unmarshal([]byte(value), &m)
-				bValue = jsonMapToInterfaceMap(m)
-			case map[string]interface{}:
-				bValue = value
-			default:
-				panic("invalid merge")
-			}
-
-			mergeMaps(aValue, bValue)
-			continue
-		}
-	}
-
-	for k, v := range src {
-		if _, ok := dst[k]; ok {
-			continue
-		}
-		dst[k] = v
-	}
-}
-
-func (s *ExecutableSchema) evaluateSkipAndInclude(vars map[string]interface{}, op *ast.OperationDefinition) *ast.OperationDefinition {
-	return &ast.OperationDefinition{
-		Operation:           op.Operation,
-		Name:                op.Name,
-		VariableDefinitions: op.VariableDefinitions,
-		Directives:          op.Directives,
-		SelectionSet:        s.evaluateSkipAndIncludeRec(vars, op.SelectionSet),
-		Position:            op.Position,
-	}
-}
-
-func (s *ExecutableSchema) evaluateSkipAndIncludeRec(vars map[string]interface{}, selectionSet ast.SelectionSet) ast.SelectionSet {
-	if selectionSet == nil {
 		return nil
 	}
-	result := ast.SelectionSet{}
-	for _, someSelection := range selectionSet {
-		var skipDirective, includeDirective *ast.Directive
-		switch selection := someSelection.(type) {
-		case *ast.Field:
-			skipDirective = selection.Directives.ForName("skip")
-			includeDirective = selection.Directives.ForName("include")
-		case *ast.InlineFragment:
-			skipDirective = selection.Directives.ForName("skip")
-			includeDirective = selection.Directives.ForName("include")
-		case *ast.FragmentSpread:
-			skipDirective = selection.Directives.ForName("skip")
-			includeDirective = selection.Directives.ForName("include")
-		}
-		skip, include := false, true
-		if skipDirective != nil {
-			skip = resolveIfArgument(skipDirective, vars)
-		}
-		if includeDirective != nil {
-			include = resolveIfArgument(includeDirective, vars)
-		}
-		if !skip && include {
-			switch selection := someSelection.(type) {
-			case *ast.Field:
-				result = append(result, &ast.Field{
-					Alias:            selection.Alias,
-					Name:             selection.Name,
-					Arguments:        selection.Arguments,
-					Directives:       removeSkipAndInclude(selection.Directives),
-					SelectionSet:     s.evaluateSkipAndIncludeRec(vars, selection.SelectionSet),
-					Position:         selection.Position,
-					Definition:       selection.Definition,
-					ObjectDefinition: selection.ObjectDefinition,
-				})
-			case *ast.InlineFragment:
-				result = append(result, &ast.InlineFragment{
-					TypeCondition:    selection.TypeCondition,
-					Directives:       removeSkipAndInclude(selection.Directives),
-					SelectionSet:     s.evaluateSkipAndIncludeRec(vars, selection.SelectionSet),
-					Position:         selection.Position,
-					ObjectDefinition: selection.ObjectDefinition,
-				})
-			case *ast.FragmentSpread:
-				result = append(result, &ast.FragmentSpread{
-					Name:             selection.Name,
-					Directives:       removeSkipAndInclude(selection.Directives),
-					Position:         selection.Position,
-					ObjectDefinition: selection.ObjectDefinition,
-					Definition: &ast.FragmentDefinition{
-						Name:               selection.Definition.Name,
-						VariableDefinition: selection.Definition.VariableDefinition,
-						TypeCondition:      selection.Definition.TypeCondition,
-						Directives:         removeSkipAndInclude(selection.Definition.Directives),
-						SelectionSet:       s.evaluateSkipAndIncludeRec(vars, selection.Definition.SelectionSet),
-						Definition:         selection.Definition.Definition,
-						Position:           selection.Definition.Position,
-					},
-				})
+
+	// recursive case
+	switch ptr := dst.(type) {
+	case map[string]interface{}:
+		switch ptr := ptr[insertionPoint[0]].(type) {
+		case []interface{}:
+			for _, innerPtr := range ptr {
+				if err := mergeExecutionResultsRec(src, innerPtr, insertionPoint[1:]); err != nil {
+					return err
+				}
+			}
+		default:
+			if err := mergeExecutionResultsRec(src, ptr, insertionPoint[1:]); err != nil {
+				return err
 			}
 		}
+	case []interface{}:
+		for _, innerPtr := range ptr {
+			if err := mergeExecutionResultsRec(src, innerPtr, insertionPoint); err != nil {
+				return err
+			}
+		}
+	case nil:
+		// The destination is nil, so the src can not be merged
+		return nil
+	default:
+		return fmt.Errorf("mergeExecutionResultsRec: unxpected type '%T' for non top-level merge", ptr)
 	}
-	return result
+	return nil
 }
 
-func removeSkipAndInclude(directives ast.DirectiveList) ast.DirectiveList {
-	var result ast.DirectiveList
-	for _, d := range directives {
-		if d.Name == "include" || d.Name == "skip" {
+func boundaryIDFromMap(boundaryMap map[string]interface{}) (string, error) {
+	id, ok := boundaryMap["_bramble_id"].(string)
+	if ok {
+		return id, nil
+	}
+	return "", errors.New("boundaryIDFromMap: \"_bramble_id\" not found")
+}
+
+func getBoundaryFieldResults(src []interface{}) ([]map[string]interface{}, error) {
+	var results []map[string]interface{}
+	for i, element := range src {
+		if element == nil {
 			continue
 		}
-		result = append(result, d)
+		elementMap, ok := element.(map[string]interface{})
+		if !ok {
+			return nil, fmt.Errorf("getBoundaryFieldResults: expect value at index %d to be map[string]interface{}' but got '%T'", i, element)
+		}
+		results = append(results, elementMap)
 	}
-	return result
+	return results, nil
 }
 
-func resolveIfArgument(d *ast.Directive, variables map[string]interface{}) bool {
-	arg := d.Arguments.ForName("if")
-	if arg == nil {
-		panic(fmt.Sprintf("%s: argument 'if' not defined", d.Name))
-	}
-	value, err := arg.Value.Value(variables)
+// bubbleUpNullValuesInPlace checks for expected null values (as per schema) and bubbles them up if needed, and checks for
+// unexpected null values and returns errors for each (these unexpected nulls are also bubbled up).
+// See https://spec.graphql.org/June2018/#sec-Errors-and-Non-Nullability
+func bubbleUpNullValuesInPlace(schema *ast.Schema, selectionSet ast.SelectionSet, result map[string]interface{}) ([]*gqlerror.Error, error) {
+	errs, bubbleUp, err := bubbleUpNullValuesInPlaceRec(schema, nil, selectionSet, result, ast.Path{})
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
-	result, ok := value.(bool)
+	if bubbleUp {
+		return errs, errNullBubbledToRoot
+	}
+	return errs, nil
+}
+
+func bubbleUpNullValuesInPlaceRec(schema *ast.Schema, currentType *ast.Type, selectionSet ast.SelectionSet, result interface{}, path ast.Path) (errs []*gqlerror.Error, bubbleUp bool, err error) {
+	switch result := result.(type) {
+	case map[string]interface{}:
+		objectTypename := extractAndCastTypenameField(result)
+		filteredSelectionSet := unionAndTrimSelectionSet(objectTypename, schema, selectionSet)
+
+		for _, selection := range filteredSelectionSet {
+			switch selection := selection.(type) {
+			case *ast.Field:
+				field := selection
+				if strings.HasPrefix(field.Name, "__") {
+					continue
+				}
+				value := result[field.Alias]
+				if value == nil {
+					if field.Definition.Type.NonNull {
+						errs = append(errs, &gqlerror.Error{
+							Message:    fmt.Sprintf("got a null response for non-nullable field %q", field.Alias),
+							Path:       append(path, ast.PathName(field.Alias)),
+							Extensions: nil,
+						})
+						bubbleUp = true
+					}
+					return
+				}
+				if field.SelectionSet != nil {
+					lowerErrs, lowerBubbleUp, lowerErr := bubbleUpNullValuesInPlaceRec(schema, field.Definition.Type, field.SelectionSet, value, append(path, ast.PathName(field.Alias)))
+					if lowerErr != nil {
+						return nil, false, lowerErr
+					}
+					if lowerBubbleUp {
+						if field.Definition.Type.NonNull {
+							bubbleUp = true
+						} else {
+							result[field.Alias] = nil
+						}
+					}
+					errs = append(errs, lowerErrs...)
+				}
+			case *ast.FragmentSpread:
+				fragment := selection
+				lowerErrs, lowerBubbleUp, lowerErr := bubbleUpNullValuesInPlaceRec(schema, nil, fragment.Definition.SelectionSet, result, path)
+				if lowerErr != nil {
+					return nil, false, lowerErr
+				}
+				bubbleUp = lowerBubbleUp
+				errs = append(errs, lowerErrs...)
+			case *ast.InlineFragment:
+				fragment := selection
+				lowerErrs, lowerBubbleUp, lowerErr := bubbleUpNullValuesInPlaceRec(schema, nil, fragment.SelectionSet, result, path)
+				if lowerErr != nil {
+					return nil, false, lowerErr
+				}
+				bubbleUp = lowerBubbleUp
+				errs = append(errs, lowerErrs...)
+			default:
+				err = fmt.Errorf("unknown selection type: %T", selection)
+				return
+			}
+		}
+	case []interface{}:
+		for i, value := range result {
+			pathWithIndex := appendPathIndex(path, i)
+			lowerErrs, lowerBubbleUp, lowerErr := bubbleUpNullValuesInPlaceRec(schema, currentType, selectionSet, value, pathWithIndex)
+			if lowerErr != nil {
+				return nil, false, lowerErr
+			}
+			if lowerBubbleUp {
+				if currentType.Elem.NonNull {
+					bubbleUp = true
+				} else {
+					result[i] = nil
+				}
+			}
+			errs = append(errs, lowerErrs...)
+		}
+	case []map[string]interface{}:
+		for i, value := range result {
+			pathWithIndex := appendPathIndex(path, i)
+			lowerErrs, lowerBubbleUp, lowerErr := bubbleUpNullValuesInPlaceRec(schema, currentType, selectionSet, value, pathWithIndex)
+			if lowerErr != nil {
+				return nil, false, lowerErr
+			}
+			if lowerBubbleUp {
+				if currentType.Elem.NonNull {
+					bubbleUp = true
+				} else {
+					result[i] = nil
+				}
+			}
+			errs = append(errs, lowerErrs...)
+		}
+	default:
+		return nil, false, fmt.Errorf("bubbleUpNullValuesInPlaceRec: unxpected result type '%T'", result)
+	}
+	return
+}
+
+func appendPathIndex(path []ast.PathElement, index int) []ast.PathElement {
+	pathCopy := make([]ast.PathElement, len(path))
+	copy(pathCopy, path)
+	return append(pathCopy, ast.PathIndex(index))
+}
+
+func formatResponseData(schema *ast.Schema, selectionSet ast.SelectionSet, result map[string]interface{}) []byte {
+	return formatResponseDataRec(schema, selectionSet, result, false)
+}
+
+func formatResponseDataRec(schema *ast.Schema, selectionSet ast.SelectionSet, result interface{}, insideFragment bool) []byte {
+	var buf bytes.Buffer
+	if result == nil {
+		return []byte("null")
+	}
+	switch result := result.(type) {
+	case map[string]interface{}:
+		if len(result) == 0 {
+			return []byte("null")
+		}
+		if !insideFragment {
+			buf.WriteString("{")
+		}
+
+		objectTypename := extractAndCastTypenameField(result)
+		filteredSelectionSet := unionAndTrimSelectionSet(objectTypename, schema, selectionSet)
+
+		for i, selection := range filteredSelectionSet {
+			switch selection := selection.(type) {
+			case *ast.InlineFragment:
+				innerBody := formatResponseDataRec(schema, selection.SelectionSet, result, true)
+				buf.Write(innerBody)
+
+			case *ast.FragmentSpread:
+				innerBody := formatResponseDataRec(schema, selection.Definition.SelectionSet, result, true)
+				buf.Write(innerBody)
+			case *ast.Field:
+				field := selection
+				fieldData, ok := result[field.Alias]
+				buf.WriteString(fmt.Sprintf(`"%s":`, field.Alias))
+				if !ok {
+					buf.WriteString("null")
+					if i < len(filteredSelectionSet)-1 {
+						buf.WriteString(",")
+					}
+					continue
+				}
+				if field.SelectionSet != nil && len(field.SelectionSet) > 0 {
+					innerBody := formatResponseDataRec(schema, field.SelectionSet, fieldData, false)
+					buf.Write(innerBody)
+				} else {
+					fieldJSON, err := json.Marshal(&fieldData)
+					if err != nil {
+						// We panic here because the data we're working on has already come through
+						// from downstream services as JSON. We should never get to this point with invalid JSON.
+						log.Panicf("invalid json when formatting response: %v", err)
+					}
+
+					buf.Write(fieldJSON)
+				}
+			}
+			if i < len(filteredSelectionSet)-1 {
+				buf.WriteString(",")
+			}
+		}
+		if !insideFragment {
+			buf.WriteString("}")
+		}
+	case []interface{}:
+		buf.WriteString("[")
+		for i, v := range result {
+			innerBody := formatResponseDataRec(schema, selectionSet, v, false)
+			buf.Write(innerBody)
+
+			if i < len(result)-1 {
+				buf.WriteString(",")
+			}
+		}
+		buf.WriteString("]")
+	case []map[string]interface{}:
+		buf.WriteString("[")
+		for i, v := range result {
+			innerBody := formatResponseDataRec(schema, selectionSet, v, false)
+			buf.Write(innerBody)
+
+			if i < len(result)-1 {
+				buf.WriteString(",")
+			}
+		}
+		buf.WriteString("]")
+	}
+
+	return buf.Bytes()
+}
+
+// When formatting the response data, the shape of the selection set has to potentially be modified to more closely resemble the shape
+// of the response. This only happens when running into fragments, there are two cases we need to deal with:
+//   1. the selection set of the target fragment has to be unioned with the selection set at the level for which the target fragment is referenced
+//   2. if the target fragments are an implementation of an abstract type, we need to use the __typename from the response body to check which
+//   implementation was resolved. Any fragments that do not match are dropped from the selection set.
+func unionAndTrimSelectionSet(responseObjectTypeName string, schema *ast.Schema, selectionSet ast.SelectionSet) ast.SelectionSet {
+	filteredSelectionSet := eliminateUnwantedFragments(responseObjectTypeName, schema, selectionSet)
+	return mergeWithTopLevelFragmentFields(filteredSelectionSet)
+}
+
+func eliminateUnwantedFragments(responseObjectTypeName string, schema *ast.Schema, selectionSet ast.SelectionSet) ast.SelectionSet {
+	var filteredSelectionSet ast.SelectionSet
+
+	for _, selection := range selectionSet {
+		var (
+			fragmentObjectDefinition *ast.Definition
+			fragmentTypeCondition    string
+		)
+		switch selection := selection.(type) {
+		case *ast.Field:
+			filteredSelectionSet = append(filteredSelectionSet, selection)
+
+		case *ast.InlineFragment:
+			fragmentObjectDefinition = selection.ObjectDefinition
+			fragmentTypeCondition = selection.TypeCondition
+
+		case *ast.FragmentSpread:
+			fragmentObjectDefinition = selection.ObjectDefinition
+			fragmentTypeCondition = selection.Definition.TypeCondition
+		}
+
+		if fragmentObjectDefinition != nil && includeFragment(responseObjectTypeName, schema, fragmentObjectDefinition, fragmentTypeCondition) {
+			filteredSelectionSet = append(filteredSelectionSet, selection)
+		}
+	}
+
+	return filteredSelectionSet
+
+}
+
+func includeFragment(responseObjectTypeName string, schema *ast.Schema, objectDefinition *ast.Definition, typeCondition string) bool {
+	return !(objectDefinition.IsAbstractType() &&
+		fragmentImplementsAbstractType(schema, objectDefinition.Name, typeCondition) &&
+		objectTypenameMatchesDifferentFragment(responseObjectTypeName, typeCondition))
+}
+
+func mergeWithTopLevelFragmentFields(selectionSet ast.SelectionSet) ast.SelectionSet {
+	merged := newSelectionSetMerger()
+
+	for _, selection := range selectionSet {
+		switch selection := selection.(type) {
+		case *ast.Field:
+			merged.addField(selection)
+		case *ast.InlineFragment:
+			fragment := selection
+			merged.addInlineFragment(fragment)
+		case *ast.FragmentSpread:
+			fragment := selection
+			merged.addFragmentSpread(fragment)
+		}
+	}
+
+	return merged.selectionSet
+}
+
+type selectionSetMerger struct {
+	selectionSet ast.SelectionSet
+	seenFields   map[string]*ast.Field
+}
+
+func newSelectionSetMerger() *selectionSetMerger {
+	return &selectionSetMerger{
+		selectionSet: []ast.Selection{},
+		seenFields:   make(map[string]*ast.Field),
+	}
+}
+
+func (s *selectionSetMerger) addField(field *ast.Field) {
+	shouldAppend := s.shouldAppendField(field)
+	if shouldAppend {
+		s.selectionSet = append(s.selectionSet, field)
+	}
+}
+
+func (s *selectionSetMerger) shouldAppendField(field *ast.Field) bool {
+	if seenField, ok := s.seenFields[field.Alias]; ok {
+		if seenField.Name == field.Name && seenField.SelectionSet != nil && field.SelectionSet != nil {
+			seenField.SelectionSet = append(seenField.SelectionSet, field.SelectionSet...)
+		}
+		return false
+	} else {
+		s.seenFields[field.Alias] = field
+		return true
+	}
+}
+
+func (s *selectionSetMerger) addInlineFragment(fragment *ast.InlineFragment) {
+	dedupedSelectionSet := s.dedupeFragmentSelectionSet(fragment.SelectionSet)
+	if len(dedupedSelectionSet) > 0 {
+		fragment.SelectionSet = dedupedSelectionSet
+		s.selectionSet = append(s.selectionSet, fragment)
+	}
+}
+
+func (s *selectionSetMerger) addFragmentSpread(fragment *ast.FragmentSpread) {
+	dedupedSelectionSet := s.dedupeFragmentSelectionSet(fragment.Definition.SelectionSet)
+	if len(dedupedSelectionSet) > 0 {
+		fragment.Definition.SelectionSet = dedupedSelectionSet
+		s.selectionSet = append(s.selectionSet, fragment)
+	}
+}
+
+func (s *selectionSetMerger) dedupeFragmentSelectionSet(selectionSet ast.SelectionSet) ast.SelectionSet {
+	var filteredSelectionSet ast.SelectionSet
+	for _, selection := range selectionSet {
+		switch selection := selection.(type) {
+		case *ast.Field:
+			shouldAppend := s.shouldAppendField(selection)
+			if shouldAppend {
+				filteredSelectionSet = append(filteredSelectionSet, selection)
+			}
+		case *ast.InlineFragment, *ast.FragmentSpread:
+			filteredSelectionSet = append(filteredSelectionSet, selection)
+		}
+	}
+
+	return filteredSelectionSet
+}
+
+func extractAndCastTypenameField(result map[string]interface{}) string {
+	typeNameInterface, ok := result["_bramble__typename"]
 	if !ok {
-		panic(fmt.Sprintf("%s: argument 'if' is not a boolean", d.Name))
+		return ""
 	}
-	return result
+
+	return typeNameInterface.(string)
+}
+
+func objectTypenameMatchesDifferentFragment(typename, fragmentTypeCondition string) bool {
+	return fragmentTypeCondition != typename
 }
