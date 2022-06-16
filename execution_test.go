@@ -5794,6 +5794,27 @@ func TestQueryWithArrayBoundaryFields(t *testing.T) {
 	f.checkSuccess(t)
 }
 
+func TestMergeWithNull(t *testing.T) {
+	nullMap := make(map[string]interface{})
+	dataMap := map[string]interface{}{
+		"data": "foo",
+	}
+
+	require.NoError(t, json.Unmarshal([]byte(`null`), &nullMap))
+
+	merged, err := mergeExecutionResults([]executionResult{
+		{
+			Data: nullMap,
+		},
+		{
+			Data: dataMap,
+		},
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, dataMap, merged)
+}
+
 func TestSchemaUpdate_serviceError(t *testing.T) {
 	schemaA := `directive @boundary on OBJECT
 				type Service {
