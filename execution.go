@@ -17,9 +17,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-var (
-	errNullBubbledToRoot = errors.New("bubbleUpNullValuesInPlace: null bubbled up to root")
-)
+var errNullBubbledToRoot = errors.New("bubbleUpNullValuesInPlace: null bubbled up to root")
 
 type executionResult struct {
 	ServiceURL     string
@@ -150,8 +148,8 @@ func (q *queryExecution) writeExecutionResult(step *QueryPlanStep, data interfac
 }
 
 func (q *queryExecution) executeChildStep(step *QueryPlanStep, boundaryIDs []string) error {
-	atomic.AddInt32(&q.requestCount, 1)
-	if atomic.LoadInt32(&q.requestCount) > q.maxRequest {
+	newRequestCount := atomic.AddInt32(&q.requestCount, 1)
+	if newRequestCount > q.maxRequest {
 		return fmt.Errorf("exceeded max requests of %v", q.maxRequest)
 	}
 
@@ -173,15 +171,15 @@ func (q *queryExecution) executeChildStep(step *QueryPlanStep, boundaryIDs []str
 
 	q.writeExecutionResult(step, data, nil)
 
-	nonNillBoundaryResults := extractNonNilBoundaryResults(data)
+	nonNilBoundaryResults := extractNonNilBoundaryResults(data)
 
-	if len(nonNillBoundaryResults) > 0 {
+	if len(nonNilBoundaryResults) > 0 {
 		for _, childStep := range step.Then {
-			boundaryResultInsertionPoint, err := trimInsertionPointForNestedBoundaryStep(nonNillBoundaryResults, childStep.InsertionPoint)
+			boundaryResultInsertionPoint, err := trimInsertionPointForNestedBoundaryStep(nonNilBoundaryResults, childStep.InsertionPoint)
 			if err != nil {
 				return err
 			}
-			boundaryIDs, err := extractAndDedupeBoundaryIDs(nonNillBoundaryResults, boundaryResultInsertionPoint)
+			boundaryIDs, err := extractAndDedupeBoundaryIDs(nonNilBoundaryResults, boundaryResultInsertionPoint)
 			if err != nil {
 				return err
 			}
@@ -201,10 +199,10 @@ func (q *queryExecution) executeChildStep(step *QueryPlanStep, boundaryIDs []str
 func extractNonNilBoundaryResults(data []interface{}) []interface{} {
 	var nonNilResults []interface{}
 	for _, d := range data {
-		if d != nil {
-			nonNilResults = append(nonNilResults, d)
+		if d == nil {
+			continue
 		}
-
+		nonNilResults = append(nonNilResults, d)
 	}
 
 	return nonNilResults
@@ -312,7 +310,7 @@ func (q *queryExecution) createGQLErrors(step *QueryPlanStep, err error) gqlerro
 // When a match is found, the remainder of the insertionPoint is used, which in this case is only ["compTitles"].
 // This logic is only needed when we are already in a child step, which itself contains it's own child steps.
 func trimInsertionPointForNestedBoundaryStep(data []interface{}, childInsertionPoint []string) ([]string, error) {
-	if len(data) < 1 {
+	if len(data) == 0 {
 		return nil, fmt.Errorf("no boundary results to process")
 	}
 
@@ -363,15 +361,6 @@ func buildTypenameResponseMap(selectionSet ast.SelectionSet, parentTypeName stri
 		}
 	}
 	return result, nil
-}
-
-func fragmentImplementsAbstractType(schema *ast.Schema, abstractObjectTypename, fragmentTypeDefinition string) bool {
-	for _, def := range schema.Implements[fragmentTypeDefinition] {
-		if def.Name == abstractObjectTypename {
-			return true
-		}
-	}
-	return false
 }
 
 func extractAndDedupeBoundaryIDs(data interface{}, insertionPoint []string) ([]string, error) {
@@ -863,6 +852,19 @@ func includeFragment(responseObjectTypeName string, schema *ast.Schema, objectDe
 		objectTypenameMatchesDifferentFragment(responseObjectTypeName, typeCondition))
 }
 
+func fragmentImplementsAbstractType(schema *ast.Schema, abstractObjectTypename, fragmentTypeDefinition string) bool {
+	for _, def := range schema.Implements[fragmentTypeDefinition] {
+		if def.Name == abstractObjectTypename {
+			return true
+		}
+	}
+	return false
+}
+
+func objectTypenameMatchesDifferentFragment(typename, fragmentTypeCondition string) bool {
+	return fragmentTypeCondition != typename
+}
+
 func mergeWithTopLevelFragmentFields(selectionSet ast.SelectionSet) ast.SelectionSet {
 	merged := newSelectionSetMerger()
 
@@ -953,8 +955,4 @@ func extractAndCastTypenameField(result map[string]interface{}) string {
 	}
 
 	return typeNameInterface.(string)
-}
-
-func objectTypenameMatchesDifferentFragment(typename, fragmentTypeCondition string) bool {
-	return fragmentTypeCondition != typename
 }
