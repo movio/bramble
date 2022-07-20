@@ -64,8 +64,11 @@ func Main() {
 
 func runHandler(ctx context.Context, wg *sync.WaitGroup, name, addr string, handler http.Handler) {
 	srv := &http.Server{
-		Addr:    addr,
-		Handler: handler,
+		Addr:         addr,
+		Handler:      handler,
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  120 * time.Second,
 	}
 
 	go func() {
