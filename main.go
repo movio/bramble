@@ -40,17 +40,8 @@ func Main() {
 
 	go gtw.UpdateSchemas(cfg.PollIntervalDuration)
 
-	signalChan := make(chan os.Signal, 1)
-	signal.Notify(signalChan, os.Interrupt)
-
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
-
-	go func() {
-		<-signalChan
-		log.Info("received shutdown signal")
-		cancel()
-	}()
 
 	var wg sync.WaitGroup
 	wg.Add(3)
