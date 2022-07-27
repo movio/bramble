@@ -242,7 +242,7 @@ func mergePossibleTypes(sources []*ast.Schema, mergedTypes map[string]*ast.Defin
 				for _, possibleType := range possibleTypes {
 					if possibleType.Name != nodeInterfaceName {
 						if ast.DefinitionList(result[typeName]).ForName(possibleType.Name) == nil {
-							result[typeName] = append(result[typeName], possibleType)
+							result[typeName] = append(result[typeName], mergedTypes[possibleType.Name])
 						}
 					}
 				}
