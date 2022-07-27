@@ -20,7 +20,7 @@ type LimitsPlugin struct {
 
 type LimitsPluginConfig struct {
 	MaxRequestBytes     int64  `json:"max-request-bytes"`
-	MaxResponeTime      string `json:"max-response-time"`
+	MaxResponseTime     string `json:"max-response-time"`
 	maxResponseDuration time.Duration
 }
 
@@ -46,11 +46,11 @@ func (p *LimitsPlugin) Configure(cfg *bramble.Config, data json.RawMessage) erro
 		return fmt.Errorf("MaxRequestBytes is undefined")
 	}
 
-	if p.config.MaxResponeTime == "" {
+	if p.config.MaxResponseTime == "" {
 		return fmt.Errorf("MaxResponseTime is undefined")
 	}
 
-	p.config.maxResponseDuration, err = time.ParseDuration(p.config.MaxResponeTime)
+	p.config.maxResponseDuration, err = time.ParseDuration(p.config.MaxResponseTime)
 	if err != nil {
 		return fmt.Errorf("invalid duration: %w", err)
 	}

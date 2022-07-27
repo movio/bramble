@@ -31,6 +31,15 @@ func mergeExecutionResults(results []executionResult) (map[string]interface{}, e
 	}
 
 	data := results[0].Data
+	switch ptr := data.(type) {
+	case nil:
+		data = make(map[string]interface{})
+	case map[string]interface{}:
+		if ptr == nil {
+			data = make(map[string]interface{})
+		}
+	}
+
 	for _, result := range results[1:] {
 		if err := mergeExecutionResultsRec(result.Data, data, result.InsertionPoint); err != nil {
 			return nil, err
