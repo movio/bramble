@@ -923,3 +923,79 @@ func TestMergeWithAlternateId(t *testing.T) {
 	fixture.CheckSuccess(t)
 	IdFieldName = "id" // reset!
 }
+
+func TestMergePossibleTypes(t *testing.T) {
+	fixture := MergeTestFixture{
+		Input1: `
+			directive @boundary on OBJECT | FIELD_DEFINITION
+
+			interface Face {
+				id: ID!
+			}
+
+			type Foo implements Face @boundary {
+				id: ID!
+				foo: Boolean!
+			}
+
+			type Bar implements Face {
+				id: ID!
+				bar: Boolean!
+			}
+
+			type Query  {
+				faces: [Face!]!
+				face(id: ID!): Face @boundary
+				service: Service!
+			}
+
+			type Service {
+				name: String!
+				version: String!
+				schema: String!
+			}
+		`,
+		Input2: `
+			directive @boundary on OBJECT | FIELD_DEFINITION
+
+			type Foo @boundary {
+				id: ID!
+				superfoo: Boolean!
+			}
+
+			type Query  {
+				face(id: ID!): Foo @boundary
+				service: Service!
+			}
+
+			type Service {
+				name: String!
+				version: String!
+				schema: String!
+			}
+	`,
+		Expected: `
+			directive @boundary on OBJECT | FIELD_DEFINITION
+
+			interface Face {
+				id: ID!
+			}
+
+			type Foo implements Face @boundary {
+				id: ID!
+				superfoo: Boolean!
+				foo: Boolean!
+			}
+
+			type Bar implements Face {
+				id: ID!
+				bar: Boolean!
+			}
+
+			type Query  {
+				faces: [Face!]!
+			}
+		`,
+	}
+	fixture.CheckSuccess(t)
+}

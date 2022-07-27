@@ -234,15 +234,15 @@ func mergeDirectives(sources []*ast.Schema) map[string]*ast.DirectiveDefinition 
 func mergePossibleTypes(sources []*ast.Schema, mergedTypes map[string]*ast.Definition) map[string][]*ast.Definition {
 	result := map[string][]*ast.Definition{}
 	for _, schema := range sources {
-		for typeName, interfaces := range schema.PossibleTypes {
+		for typeName, possibleTypes := range schema.PossibleTypes {
 			if typeName != serviceObjectName && typeName != nodeInterfaceName {
 				if _, ok := mergedTypes[typeName]; !ok {
 					continue
 				}
-				for _, i := range interfaces {
-					if i.Name != nodeInterfaceName {
-						if ast.DefinitionList(result[typeName]).ForName(i.Name) == nil {
-							result[typeName] = append(result[typeName], i)
+				for _, possibleType := range possibleTypes {
+					if possibleType.Name != nodeInterfaceName {
+						if ast.DefinitionList(result[typeName]).ForName(possibleType.Name) == nil {
+							result[typeName] = append(result[typeName], mergedTypes[possibleType.Name])
 						}
 					}
 				}

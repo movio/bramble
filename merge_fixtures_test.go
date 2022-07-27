@@ -113,7 +113,17 @@ func assertSchemaPossibleTypesConsistency(t *testing.T, schema *ast.Schema) {
 	t.Helper()
 	actual := getPossibleTypes(schema)
 	expected := getPossibleTypes(loadSchema(formatSchema(schema)))
-	assert.Equal(t, expected, actual, "schema.PossibleTypes is not consistent")
+	actualKeys, expectedKeys := []string{}, []string{}
+	for key := range actual {
+		actualKeys = append(actualKeys, key)
+	}
+	for key := range expected {
+		expectedKeys = append(expectedKeys, key)
+	}
+	assert.ElementsMatch(t, expectedKeys, actualKeys, "schema.PossibleTypes is not consistent")
+	for typeName := range actual {
+		assert.ElementsMatchf(t, actual[typeName], expected[typeName], "schema.PossibleTypes[%s] is not consistent", typeName)
+	}
 }
 
 func assertSchemaIntrospectionTypes(t *testing.T, schema *ast.Schema) {
