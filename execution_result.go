@@ -75,13 +75,13 @@ func mergeExecutionResultsRec(src interface{}, dst interface{}, insertionPoint [
 
 				dstID, err := boundaryIDFromMap(ptr)
 				if err != nil {
-					return err
+					return nil
 				}
 
 				for _, result := range boundaryResults {
 					srcID, err := boundaryIDFromMap(result)
 					if err != nil {
-						return err
+						return nil
 					}
 					if srcID == dstID {
 						for k, v := range result {
