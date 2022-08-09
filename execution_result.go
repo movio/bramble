@@ -142,7 +142,7 @@ func boundaryIDFromMap(boundaryMap map[string]interface{}) (string, error) {
 	if ok {
 		return id, nil
 	}
-	return "", errors.New("boundaryIDFromMap: \"_bramble_id\" not found")
+	return "", fmt.Errorf(`boundaryIDFromMap: "_bramble_id" not found`)
 }
 
 func getBoundaryFieldResults(src []interface{}) ([]map[string]interface{}, error) {
