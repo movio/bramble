@@ -3155,6 +3155,99 @@ func TestQueryWithArrayBoundaryFields(t *testing.T) {
 	f.checkSuccess(t)
 }
 
+func TestQueryWithAbstractType(t *testing.T) {
+	f := &queryExecutionFixture{
+		services: []testService{
+			{
+				schema: `
+				directive @boundary on OBJECT | FIELD_DEFINITION
+
+				interface Foo {
+				  id: ID!
+				}
+
+				type Bar implements Foo {
+				  id: ID!
+				  bar: String!
+				}
+
+				type Baz implements Foo @boundary {
+				  id: ID!
+				}
+
+				type Query {
+				  foos: [Foo!]!
+				  baz(id: ID!): Baz @boundary
+				}`,
+				handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					_, _ = w.Write([]byte(`{
+						"data": {
+							"foos": [
+								{
+									"_bramble_id": "1",
+									"id": "1"
+								},
+								{
+									"id": "2",
+									"bar": "bar"
+								}
+							]
+						}
+					}
+					`))
+				}),
+			},
+			{
+				schema: `
+					directive @boundary on OBJECT | FIELD_DEFINITION
+
+					type Baz @boundary {
+						id: ID!
+						baz: String!
+					}
+
+					type Query {
+						baz(id: ID!): Baz @boundary
+					}
+				`,
+				handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					_, _ = w.Write([]byte(`{
+						"data": {
+							"_0": {
+								"_bramble_id": "1",
+								"id": "1",
+								"baz": "baz"
+							}
+						}
+					}
+					`))
+				}),
+			},
+		},
+		query: `{
+			foos {
+				id
+				... on Baz {
+					baz
+				}
+			}
+		}`,
+		expected: `{
+			"foos": [
+				{
+					"id": "1",
+					"baz": "baz"
+				},
+				{
+					"id": "2"
+				}
+			]
+		}`,
+	}
+
+	f.checkSuccess(t)
+}
+
 func TestMergeWithNull(t *testing.T) {
 	nullMap := make(map[string]interface{})
 	dataMap := map[string]interface{}{

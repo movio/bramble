@@ -387,9 +387,6 @@ func extractBoundaryIDs(data interface{}, insertionPoint []string) ([]string, er
 		switch ptr := ptr.(type) {
 		case map[string]interface{}:
 			id, err := boundaryIDFromMap(ptr)
-			if err != nil {
-				return []string{}, nil
-			}
 			return []string{id}, err
 		case []interface{}:
 			result := []string{}
