@@ -105,7 +105,7 @@ func TestMergeTwoSchemasNoBoundaryTypes(t *testing.T) {
 	fixture.CheckSuccess(t)
 }
 
-func TestMergeTwoSchemasWithCollindingInterface(t *testing.T) {
+func TestMergeTwoSchemasWithCollidingInterface(t *testing.T) {
 	fixture := MergeTestFixture{
 		Input1: `
 			interface Named {

@@ -553,30 +553,38 @@ func TestExtractBoundaryIDs(t *testing.T) {
 		"gizmos": [
 			{
 				"_bramble_id": "1",
+				"_bramble__typename": "Gizmo",
 				"name": "Gizmo 1",
 				"owner": {
-					"_bramble_id": "1"
+					"_bramble_id": "1",
+					"_bramble__typename": "Owner"
 				}
 			},
 			{
 				"_bramble_id": "2",
+				"_bramble__typename": "Gizmo",
 				"name": "Gizmo 2",
 				"owner": {
-					"_bramble_id": "1"
+					"_bramble_id": "1",
+					"_bramble__typename": "Owner"
 				}
 			},
 			{
 				"_bramble_id": "3",
+				"_bramble__typename": "Gizmo",
 				"name": "Gizmo 3",
 				"owner": {
-					"_bramble_id": "2"
+					"_bramble_id": "2",
+					"_bramble__typename": "Owner"
 				}
 			},
 			{
 				"_bramble_id": "4",
+				"_bramble__typename": "Gizmo",
 				"name": "Gizmo 4",
 				"owner": {
-					"_bramble_id": "5"
+					"_bramble_id": "5",
+					"_bramble__typename": "Owner"
 				}
 			}
 		]
@@ -585,7 +593,7 @@ func TestExtractBoundaryIDs(t *testing.T) {
 	expected := []string{"1", "1", "2", "5"}
 	insertionPoint := []string{"gizmos", "owner"}
 	require.NoError(t, json.Unmarshal([]byte(dataJSON), &data))
-	result, err := extractBoundaryIDs(data, insertionPoint)
+	result, err := extractBoundaryIDs(data, insertionPoint, "Owner")
 	require.NoError(t, err)
 	require.Equal(t, expected, result)
 }
