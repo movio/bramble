@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -288,7 +287,7 @@ func (q *queryExecution) createGQLErrors(step *QueryPlanStep, err error) gqlerro
 }
 
 // The insertionPoint represents the level a piece of data should be inserted at, relative to the root of the root step's data.
-// However results from a boundary query only contain a portion of that tree. For example, you could
+// However, results from a boundary query only contain a portion of that tree. For example, you could
 // have insertionPoint: ["foo", "bar", "movies", "movie", "compTitles"], with the below example as the boundary result we're
 // crawling for ids:
 // [
@@ -375,7 +374,7 @@ func extractAndDedupeBoundaryIDs(data interface{}, insertionPoint []string) ([]s
 		deduped = append(deduped, id)
 	}
 
-	return sort.StringSlice(deduped), nil
+	return deduped, nil
 }
 
 func extractBoundaryIDs(data interface{}, insertionPoint []string) ([]string, error) {
@@ -386,10 +385,13 @@ func extractBoundaryIDs(data interface{}, insertionPoint []string) ([]string, er
 	if len(insertionPoint) == 0 {
 		switch ptr := ptr.(type) {
 		case map[string]interface{}:
-			id, err := boundaryIDFromMap(ptr)
-			return []string{id}, err
+			id := boundaryIDFromMap(ptr)
+			if id == "" {
+				return []string{}, nil
+			}
+			return []string{id}, nil
 		case []interface{}:
-			result := []string{}
+			var result []string
 			for _, innerPtr := range ptr {
 				ids, err := extractBoundaryIDs(innerPtr, insertionPoint)
 				if err != nil {
@@ -406,7 +408,7 @@ func extractBoundaryIDs(data interface{}, insertionPoint []string) ([]string, er
 	case map[string]interface{}:
 		return extractBoundaryIDs(ptr[insertionPoint[0]], insertionPoint[1:])
 	case []interface{}:
-		result := []string{}
+		var result []string
 		for _, innerPtr := range ptr {
 			ids, err := extractBoundaryIDs(innerPtr, insertionPoint)
 			if err != nil {

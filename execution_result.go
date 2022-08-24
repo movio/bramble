@@ -73,15 +73,11 @@ func mergeExecutionResultsRec(src interface{}, dst interface{}, insertionPoint [
 					return err
 				}
 
-				dstID, err := boundaryIDFromMap(ptr)
-				if err != nil {
-					return err
-				}
-
+				dstID := boundaryIDFromMap(ptr)
 				for _, result := range boundaryResults {
-					srcID, err := boundaryIDFromMap(result)
-					if err != nil {
-						return err
+					srcID := boundaryIDFromMap(result)
+					if dstID == "" || srcID == "" {
+						continue
 					}
 					if srcID == dstID {
 						for k, v := range result {
@@ -137,12 +133,12 @@ func mergeExecutionResultsRec(src interface{}, dst interface{}, insertionPoint [
 	return nil
 }
 
-func boundaryIDFromMap(boundaryMap map[string]interface{}) (string, error) {
+func boundaryIDFromMap(boundaryMap map[string]interface{}) string {
 	id, ok := boundaryMap["_bramble_id"].(string)
 	if ok {
-		return id, nil
+		return id
 	}
-	return "", fmt.Errorf(`boundaryIDFromMap: "_bramble_id" not found`)
+	return ""
 }
 
 func getBoundaryFieldResults(src []interface{}) ([]map[string]interface{}, error) {

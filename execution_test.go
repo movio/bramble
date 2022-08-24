@@ -3185,6 +3185,7 @@ func TestQueryWithAbstractType(t *testing.T) {
 							"foos": [
 								{
 									"_bramble_id": "1",
+									"_bramble__typename": "Baz",
 									"id": "1"
 								},
 								{
