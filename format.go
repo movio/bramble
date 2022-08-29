@@ -3,9 +3,7 @@ package bramble
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
@@ -33,6 +31,73 @@ func indentPrefix(sb *strings.Builder, level int, suffix ...string) (int, error)
 		}
 	}
 	return total, nil
+}
+
+func formatDocument(ctx context.Context, schema *ast.Schema, operationType string, selectionSet ast.SelectionSet) string {
+	return strings.ToLower(operationType) + formatOperation(ctx, selectionSet) + formatSelectionSet(ctx, schema, selectionSet)
+}
+
+func formatOperation(ctx context.Context, selection ast.SelectionSet) string {
+	sb := strings.Builder{}
+
+	if !graphql.HasOperationContext(ctx) {
+		return ""
+	}
+	operationCtx := graphql.GetOperationContext(ctx)
+
+	var arguments []string
+	variableNames := variables(selection)
+	for _, variableDefinition := range operationCtx.Operation.VariableDefinitions {
+		if _, exists := variableNames[variableDefinition.Variable]; !exists {
+			continue
+		}
+
+		argument := fmt.Sprintf("$%s: %s", variableDefinition.Variable, variableDefinition.Type.String())
+		arguments = append(arguments, argument)
+	}
+
+	sb.WriteString(" " + operationCtx.OperationName)
+	if len(arguments) == 0 {
+		return sb.String()
+	}
+
+	sb.WriteString("(")
+	sb.WriteString(strings.Join(arguments, ","))
+	sb.WriteString(")")
+
+	return sb.String()
+}
+
+func variables(selectionSet ast.SelectionSet) map[string]interface{} {
+	var names []string
+	for _, s := range selectionSet {
+		switch selection := s.(type) {
+		case *ast.Field:
+			for _, a := range selection.Arguments {
+				names = append(names, variableNames(a.Value, names)...)
+			}
+		}
+	}
+
+	uniqueNames := map[string]interface{}{}
+	for _, n := range names {
+		uniqueNames[n] = struct{}{}
+	}
+
+	return uniqueNames
+}
+
+func variableNames(a *ast.Value, names []string) []string {
+	switch a.Kind {
+	case ast.Variable:
+		names = append(names, a.Raw)
+	default:
+		for _, child := range a.Children {
+			names = append(names, variableNames(child.Value, names)...)
+		}
+	}
+
+	return names
 }
 
 func formatSelectionSelectionSet(sb *strings.Builder, schema *ast.Schema, vars map[string]interface{}, level int, selectionSet ast.SelectionSet) {
@@ -95,7 +160,7 @@ func formatSelectionSet(ctx context.Context, schema *ast.Schema, selection ast.S
 
 	sb.WriteString("{")
 	formatSelection(&sb, schema, vars, 0, selection)
-	sb.WriteString("\n}")
+	sb.WriteString(" }")
 
 	return sb.String()
 }
@@ -120,7 +185,7 @@ func formatArgument(schema *ast.Schema, v *ast.Value, vars map[string]interface{
 	}
 	switch v.Kind {
 	case ast.Variable:
-		return expandAndFormatVariable(schema, schema.Types[v.ExpectedType.Name()], vars[v.Raw])
+		return "$" + v.Raw
 	case ast.IntValue, ast.FloatValue, ast.EnumValue, ast.BooleanValue, ast.NullValue:
 		return v.Raw
 	case ast.StringValue, ast.BlockValue:
@@ -140,69 +205,6 @@ func formatArgument(schema *ast.Schema, v *ast.Value, vars map[string]interface{
 	default:
 		panic(fmt.Errorf("unknown value kind %d", v.Kind))
 	}
-}
-
-func expandAndFormatVariable(schema *ast.Schema, objectType *ast.Definition, v interface{}) string {
-	if v == nil {
-		return "null"
-	}
-
-	switch objectType.Kind {
-	case ast.Scalar:
-		b, _ := json.Marshal(v)
-		return string(b)
-	case ast.Enum:
-		return fmt.Sprint(v)
-	case ast.Object, ast.InputObject, ast.Interface, ast.Union:
-		switch v := v.(type) {
-		case map[string]interface{}:
-			var buf strings.Builder
-			buf.WriteString("{")
-
-			for i, f := range objectType.Fields {
-				if i != 0 {
-					buf.WriteString(" ")
-				}
-
-				fieldName := f.Name
-				value, ok := v[fieldName]
-				if !ok {
-					continue
-				}
-
-				// if it's a list we call recursively on every element
-				if f.Type.Elem != nil {
-					switch reflect.TypeOf(value).Kind() {
-					case reflect.Slice:
-						s := reflect.ValueOf(value)
-						var elems []string
-						for i := 0; i < s.Len(); i++ {
-							elems = append(elems, expandAndFormatVariable(schema, schema.Types[f.Type.Elem.Name()], s.Index(i).Interface()))
-						}
-						fmt.Fprintf(&buf, "%s: [%s]", fieldName, strings.Join(elems, ", "))
-						continue
-					default:
-						panic("invalid type, expected slice")
-					}
-				}
-
-				fmt.Fprintf(&buf, "%s: %s", fieldName, expandAndFormatVariable(schema, schema.Types[f.Type.Name()], value))
-			}
-
-			buf.WriteString("}")
-			return buf.String()
-		case []interface{}:
-			var val []string
-			for _, elem := range v {
-				val = append(val, expandAndFormatVariable(schema, objectType, elem))
-			}
-			return "[" + strings.Join(val, ",") + "]"
-		default:
-			panic("unknown type " + reflect.TypeOf(v).String())
-		}
-	}
-
-	return ""
 }
 
 func formatSchema(schema *ast.Schema) string {

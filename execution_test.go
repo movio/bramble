@@ -3594,9 +3594,15 @@ func testContextWithNoPermissions(op *ast.OperationDefinition) context.Context {
 }
 
 func testContextWithVariables(vars map[string]interface{}, op *ast.OperationDefinition) context.Context {
+	operationName := ""
+	if op != nil {
+		operationName = op.Name
+	}
+
 	return AddPermissionsToContext(graphql.WithResponseContext(graphql.WithOperationContext(context.Background(), &graphql.OperationContext{
-		Variables: vars,
-		Operation: op,
+		OperationName: operationName,
+		Variables:     vars,
+		Operation:     op,
 	}), graphql.DefaultErrorPresenter, graphql.DefaultRecover), OperationPermissions{
 		AllowedRootQueryFields:        AllowedFields{AllowAll: true},
 		AllowedRootMutationFields:     AllowedFields{AllowAll: true},

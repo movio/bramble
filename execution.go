@@ -8,6 +8,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/99designs/gqlgen/graphql"
 	"github.com/vektah/gqlparser/v2/ast"
 	"github.com/vektah/gqlparser/v2/gqlerror"
 	"golang.org/x/sync/errgroup"
@@ -92,17 +93,21 @@ func (q *queryExecution) Execute(queryPlan *QueryPlan) ([]executionResult, gqler
 func (q *queryExecution) executeRootStep(step *QueryPlanStep) error {
 	var document string
 
-	switch operationType := step.ParentType; operationType {
+	switch step.ParentType {
 	case queryObjectName, mutationObjectName:
-		selectionSet := formatSelectionSet(q.ctx, q.schema, step.SelectionSet)
-		document = fmt.Sprintf(`%s %s %s`, strings.ToLower(operationType), q.operationName, selectionSet)
+		document = formatDocument(q.ctx, q.schema, step.ParentType, step.SelectionSet)
 	default:
 		return errors.New("expected mutation or query root step")
 	}
 
-	var data map[string]interface{}
+	var variables map[string]interface{}
+	if graphql.HasOperationContext(q.ctx) {
+		operationContext := graphql.GetOperationContext(q.ctx)
+		variables = operationContext.Variables
+	}
 
-	err := q.executeDocument(document, step.ServiceURL, &data)
+	var data map[string]interface{}
+	err := q.executeDocument(document, variables, step.ServiceURL, &data)
 	if err != nil {
 		q.writeExecutionResult(step, data, err)
 		return nil
@@ -127,8 +132,9 @@ func (q *queryExecution) executeRootStep(step *QueryPlanStep) error {
 	return nil
 }
 
-func (q *queryExecution) executeDocument(document string, serviceURL string, response interface{}) error {
-	req := NewRequest(document).
+func (q *queryExecution) executeDocument(query string, variables map[string]interface{}, serviceURL string, response interface{}) error {
+	req := NewRequest(query).
+		WithVariables(variables).
 		WithHeaders(GetOutgoingRequestHeadersFromContext(q.ctx)).
 		WithOperationName(q.operationName)
 	return q.graphqlClient.Request(q.ctx, serviceURL, req, &response)
@@ -213,7 +219,7 @@ func (q *queryExecution) executeBoundaryQuery(documents []string, serviceURL str
 	if !boundaryFieldGetter.Array {
 		for _, document := range documents {
 			partialData := make(map[string]interface{})
-			err := q.executeDocument(document, serviceURL, &partialData)
+			err := q.executeDocument(document, nil, serviceURL, &partialData)
 			if err != nil {
 				return nil, err
 			}
@@ -232,7 +238,7 @@ func (q *queryExecution) executeBoundaryQuery(documents []string, serviceURL str
 		Result []interface{} `json:"_result"`
 	}{}
 
-	err := q.executeDocument(documents[0], serviceURL, &data)
+	err := q.executeDocument(documents[0], nil, serviceURL, &data)
 	return data.Result, err
 }
 
