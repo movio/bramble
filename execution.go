@@ -8,7 +8,6 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/99designs/gqlgen/graphql"
 	"github.com/vektah/gqlparser/v2/ast"
 	"github.com/vektah/gqlparser/v2/gqlerror"
 	"golang.org/x/sync/errgroup"
@@ -93,17 +92,12 @@ func (q *queryExecution) Execute(queryPlan *QueryPlan) ([]executionResult, gqler
 func (q *queryExecution) executeRootStep(step *QueryPlanStep) error {
 	var document string
 
+	var variables map[string]interface{}
 	switch step.ParentType {
 	case queryObjectName, mutationObjectName:
-		document = formatDocument(q.ctx, q.schema, step.ParentType, step.SelectionSet)
+		document, variables = formatDocument(q.ctx, q.schema, step.ParentType, step.SelectionSet)
 	default:
 		return errors.New("expected mutation or query root step")
-	}
-
-	var variables map[string]interface{}
-	if graphql.HasOperationContext(q.ctx) {
-		operationContext := graphql.GetOperationContext(q.ctx)
-		variables = operationContext.Variables
 	}
 
 	var data map[string]interface{}

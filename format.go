@@ -33,23 +33,31 @@ func indentPrefix(sb *strings.Builder, level int, suffix ...string) (int, error)
 	return total, nil
 }
 
-func formatDocument(ctx context.Context, schema *ast.Schema, operationType string, selectionSet ast.SelectionSet) string {
-	return strings.ToLower(operationType) + formatOperation(ctx, selectionSet) + formatSelectionSet(ctx, schema, selectionSet)
+func formatDocument(ctx context.Context, schema *ast.Schema, operationType string, selectionSet ast.SelectionSet) (string, map[string]interface{}) {
+	operation, vars := formatOperation(ctx, selectionSet)
+	return strings.ToLower(operationType) + operation + formatSelectionSet(ctx, schema, selectionSet), vars
 }
 
-func formatOperation(ctx context.Context, selection ast.SelectionSet) string {
+func formatOperation(ctx context.Context, selection ast.SelectionSet) (string, map[string]interface{}) {
 	sb := strings.Builder{}
 
 	if !graphql.HasOperationContext(ctx) {
-		return ""
+		return "", nil
 	}
 	operationCtx := graphql.GetOperationContext(ctx)
 
+	usedVariables := map[string]interface{}{}
 	var arguments []string
 	variableNames := variables(selection)
 	for _, variableDefinition := range operationCtx.Operation.VariableDefinitions {
 		if _, exists := variableNames[variableDefinition.Variable]; !exists {
 			continue
+		}
+
+		for varName, varValue := range operationCtx.Variables {
+			if varName == variableDefinition.Variable {
+				usedVariables[varName] = varValue
+			}
 		}
 
 		argument := fmt.Sprintf("$%s: %s", variableDefinition.Variable, variableDefinition.Type.String())
@@ -58,14 +66,14 @@ func formatOperation(ctx context.Context, selection ast.SelectionSet) string {
 
 	sb.WriteString(" " + operationCtx.OperationName)
 	if len(arguments) == 0 {
-		return sb.String()
+		return sb.String(), nil
 	}
 
 	sb.WriteString("(")
 	sb.WriteString(strings.Join(arguments, ","))
 	sb.WriteString(")")
 
-	return sb.String()
+	return sb.String(), usedVariables
 }
 
 func variables(selectionSet ast.SelectionSet) map[string]interface{} {

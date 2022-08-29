@@ -390,13 +390,14 @@ func TestFormatDocument(t *testing.T) {
 	}`)
 
 	operationDefinition := query.Operations[0]
-	res := formatDocument(
+	res, vars := formatDocument(
 		testContextWithVariables(map[string]interface{}{"id": "123"}, operationDefinition),
 		schema,
 		string(operationDefinition.Operation),
 		operationDefinition.SelectionSet,
 	)
 	assert.Equal(t, `query {    search(id: "123") {        id        title    } }`, res)
+	assert.Equal(t, (map[string]interface{})(nil), vars)
 }
 
 func TestFormatDocumentWithOperationName(t *testing.T) {
@@ -416,13 +417,14 @@ func TestFormatDocumentWithOperationName(t *testing.T) {
 	}`)
 
 	operationDefinition := query.Operations[0]
-	res := formatDocument(
+	res, vars := formatDocument(
 		testContextWithVariables(map[string]interface{}{"id": "123"}, operationDefinition),
 		schema,
 		string(operationDefinition.Operation),
 		operationDefinition.SelectionSet,
 	)
 	assert.Equal(t, `query search{    search(id: "123") {        id        title    } }`, res)
+	assert.Equal(t, (map[string]interface{})(nil), vars)
 }
 
 func TestFormatDocumentWithVariable(t *testing.T) {
@@ -442,13 +444,14 @@ func TestFormatDocumentWithVariable(t *testing.T) {
 	}`)
 
 	operationDefinition := query.Operations[0]
-	res := formatDocument(
-		testContextWithVariables(nil, operationDefinition),
+	res, vars := formatDocument(
+		testContextWithVariables(map[string]interface{}{"id": "123", "extra": "ignore"}, operationDefinition),
 		schema,
 		string(operationDefinition.Operation),
 		operationDefinition.SelectionSet,
 	)
 	assert.Equal(t, `query search($id: ID!){    search(id: $id) {        id        title    } }`, res)
+	assert.Equal(t, map[string]interface{}{"id": "123"}, vars)
 }
 
 func TestFormatDocumentWithListVariable(t *testing.T) {
@@ -468,13 +471,14 @@ func TestFormatDocumentWithListVariable(t *testing.T) {
 	}`)
 
 	operationDefinition := query.Operations[0]
-	res := formatDocument(
-		testContextWithVariables(nil, operationDefinition),
+	res, vars := formatDocument(
+		testContextWithVariables(map[string]interface{}{"ids": `["123", "456"]`, "extra": "ignore"}, operationDefinition),
 		schema,
 		string(operationDefinition.Operation),
 		operationDefinition.SelectionSet,
 	)
 	assert.Equal(t, `query search($ids: [ID!]){    search(ids: $ids) {        id        title    } }`, res)
+	assert.Equal(t, map[string]interface{}{"ids": `["123", "456"]`}, vars)
 }
 
 func TestFormatDocumentWithVariableWithinList(t *testing.T) {
@@ -494,13 +498,14 @@ func TestFormatDocumentWithVariableWithinList(t *testing.T) {
 	}`)
 
 	operationDefinition := query.Operations[0]
-	res := formatDocument(
-		testContextWithVariables(nil, operationDefinition),
+	res, vars := formatDocument(
+		testContextWithVariables(map[string]interface{}{"id": "123", "extra": "ignore"}, operationDefinition),
 		schema,
 		string(operationDefinition.Operation),
 		operationDefinition.SelectionSet,
 	)
 	assert.Equal(t, `query search($id: ID!){    search(ids: ["123",$id,"789"]) {        id        title    } }`, res)
+	assert.Equal(t, map[string]interface{}{"id": "123"}, vars)
 }
 
 func TestFormatDocumentWithInputVariable(t *testing.T) {
@@ -524,13 +529,14 @@ func TestFormatDocumentWithInputVariable(t *testing.T) {
 	}`)
 
 	operationDefinition := query.Operations[0]
-	res := formatDocument(
-		testContextWithVariables(nil, operationDefinition),
+	res, vars := formatDocument(
+		testContextWithVariables(map[string]interface{}{"filter": `{id: "123"}`, "extra": "ignore"}, operationDefinition),
 		schema,
 		string(operationDefinition.Operation),
 		operationDefinition.SelectionSet,
 	)
 	assert.Equal(t, `query search($filter: Filter){    search(filter: $filter) {        id        title    } }`, res)
+	assert.Equal(t, map[string]interface{}{"filter": `{id: "123"}`}, vars)
 }
 
 func TestFormatDocumentWithVariableWithinInput(t *testing.T) {
@@ -554,13 +560,14 @@ func TestFormatDocumentWithVariableWithinInput(t *testing.T) {
 	}`)
 
 	operationDefinition := query.Operations[0]
-	res := formatDocument(
-		testContextWithVariables(nil, operationDefinition),
+	res, vars := formatDocument(
+		testContextWithVariables(map[string]interface{}{"id": "123", "extra": "ignore"}, operationDefinition),
 		schema,
 		string(operationDefinition.Operation),
 		operationDefinition.SelectionSet,
 	)
 	assert.Equal(t, `query search($id: ID!){    search(filter: {id:$id}) {        id        title    } }`, res)
+	assert.Equal(t, map[string]interface{}{"id": "123"}, vars)
 }
 
 func TestFormatDocumentWithVariableWithinNestedInput(t *testing.T) {
@@ -588,11 +595,12 @@ func TestFormatDocumentWithVariableWithinNestedInput(t *testing.T) {
 	}`)
 
 	operationDefinition := query.Operations[0]
-	res := formatDocument(
-		testContextWithVariables(map[string]interface{}{"filter": `{id: "123"}`}, operationDefinition),
+	res, vars := formatDocument(
+		testContextWithVariables(map[string]interface{}{"id": "123", "extra": "ignore"}, operationDefinition),
 		schema,
 		string(operationDefinition.Operation),
 		operationDefinition.SelectionSet,
 	)
 	assert.Equal(t, `query search($id: ID!){    search(filter: {sub:{id:$id}}) {        id        title    } }`, res)
+	assert.Equal(t, map[string]interface{}{"id": "123"}, vars)
 }
