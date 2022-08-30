@@ -158,12 +158,12 @@ func (q *queryExecution) executeChildStep(step *QueryPlanStep, boundaryIDs []str
 		return err
 	}
 
-	documents, err := buildBoundaryQueryDocuments(q.ctx, q.operationName, q.schema, step, boundaryIDs, boundaryField, 50)
+	documents, variables, err := buildBoundaryQueryDocuments(q.ctx, q.schema, step, boundaryIDs, boundaryField, 50)
 	if err != nil {
 		return err
 	}
 
-	data, err := q.executeBoundaryQuery(documents, step.ServiceURL, boundaryField)
+	data, err := q.executeBoundaryQuery(documents, step.ServiceURL, variables, boundaryField)
 	if err != nil {
 		q.writeExecutionResult(step, data, err)
 		return nil
@@ -208,12 +208,12 @@ func extractNonNilBoundaryResults(data []interface{}) []interface{} {
 	return nonNilResults
 }
 
-func (q *queryExecution) executeBoundaryQuery(documents []string, serviceURL string, boundaryFieldGetter BoundaryField) ([]interface{}, error) {
+func (q *queryExecution) executeBoundaryQuery(documents []string, serviceURL string, variables map[string]interface{}, boundaryFieldGetter BoundaryField) ([]interface{}, error) {
 	output := make([]interface{}, 0)
 	if !boundaryFieldGetter.Array {
 		for _, document := range documents {
 			partialData := make(map[string]interface{})
-			err := q.executeDocument(document, nil, serviceURL, &partialData)
+			err := q.executeDocument(document, variables, serviceURL, &partialData)
 			if err != nil {
 				return nil, err
 			}
@@ -232,7 +232,7 @@ func (q *queryExecution) executeBoundaryQuery(documents []string, serviceURL str
 		Result []interface{} `json:"_result"`
 	}{}
 
-	err := q.executeDocument(documents[0], nil, serviceURL, &data)
+	err := q.executeDocument(documents[0], variables, serviceURL, &data)
 	return data.Result, err
 }
 
@@ -292,7 +292,7 @@ func (q *queryExecution) createGQLErrors(step *QueryPlanStep, err error) gqlerro
 }
 
 // The insertionPoint represents the level a piece of data should be inserted at, relative to the root of the root step's data.
-// However, results from a boundary query only contain a portion of that tree. For example, you could
+// However results from a boundary query only contain a portion of that tree. For example, you could
 // have insertionPoint: ["foo", "bar", "movies", "movie", "compTitles"], with the below example as the boundary result we're
 // crawling for ids:
 // [
@@ -435,15 +435,17 @@ func extractBoundaryIDs(data interface{}, insertionPoint []string, parentType st
 	}
 }
 
-func buildBoundaryQueryDocuments(ctx context.Context, operationName string, schema *ast.Schema, step *QueryPlanStep, ids []string, parentTypeBoundaryField BoundaryField, batchSize int) ([]string, error) {
+func buildBoundaryQueryDocuments(ctx context.Context, schema *ast.Schema, step *QueryPlanStep, ids []string, parentTypeBoundaryField BoundaryField, batchSize int) ([]string, map[string]interface{}, error) {
+	operation, variables := formatOperation(ctx, step.SelectionSet)
+
 	selectionSetQL := formatSelectionSetSingleLine(ctx, schema, step.SelectionSet)
 	if parentTypeBoundaryField.Array {
-		qids := []string{}
+		var qids []string
 		for _, id := range ids {
 			qids = append(qids, fmt.Sprintf("%q", id))
 		}
 		idsQL := fmt.Sprintf("[%s]", strings.Join(qids, ", "))
-		return []string{fmt.Sprintf(`query %s { _result: %s(%s: %s) %s }`, operationName, parentTypeBoundaryField.Field, parentTypeBoundaryField.Argument, idsQL, selectionSetQL)}, nil
+		return []string{fmt.Sprintf(`query %s { _result: %s(%s: %s) %s }`, operation, parentTypeBoundaryField.Field, parentTypeBoundaryField.Argument, idsQL, selectionSetQL)}, variables, nil
 	}
 
 	var (
@@ -457,12 +459,11 @@ func buildBoundaryQueryDocuments(ctx context.Context, operationName string, sche
 			selections = append(selections, selection)
 			selectionIndex++
 		}
-
-		document := fmt.Sprintf("query %s { %s }", operationName, strings.Join(selections, " "))
+		document := "{ " + strings.Join(selections, " ") + " }"
 		documents = append(documents, document)
 	}
 
-	return documents, nil
+	return documents, variables, nil
 }
 
 func batchBy(items []string, batchSize int) (batches [][]string) {

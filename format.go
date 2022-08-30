@@ -35,7 +35,7 @@ func indentPrefix(sb *strings.Builder, level int, suffix ...string) (int, error)
 
 func formatDocument(ctx context.Context, schema *ast.Schema, operationType string, selectionSet ast.SelectionSet) (string, map[string]interface{}) {
 	operation, vars := formatOperation(ctx, selectionSet)
-	return strings.ToLower(operationType) + operation + formatSelectionSet(ctx, schema, selectionSet), vars
+	return strings.ToLower(operationType) + " " + operation + formatSelectionSet(ctx, schema, selectionSet), vars
 }
 
 func formatOperation(ctx context.Context, selection ast.SelectionSet) (string, map[string]interface{}) {
@@ -46,9 +46,14 @@ func formatOperation(ctx context.Context, selection ast.SelectionSet) (string, m
 	}
 	operationCtx := graphql.GetOperationContext(ctx)
 
-	usedVariables := map[string]interface{}{}
+	var variables []string
+	variableNames := map[string]struct{}{}
+	for _, s := range selectionSetVariables(selection, variables) {
+		variableNames[s] = struct{}{}
+	}
+
 	var arguments []string
-	variableNames := variables(selection)
+	usedVariables := map[string]interface{}{}
 	for _, variableDefinition := range operationCtx.Operation.VariableDefinitions {
 		if _, exists := variableNames[variableDefinition.Variable]; !exists {
 			continue
@@ -64,7 +69,7 @@ func formatOperation(ctx context.Context, selection ast.SelectionSet) (string, m
 		arguments = append(arguments, argument)
 	}
 
-	sb.WriteString(" " + operationCtx.OperationName)
+	sb.WriteString(operationCtx.OperationName)
 	if len(arguments) == 0 {
 		return sb.String(), nil
 	}
@@ -76,36 +81,51 @@ func formatOperation(ctx context.Context, selection ast.SelectionSet) (string, m
 	return sb.String(), usedVariables
 }
 
-func variables(selectionSet ast.SelectionSet) map[string]interface{} {
-	var names []string
+func selectionSetVariables(selectionSet ast.SelectionSet, vars []string) []string {
 	for _, s := range selectionSet {
 		switch selection := s.(type) {
 		case *ast.Field:
-			for _, a := range selection.Arguments {
-				names = append(names, variableNames(a.Value, names)...)
-			}
+			vars = directiveListVariables(selection.Directives, vars)
+			vars = argumentListVariables(selection.Arguments, vars)
+			vars = append(vars, selectionSetVariables(selection.SelectionSet, vars)...)
+		case *ast.InlineFragment:
+			vars = directiveListVariables(selection.Directives, vars)
+			vars = append(vars, selectionSetVariables(selection.SelectionSet, vars)...)
+		case *ast.FragmentSpread:
+			vars = directiveListVariables(selection.Directives, vars)
 		}
 	}
 
-	uniqueNames := map[string]interface{}{}
-	for _, n := range names {
-		uniqueNames[n] = struct{}{}
-	}
-
-	return uniqueNames
+	return vars
 }
 
-func variableNames(a *ast.Value, names []string) []string {
+func directiveListVariables(directives ast.DirectiveList, vars []string) []string {
+	for _, d := range directives {
+		vars = argumentListVariables(d.Arguments, vars)
+	}
+
+	return vars
+}
+
+func argumentListVariables(arguments ast.ArgumentList, vars []string) []string {
+	for _, a := range arguments {
+		vars = append(vars, valueVariables(a.Value, vars)...)
+	}
+
+	return vars
+}
+
+func valueVariables(a *ast.Value, vars []string) []string {
 	switch a.Kind {
 	case ast.Variable:
-		names = append(names, a.Raw)
+		vars = append(vars, a.Raw)
 	default:
 		for _, child := range a.Children {
-			names = append(names, variableNames(child.Value, names)...)
+			vars = append(vars, valueVariables(child.Value, vars)...)
 		}
 	}
 
-	return names
+	return vars
 }
 
 func formatSelectionSelectionSet(sb *strings.Builder, schema *ast.Schema, vars map[string]interface{}, level int, selectionSet ast.SelectionSet) {

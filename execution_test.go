@@ -3572,9 +3572,17 @@ func assertQueriesEqual(t *testing.T, schema, expected, actual string) bool {
 }
 
 func testContextWithoutVariables(op *ast.OperationDefinition) context.Context {
+	operationName := ""
+	if op != nil {
+		operationName = op.Name
+	} else {
+		op = &ast.OperationDefinition{}
+	}
+
 	return AddPermissionsToContext(graphql.WithOperationContext(context.Background(), &graphql.OperationContext{
-		Variables: map[string]interface{}{},
-		Operation: op,
+		OperationName: operationName,
+		Variables:     map[string]interface{}{},
+		Operation:     op,
 	}), OperationPermissions{
 		AllowedRootQueryFields:        AllowedFields{AllowAll: true},
 		AllowedRootMutationFields:     AllowedFields{AllowAll: true},
@@ -3583,9 +3591,17 @@ func testContextWithoutVariables(op *ast.OperationDefinition) context.Context {
 }
 
 func testContextWithNoPermissions(op *ast.OperationDefinition) context.Context {
+	operationName := ""
+	if op != nil {
+		operationName = op.Name
+	} else {
+		op = &ast.OperationDefinition{}
+	}
+
 	return AddPermissionsToContext(graphql.WithOperationContext(context.Background(), &graphql.OperationContext{
-		Variables: map[string]interface{}{},
-		Operation: op,
+		OperationName: operationName,
+		Variables:     map[string]interface{}{},
+		Operation:     op,
 	}), OperationPermissions{
 		AllowedRootQueryFields:        AllowedFields{},
 		AllowedRootMutationFields:     AllowedFields{},
@@ -3597,6 +3613,8 @@ func testContextWithVariables(vars map[string]interface{}, op *ast.OperationDefi
 	operationName := ""
 	if op != nil {
 		operationName = op.Name
+	} else {
+		op = &ast.OperationDefinition{}
 	}
 
 	return AddPermissionsToContext(graphql.WithResponseContext(graphql.WithOperationContext(context.Background(), &graphql.OperationContext{
