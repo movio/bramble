@@ -25,6 +25,10 @@ func NewGateway(executableSchema *ExecutableSchema, plugins []Plugin) *Gateway {
 	}
 }
 
+func FromConfig(cfg *Config) *Gateway {
+	return NewGateway(cfg.executableSchema, cfg.plugins)
+}
+
 // UpdateSchemas periodically updates the execute schema
 func (g *Gateway) UpdateSchemas(interval time.Duration) {
 	for range time.Tick(interval) {
