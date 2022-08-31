@@ -213,7 +213,7 @@ func TestFederatedQueryFragmentSpreads(t *testing.T) {
 						"snapshot": {
 							"id": "100",
 							"name": "foo",
-							"gizmos": [{ "_bramble_id": "GIZMO1", "id": "GIZMO1" }],
+							"gizmos": [{ "_bramble_id": "GIZMO1", "id": "GIZMO1", "_bramble__typename": "Gizmo" }],
 							"_bramble__typename": "GizmoImplementation"
 						}
 					}
@@ -225,7 +225,7 @@ func TestFederatedQueryFragmentSpreads(t *testing.T) {
 						"snapshot": {
 							"id": "100",
 							"name": "foo",
-							"gadgets": [{ "_bramble_id": "GADGET1", "id": "GADGET1" }],
+							"gadgets": [{ "_bramble_id": "GADGET1", "id": "GADGET1", "_bramble__typename": "Gadget" }],
 							"_bramble__typename": "GadgetImplementation"
 						}
 					}
@@ -239,13 +239,13 @@ func TestFederatedQueryFragmentSpreads(t *testing.T) {
 							{
 								"id": "100",
 								"name": "foo",
-								"gadgets": [{ "_bramble_id": "GADGET1", "id": "GADGET1" }],
+								"gadgets": [{ "_bramble_id": "GADGET1", "id": "GADGET1", "_bramble__typename": "Gadget" }],
 								"_bramble__typename": "GadgetImplementation"
 							},
 							{
 								"id": "100",
 								"name": "foo",
-								"gizmos": [{ "_bramble_id": "GIZMO1", "id": "GIZMO1" }],
+								"gizmos": [{ "_bramble_id": "GIZMO1", "id": "GIZMO1", "_bramble__typename": "Gizmo" }],
 								"_bramble__typename": "GizmoImplementation"
 							}
 						]
@@ -287,6 +287,7 @@ func TestFederatedQueryFragmentSpreads(t *testing.T) {
 					"data": {
 						"_0": {
 							"_bramble_id": "GIZMO1",
+							"_bramble__typename": "Gizmo",
 							"id": "GIZMO1",
 							"name": "Gizmo #1"
 						}
@@ -299,6 +300,7 @@ func TestFederatedQueryFragmentSpreads(t *testing.T) {
 						"_result": [
 							{
 								"_bramble_id": "GADGET1",
+								"_bramble__typename": "Gadget",
 								"id": "GADGET1",
 								"name": "Gadget #1",
 								"agents": [
@@ -672,6 +674,7 @@ func TestQueryExecutionMultipleServices(t *testing.T) {
 						"data": {
 							"movie": {
 								"_bramble_id": "1",
+								"_bramble__typename": "Movie",
 								"id": "1",
 								"title": "Test title"
 							}
@@ -696,6 +699,7 @@ func TestQueryExecutionMultipleServices(t *testing.T) {
 						"data": {
 							"_0": {
 								"_bramble_id": "1",
+								"_bramble__typename": "Movie",
 								"id": "1",
 								"release": 2007
 							}
@@ -742,6 +746,7 @@ func TestQueryExecutionServiceTimeout(t *testing.T) {
 						"data": {
 							"movie": {
 								"_bramble_id": "1",
+								"_bramble__typename": "Movie",
 								"id": "1",
 								"title": "Test title"
 							}
@@ -768,6 +773,7 @@ func TestQueryExecutionServiceTimeout(t *testing.T) {
 						"data": {
 							"_0": {
 								"_bramble_id": "1",
+								"_bramble__typename": "Movie",
 								"id": "1",
 								"release": 2007,
 								"slowField": "very slow field"
@@ -803,7 +809,7 @@ func TestQueryExecutionServiceTimeout(t *testing.T) {
 					{Line: 5, Column: 5},
 				},
 				Extensions: map[string]interface{}{
-					"selectionSet": "{ slowField _bramble_id: id }",
+					"selectionSet": "{ slowField _bramble_id: id _bramble__typename: __typename }",
 				},
 			},
 		},
@@ -1030,6 +1036,7 @@ func TestQueryWithArrayBoundaryFieldsAndMultipleChildrenSteps(t *testing.T) {
 						"data": {
 							"randomMovie": {
 									"_bramble_id": "1",
+									"_bramble__typename": "Movie",
 									"id": "1",
 									"title": "Movie 1"
 							}
@@ -1040,9 +1047,9 @@ func TestQueryWithArrayBoundaryFieldsAndMultipleChildrenSteps(t *testing.T) {
 						w.Write([]byte(`{
 						"data": {
 							"_result": [
-								{ "_bramble_id": "2", "id": "2", "title": "Movie 2" },
-								{ "_bramble_id": "3", "id": "3", "title": "Movie 3" },
-								{ "_bramble_id": "4", "id": "4", "title": "Movie 4" }
+								{ "_bramble_id": "2", "_bramble__typename": "Movie", "id": "2", "title": "Movie 2" },
+								{ "_bramble_id": "3", "_bramble__typename": "Movie", "id": "3", "title": "Movie 3" },
+								{ "_bramble_id": "4", "_bramble__typename": "Movie", "id": "4", "title": "Movie 4" }
 							]
 						}
 					}
@@ -1067,10 +1074,11 @@ func TestQueryWithArrayBoundaryFieldsAndMultipleChildrenSteps(t *testing.T) {
 							"_result": [
 								{
 									"_bramble_id": "1",
+									"_bramble__typename": "Movie",
 									"compTitles": [
-										{"_bramble_id": "2", "id": "2"},
-										{"_bramble_id": "3", "id": "3"},
-										{"_bramble_id": "4", "id": "4"}
+										{"_bramble_id": "2", "_bramble__typename": "Movie", "id": "2"},
+										{"_bramble_id": "3", "_bramble__typename": "Movie", "id": "3"},
+										{"_bramble_id": "4", "_bramble__typename": "Movie", "id": "4"}
 									]
 								}
 							]
@@ -1135,15 +1143,18 @@ func TestQueryWithBoundaryFieldsAndNullsAboveInsertionPoint(t *testing.T) {
 					response := jsonToInterfaceMap(`{
 						"data": {
 							"ns": {
+								"_bramble__typename": "Namespace",
 								"movies": [
 									{
 										"_bramble_id": "MOVIE1",
+										"_bramble__typename": "Movie",
 										"id": "MOVIE1",
 										"title": "Movie #1",
-										"director": { "_bramble_id": "DIRECTOR1", "id": "DIRECTOR1" }
+										"director": { "_bramble_id": "DIRECTOR1", "_bramble__typename": "Person", "id": "DIRECTOR1" }
 									},
 									{
 										"_bramble_id": "MOVIE2",
+										"_bramble__typename": "Movie",
 										"id": "MOVIE2",
 										"title": "Movie #2",
 										"director": null
@@ -1174,6 +1185,7 @@ func TestQueryWithBoundaryFieldsAndNullsAboveInsertionPoint(t *testing.T) {
 							"data": {
 								"_0": {
 									"_bramble_id": "DIRECTOR1",
+									"_bramble__typename": "Person",
 									"name": "David Fincher"
 								}
 							}
@@ -1237,14 +1249,17 @@ func TestNestingNullableBoundaryTypes(t *testing.T) {
 									"tastyGizmos": [
 										{
 											"_bramble_id": "beehasknees",
+											"_bramble__typename": "Gizmo",
 											"id": "beehasknees"
 										},
 										{
 											"_bramble_id": "umlaut",
+											"_bramble__typename": "Gizmo",
 											"id": "umlaut"
 										},
 										{
 											"_bramble_id": "probanana",
+											"_bramble__typename": "Gizmo",
 											"id": "probanana"
 										}
 									]
@@ -1338,14 +1353,17 @@ func TestNestingNullableBoundaryTypes(t *testing.T) {
 									"tastyGizmos": [
 										{
 											"_bramble_id": "beehasknees",
+											"_bramble__typename": "Gizmo",
 											"id": "beehasknees"
 										},
 										{
 											"_bramble_id": "umlaut",
+											"_bramble__typename": "Gizmo",
 											"id": "umlaut"
 										},
 										{
 											"_bramble_id": "probanana",
+											"_bramble__typename": "Gizmo",
 											"id": "probanana"
 										}
 									]
@@ -1374,14 +1392,17 @@ func TestNestingNullableBoundaryTypes(t *testing.T) {
 								null,
 								{
 									"_bramble_id": "umlaut",
+									"_bramble__typename": "Gizmo",
 									"id": "umlaut",
 									"wizzle": null
 								},
 								{
 									"_bramble_id": "probanana",
+									"_bramble__typename": "Gizmo",
 									"id": "probanana",
 									"wizzle": {
 										"_bramble_id": "bananawizzle",
+										"_bramble__typename": "Wizzle",
 										"id": "bananawizzle"
 									}
 								}
@@ -1405,6 +1426,7 @@ func TestNestingNullableBoundaryTypes(t *testing.T) {
 							"_result": [
 								{
 									"_bramble_id": "bananawizzle",
+									"_bramble__typename": "Wizzle",
 									"id": "bananawizzle",
 									"bazingaFactor": 4
 								}
@@ -1596,9 +1618,9 @@ func TestQueryExecutionWithMultipleBoundaryQueries(t *testing.T) {
 					w.Write([]byte(`{
 						"data": {
 							"movies": [
-								{ "_bramble_id": "1", "id": "1", "title": "Test title 1" },
-								{ "_bramble_id": "2", "id": "2", "title": "Test title 2" },
-								{ "_bramble_id": "3", "id": "3", "title": "Test title 3" }
+								{ "_bramble_id": "1", "_bramble__typename": "Movie", "id": "1", "title": "Test title 1" },
+								{ "_bramble_id": "2", "_bramble__typename": "Movie", "id": "2", "title": "Test title 2" },
+								{ "_bramble_id": "3", "_bramble__typename": "Movie", "id": "3", "title": "Test title 3" }
 							]
 						}
 					}
@@ -1612,9 +1634,9 @@ func TestQueryExecutionWithMultipleBoundaryQueries(t *testing.T) {
 					json.NewDecoder(r.Body).Decode(&q)
 					w.Write([]byte(`{
 						"data": {
-							"_0": { "_bramble_id": "1", "id": "1", "release": 2007 },
-							"_1": { "_bramble_id": "2", "id": "2", "release": 2008 },
-							"_2": { "_bramble_id": "3", "id": "3", "release": 2009 }
+							"_0": { "_bramble_id": "1", "_bramble__typename": "Movie", "id": "1", "release": 2007 },
+							"_1": { "_bramble_id": "2", "_bramble__typename": "Movie", "id": "2", "release": 2008 },
+							"_2": { "_bramble_id": "3", "_bramble__typename": "Movie", "id": "3", "release": 2009 }
 						}
 					}
 					`))
@@ -1686,6 +1708,7 @@ func TestQueryExecutionMultipleServicesWithArray(t *testing.T) {
 							res += fmt.Sprintf(`
 								"_%d": {
 									"_bramble_id": "%s",
+									"_bramble__typename": "Movie",
 									"id": "%s",
 									"title": "title %s"
 								}`, i, id, id, id)
@@ -1696,6 +1719,7 @@ func TestQueryExecutionMultipleServicesWithArray(t *testing.T) {
 							"data": {
 								"movie": {
 									"_bramble_id": "%s",
+									"_bramble__typename": "Movie",
 									"id": "%s",
 									"title": "title %s"
 								}
@@ -1720,22 +1744,25 @@ func TestQueryExecutionMultipleServicesWithArray(t *testing.T) {
 						"data": {
 							"_0": {
 								"_bramble_id": "1",
+								"_bramble__typename": "Movie",
 								"id": "1",
 								"compTitles": [
 									{
 										"_bramble_id": "2",
+										"_bramble__typename": "Movie",
 										"id": "2",
 										"compTitles": [
-											{ "_bramble_id": "3", "id": "3" },
-											{ "_bramble_id": "4", "id": "4" }
+											{ "_bramble_id": "3", "_bramble__typename": "Movie", "id": "3" },
+											{ "_bramble_id": "4", "_bramble__typename": "Movie", "id": "4" }
 										]
 									},
 									{
 										"_bramble_id": "3",
+										"_bramble__typename": "Movie",
 										"id": "3",
 										"compTitles": [
-											{ "_bramble_id": "4", "id": "4" },
-											{ "_bramble_id": "5", "id": "5" }
+											{ "_bramble_id": "4", "_bramble__typename": "Movie", "id": "4" },
+											{ "_bramble_id": "5", "_bramble__typename": "Movie", "id": "5" }
 										]
 									}
 								]
@@ -1884,6 +1911,7 @@ func TestQueryExecutionMultipleServicesWithNestedArrays(t *testing.T) {
 						res += fmt.Sprintf(`
 								"_%d": {
 									"_bramble_id": "%s",
+									"_bramble__typename": "Movie",
 									"id": "%s",
 									"title": "title %s"
 								}`, i, id, id, id)
@@ -1894,6 +1922,7 @@ func TestQueryExecutionMultipleServicesWithNestedArrays(t *testing.T) {
 							"data": {
 								"movie": {
 									"_bramble_id": "%s",
+									"_bramble__typename": "Movie",
 									"id": "%s",
 									"title": "title %s"
 								}
@@ -1918,14 +1947,17 @@ func TestQueryExecutionMultipleServicesWithNestedArrays(t *testing.T) {
 					"data": {
 						"_0": {
 							"_bramble_id": "1",
+							"_bramble__typename": "Movie",
 							"id": "1",
 							"compTitles": [[
 								{
 									"_bramble_id": "2",
+									"_bramble__typename": "Movie",
 									"id": "2"
 								},
 								{
 									"_bramble_id": "3",
+									"_bramble__typename": "Movie",
 									"id": "3"
 								}
 							]]
@@ -1987,6 +2019,7 @@ func TestQueryExecutionEmptyBoundaryResponse(t *testing.T) {
 						"data": {
 							"movie": {
 								"_bramble_id": "1",
+								"_bramble__typename": "Movie",
 								"id": "1",
 								"title": "Test title"
 							}
@@ -2121,18 +2154,22 @@ func TestQueryExecutionWithInputObject(t *testing.T) {
 							otherMovie(arg: {id: "2", title: "another title"}) {
 								title
 								_bramble_id: id
+								_bramble__typename: __typename
 							}
 							_bramble_id: id
+							_bramble__typename: __typename
 						}
 					}`, q["query"])
 					w.Write([]byte(`{
 						"data": {
 							"movie": {
 								"_bramble_id": "1",
+								"_bramble__typename": "Movie",
 								"id": "1",
 								"title": "Test title",
 								"otherMovie": {
 									"_bramble_id": "2",
+									"_bramble__typename": "Movie",
 									"title": "another title"
 								}
 							}
@@ -2157,6 +2194,7 @@ func TestQueryExecutionWithInputObject(t *testing.T) {
 						"data": {
 							"_0": {
 								"_bramble_id": "1",
+								"_bramble__typename": "Movie",
 								"id": "1",
 								"release": 2007
 							}
@@ -2209,6 +2247,7 @@ func TestQueryExecutionMultipleObjects(t *testing.T) {
 						"data": {
 							"movie": {
 								"_bramble_id": "1",
+								"_bramble__typename": "Movie",
 								"id": "1",
 								"title": "Test title"
 							}
@@ -2235,8 +2274,8 @@ func TestQueryExecutionMultipleObjects(t *testing.T) {
 						w.Write([]byte(`{
 							"data": {
 								"movies": [
-									{ "_bramble_id": "1", "id": "1", "release": 2007 },
-									{ "_bramble_id": "2", "id": "2", "release": 2018 }
+									{ "_bramble_id": "1", "_bramble__typename": "Movie", "id": "1", "release": 2007 },
+									{ "_bramble_id": "2", "_bramble__typename": "Movie", "id": "2", "release": 2018 }
 								]
 							}
 						}
@@ -2246,6 +2285,7 @@ func TestQueryExecutionMultipleObjects(t *testing.T) {
 							"data": {
 								"_0": {
 									"_bramble_id": "1",
+									"_bramble__typename": "Movie",
 									"id": "1",
 									"release": 2007
 								}
@@ -2366,6 +2406,7 @@ func TestQueryExecutionMultipleServicesWithSkipFalseDirectives(t *testing.T) {
 						"data": {
 							"movie": {
 								"_bramble_id": "1",
+								"_bramble__typename": "Movie",
 								"id": "1"
 							}
 						}
@@ -2391,6 +2432,7 @@ func TestQueryExecutionMultipleServicesWithSkipFalseDirectives(t *testing.T) {
 						"data": {
 							"_0": {
 								"_bramble_id": "1",
+								"_bramble__typename": "Movie",
 								"id": "1",
 								"title": "no soup for you",
 								"gizmo": {
@@ -2515,6 +2557,7 @@ func TestQueryExecutionMultipleServicesWithIncludeTrueDirectives(t *testing.T) {
 						"data": {
 							"movie": {
 								"_bramble_id": "1",
+								"_bramble__typename": "Movie",
 								"id": "1"
 							}
 						}
@@ -2540,6 +2583,7 @@ func TestQueryExecutionMultipleServicesWithIncludeTrueDirectives(t *testing.T) {
 						"data": {
 							"_0": {
 								"_bramble_id": "1",
+								"_bramble__typename": "Movie",
 								"id": "1",
 								"title": "yada yada yada",
 								"gizmo": {
@@ -2601,12 +2645,13 @@ func TestMutationExecution(t *testing.T) {
 				handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					var q map[string]string
 					json.NewDecoder(r.Body).Decode(&q)
-					assertQueriesEqual(t, schema1, `mutation { updateTitle(id: "2", title: "New title") { title _bramble_id: id } }`, q["query"])
+					assertQueriesEqual(t, schema1, `mutation { updateTitle(id: "2", title: "New title") { title _bramble_id: id _bramble__typename: __typename } }`, q["query"])
 
 					w.Write([]byte(`{
 						"data": {
 							"updateTitle": {
 								"_bramble_id": "2",
+								"_bramble__typename": "Movie",
 								"id": "2",
 								"title": "New title"
 							}
@@ -2629,6 +2674,7 @@ func TestMutationExecution(t *testing.T) {
 						"data": {
 							"_0": {
 								"_bramble_id": "2",
+								"_bramble__typename": "Movie",
 								"id": "2",
 								"release": 2007
 							}
@@ -2695,6 +2741,7 @@ func TestQueryExecutionWithUnions(t *testing.T) {
 							"data": {
 								"_0": {
 									"_bramble_id": "2",
+									"_bramble__typename": "Person",
 									"pet": {
 										"name": "felix",
 										"age": 2,
@@ -2724,6 +2771,7 @@ func TestQueryExecutionWithUnions(t *testing.T) {
 						"data": {
 							"person": {
 								"_bramble_id": "2",
+								"_bramble__typename": "Person",
 								"name": "Bob"
 							}
 						}
@@ -2800,6 +2848,7 @@ func TestQueryExecutionWithNamespaces(t *testing.T) {
 							"data": {
 								"_0": {
 									"_bramble_id": "CA7",
+									"_bramble__typename": "Cat",
 									"name": "Felix"
 								}
 							}
@@ -2851,6 +2900,7 @@ func TestQueryExecutionWithNamespaces(t *testing.T) {
 								"cats": {
 									"searchCat": {
 										"_bramble_id": "CA7",
+										"_bramble__typename": "Cat",
 										"id": "CA7"
 									}
 								}
@@ -2946,6 +2996,7 @@ func TestQueryWithBoundaryFields(t *testing.T) {
 						"data": {
 							"movie": {
 								"_bramble_id": "1",
+								"_bramble__typename": "Movie",
 								"id": "1",
 								"title": "Test title"
 							}
@@ -2970,6 +3021,7 @@ func TestQueryWithBoundaryFields(t *testing.T) {
 						"data": {
 							"_0": {
 								"_bramble_id": "1",
+								"_bramble__typename": "Movie",
 								"id": "1",
 								"release": 2007
 							}
@@ -3068,16 +3120,19 @@ func TestQueryWithArrayBoundaryFields(t *testing.T) {
 							"randomMovies": [
 								{
 									"_bramble_id": "1",
+									"_bramble__typename": "Movie",
 									"id": "1",
 									"title": "Movie 1"
 								},
 								{
 									"_bramble_id": "2",
+									"_bramble__typename": "Movie",
 									"id": "2",
 									"title": "Movie 2"
 								},
 								{
 									"_bramble_id": "3",
+									"_bramble__typename": "Movie",
 									"id": "3",
 									"title": "Movie 3"
 								}
@@ -3104,16 +3159,19 @@ func TestQueryWithArrayBoundaryFields(t *testing.T) {
 							"_result": [
 								{
 									"_bramble_id": "1",
+									"_bramble__typename": "Movie",
 									"id": "1",
 									"release": 2007
 								},
 								{
 									"_bramble_id": "2",
+									"_bramble__typename": "Movie",
 									"id": "2",
 									"release": 2008
 								},
 								{
 									"_bramble_id": "3",
+									"_bramble__typename": "Movie",
 									"id": "3",
 									"release": 2009
 								}
@@ -3147,6 +3205,102 @@ func TestQueryWithArrayBoundaryFields(t *testing.T) {
 					"id": "3",
 					"title": "Movie 3",
 					"release": 2009
+				}
+			]
+		}`,
+	}
+
+	f.checkSuccess(t)
+}
+
+func TestQueryWithAbstractType(t *testing.T) {
+	f := &queryExecutionFixture{
+		services: []testService{
+			{
+				schema: `
+				directive @boundary on OBJECT | FIELD_DEFINITION
+
+				interface Foo {
+				  id: ID!
+				}
+
+				type Bar implements Foo {
+				  id: ID!
+				  bar: String!
+				}
+
+				type Baz implements Foo @boundary {
+				  id: ID!
+				}
+
+				type Query {
+				  foos: [Foo!]!
+				  baz(id: ID!): Baz @boundary
+				}`,
+				handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					_, _ = w.Write([]byte(`{
+						"data": {
+							"foos": [
+								{
+									"_bramble_id": "1",
+									"_bramble__typename": "Baz",
+									"id": "1"
+								},
+								{
+									"_bramble__typename": "Bar",
+									"id": "2",
+									"bar": "bar"
+								}
+							]
+						}
+					}
+					`))
+				}),
+			},
+			{
+				schema: `
+					directive @boundary on OBJECT | FIELD_DEFINITION
+
+					type Baz @boundary {
+						id: ID!
+						baz: String!
+					}
+
+					type Query {
+						baz(id: ID!): Baz @boundary
+					}
+				`,
+				handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					_, _ = w.Write([]byte(`{
+						"data": {
+							"_0": {
+								"_bramble_id": "1",
+								"_bramble__typename": "Baz",
+								"id": "1",
+								"baz": "baz"
+							}
+						}
+					}
+					`))
+				}),
+			},
+		},
+		query: `{
+			foos {
+				id
+				... on Baz {
+					baz
+				}
+			}
+		}`,
+		expected: `{
+			"foos": [
+				{
+					"id": "1",
+					"baz": "baz"
+				},
+				{
+					"id": "2"
 				}
 			]
 		}`,

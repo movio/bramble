@@ -173,7 +173,6 @@ func extractSelectionSet(ctx *PlanningContext, insertionPoint []string, parentTy
 			if err != nil {
 				return nil, nil, err
 			}
-			selectionSet = append(selectionSet, &ast.Field{Alias: "_bramble__typename", Name: "__typename", Definition: &ast.FieldDefinition{Name: "__typename", Type: ast.NamedType("String", nil)}})
 			inlineFragment := *selection
 			inlineFragment.SelectionSet = selectionSet
 			selectionSetResult = append(selectionSetResult, &inlineFragment)
@@ -189,7 +188,6 @@ func extractSelectionSet(ctx *PlanningContext, insertionPoint []string, parentTy
 			if err != nil {
 				return nil, nil, err
 			}
-			selectionSet = append(selectionSet, &ast.Field{Alias: "_bramble__typename", Name: "__typename", Definition: &ast.FieldDefinition{Name: "__typename", Type: ast.NamedType("String", nil)}})
 			inlineFragment := ast.InlineFragment{
 				TypeCondition: selection.Definition.TypeCondition,
 				SelectionSet:  selectionSet,
@@ -264,7 +262,10 @@ func extractSelectionSet(ctx *PlanningContext, insertionPoint []string, parentTy
 	} else if parentType != queryObjectName && parentType != mutationObjectName && ctx.IsBoundary[parentType] {
 		// Otherwise, add an id selection to all boundary types
 		if idDef := parentDef.Fields.ForName(IdFieldName); idDef != nil {
-			selectionSetResult = append(selectionSetResult, &ast.Field{Alias: "_bramble_id", Name: IdFieldName, Definition: idDef})
+			selectionSetResult = append(selectionSetResult,
+				&ast.Field{Alias: "_bramble_id", Name: IdFieldName, Definition: idDef},
+				&ast.Field{Alias: "_bramble__typename", Name: "__typename", Definition: &ast.FieldDefinition{Name: "__typename", Type: ast.NamedType("String", nil)}},
+			)
 		}
 	}
 	return selectionSetResult, childrenStepsResult, nil

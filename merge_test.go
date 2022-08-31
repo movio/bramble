@@ -105,7 +105,7 @@ func TestMergeTwoSchemasNoBoundaryTypes(t *testing.T) {
 	fixture.CheckSuccess(t)
 }
 
-func TestMergeTwoSchemasWithCollindingInterface(t *testing.T) {
+func TestMergeTwoSchemasWithCollidingInterface(t *testing.T) {
 	fixture := MergeTestFixture{
 		Input1: `
 			interface Named {
@@ -772,7 +772,7 @@ func TestRejectsConflictingMutations(t *testing.T) {
 	fixture.CheckError(t)
 }
 
-func TestMergeCustomnScalars(t *testing.T) {
+func TestMergeCustomScalars(t *testing.T) {
 	fixture := MergeTestFixture{
 		Input1:   `scalar MyCustomScalar`,
 		Input2:   `scalar MyCustomScalar`,

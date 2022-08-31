@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -109,7 +108,7 @@ func (q *queryExecution) executeRootStep(step *QueryPlanStep) error {
 	q.writeExecutionResult(step, data, nil)
 
 	for _, childStep := range step.Then {
-		boundaryIDs, err := extractAndDedupeBoundaryIDs(data, childStep.InsertionPoint)
+		boundaryIDs, err := extractAndDedupeBoundaryIDs(data, childStep.InsertionPoint, childStep.ParentType)
 		if err != nil {
 			return err
 		}
@@ -176,7 +175,7 @@ func (q *queryExecution) executeChildStep(step *QueryPlanStep, boundaryIDs []str
 			if err != nil {
 				return err
 			}
-			boundaryIDs, err := extractAndDedupeBoundaryIDs(nonNilBoundaryResults, boundaryResultInsertionPoint)
+			boundaryIDs, err := extractAndDedupeBoundaryIDs(nonNilBoundaryResults, boundaryResultInsertionPoint, childStep.ParentType)
 			if err != nil {
 				return err
 			}
@@ -288,7 +287,7 @@ func (q *queryExecution) createGQLErrors(step *QueryPlanStep, err error) gqlerro
 }
 
 // The insertionPoint represents the level a piece of data should be inserted at, relative to the root of the root step's data.
-// However results from a boundary query only contain a portion of that tree. For example, you could
+// However, results from a boundary query only contain a portion of that tree. For example, you could
 // have insertionPoint: ["foo", "bar", "movies", "movie", "compTitles"], with the below example as the boundary result we're
 // crawling for ids:
 // [
@@ -360,8 +359,8 @@ func buildTypenameResponseMap(selectionSet ast.SelectionSet, parentTypeName stri
 	return result, nil
 }
 
-func extractAndDedupeBoundaryIDs(data interface{}, insertionPoint []string) ([]string, error) {
-	boundaryIDs, err := extractBoundaryIDs(data, insertionPoint)
+func extractAndDedupeBoundaryIDs(data interface{}, insertionPoint []string, parentType string) ([]string, error) {
+	boundaryIDs, err := extractBoundaryIDs(data, insertionPoint, parentType)
 	if err != nil {
 		return nil, err
 	}
@@ -375,10 +374,10 @@ func extractAndDedupeBoundaryIDs(data interface{}, insertionPoint []string) ([]s
 		deduped = append(deduped, id)
 	}
 
-	return sort.StringSlice(deduped), nil
+	return deduped, nil
 }
 
-func extractBoundaryIDs(data interface{}, insertionPoint []string) ([]string, error) {
+func extractBoundaryIDs(data interface{}, insertionPoint []string, parentType string) ([]string, error) {
 	ptr := data
 	if ptr == nil {
 		return nil, nil
@@ -386,12 +385,21 @@ func extractBoundaryIDs(data interface{}, insertionPoint []string) ([]string, er
 	if len(insertionPoint) == 0 {
 		switch ptr := ptr.(type) {
 		case map[string]interface{}:
+			tpe, err := boundaryTypeFromMap(ptr)
+			if err != nil {
+				return nil, err
+			}
+
+			if tpe != parentType {
+				return []string{}, nil
+			}
+
 			id, err := boundaryIDFromMap(ptr)
 			return []string{id}, err
 		case []interface{}:
-			result := []string{}
+			var result []string
 			for _, innerPtr := range ptr {
-				ids, err := extractBoundaryIDs(innerPtr, insertionPoint)
+				ids, err := extractBoundaryIDs(innerPtr, insertionPoint, parentType)
 				if err != nil {
 					return nil, err
 				}
@@ -404,11 +412,11 @@ func extractBoundaryIDs(data interface{}, insertionPoint []string) ([]string, er
 	}
 	switch ptr := ptr.(type) {
 	case map[string]interface{}:
-		return extractBoundaryIDs(ptr[insertionPoint[0]], insertionPoint[1:])
+		return extractBoundaryIDs(ptr[insertionPoint[0]], insertionPoint[1:], parentType)
 	case []interface{}:
-		result := []string{}
+		var result []string
 		for _, innerPtr := range ptr {
-			ids, err := extractBoundaryIDs(innerPtr, insertionPoint)
+			ids, err := extractBoundaryIDs(innerPtr, insertionPoint, parentType)
 			if err != nil {
 				return nil, err
 			}

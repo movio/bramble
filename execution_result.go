@@ -73,12 +73,26 @@ func mergeExecutionResultsRec(src interface{}, dst interface{}, insertionPoint [
 					return err
 				}
 
-				dstID, err := boundaryIDFromMap(ptr)
+				dstType, err := boundaryTypeFromMap(ptr)
 				if err != nil {
 					return err
 				}
 
 				for _, result := range boundaryResults {
+					srcType, err := boundaryTypeFromMap(result)
+					if err != nil {
+						return err
+					}
+
+					if srcType != dstType {
+						continue
+					}
+
+					dstID, err := boundaryIDFromMap(ptr)
+					if err != nil {
+						return err
+					}
+
 					srcID, err := boundaryIDFromMap(result)
 					if err != nil {
 						return err
@@ -93,7 +107,6 @@ func mergeExecutionResultsRec(src interface{}, dst interface{}, insertionPoint [
 						}
 					}
 				}
-
 			}
 		case []interface{}:
 			for _, innerPtr := range ptr {
@@ -142,7 +155,15 @@ func boundaryIDFromMap(boundaryMap map[string]interface{}) (string, error) {
 	if ok {
 		return id, nil
 	}
-	return "", errors.New("boundaryIDFromMap: \"_bramble_id\" not found")
+	return "", fmt.Errorf(`boundaryIDFromMap: "_bramble_id" not found`)
+}
+
+func boundaryTypeFromMap(boundaryMap map[string]interface{}) (string, error) {
+	tpe, ok := boundaryMap["_bramble__typename"].(string)
+	if ok {
+		return tpe, nil
+	}
+	return "", fmt.Errorf(`boundaryTypeFromMap: "_bramble__typename" not found`)
 }
 
 func getBoundaryFieldResults(src []interface{}) ([]map[string]interface{}, error) {

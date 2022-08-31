@@ -79,10 +79,11 @@ func TestMergeExecutionResults(t *testing.T) {
 		inputMapA := jsonToInterfaceMap(`{
 			"gizmo": {
 				"_bramble_id": "1",
+				"_bramble__typename": "Gizmo",
 				"gadgets": [
-					{"_bramble_id": "GADGET1", "owner": { "_bramble_id": "OWNER1" }},
-					{"_bramble_id": "GADGET3", "owner": { "_bramble_id": "OWNER3" }},
-					{"_bramble_id": "GADGET2", "owner": null}
+					{"_bramble_id": "GADGET1", "_bramble__typename": "Gadget", "owner": { "_bramble_id": "OWNER1", "_bramble__typename": "Owner" }},
+					{"_bramble_id": "GADGET3", "_bramble__typename": "Gadget", "owner": { "_bramble_id": "OWNER3", "_bramble__typename": "Owner" }},
+					{"_bramble_id": "GADGET2", "_bramble__typename": "Gadget", "owner": null}
 				]
 			}
 		}`)
@@ -96,6 +97,7 @@ func TestMergeExecutionResults(t *testing.T) {
 		inputMapB := jsonToInterfaceSlice(`[
 			{
 				"_bramble_id": "OWNER1",
+				"_bramble__typename": "Owner",
 				"name": "008"
 			}
 		]`)
@@ -114,23 +116,29 @@ func TestMergeExecutionResults(t *testing.T) {
 				"gadgets": [
 					{
 						"_bramble_id": "GADGET1",
+						"_bramble__typename": "Gadget",
 						"owner": {
 							"_bramble_id": "OWNER1",
+							"_bramble__typename": "Owner",
 							"name": "008"
 						}
 					},
 					{
 						"_bramble_id": "GADGET3",
+						"_bramble__typename": "Gadget",
 						"owner": {
-							"_bramble_id": "OWNER3"
+							"_bramble_id": "OWNER3",
+							"_bramble__typename": "Owner"
 						}
 					},
 					{
 						"_bramble_id": "GADGET2",
+						"_bramble__typename": "Gadget",
 						"owner": null
 					}
 				],
-				"_bramble_id": "1"
+				"_bramble_id": "1",
+				"_bramble__typename": "Gizmo"
 			}
 		}`)
 
@@ -142,13 +150,14 @@ func TestMergeExecutionResults(t *testing.T) {
 		inputMapA := jsonToInterfaceMap(`{
 			"gizmo": {
 				"_bramble_id": "1",
+				"_bramble__typename": "Gizmo",
 				"gadgets": [
 					[
-						{"_bramble_id": "GADGET1", "owner": { "_bramble_id": "OWNER1" }},
-						{"_bramble_id": "GADGET3", "owner": { "_bramble_id": "OWNER3" }}
+						{"_bramble_id": "GADGET1", "_bramble__typename": "Gadget", "owner": { "_bramble_id": "OWNER1", "_bramble__typename": "Owner" }},
+						{"_bramble_id": "GADGET3", "_bramble__typename": "Gadget", "owner": { "_bramble_id": "OWNER3", "_bramble__typename": "Owner" }}
 					],
 					[
-						{"_bramble_id": "GADGET2", "owner": null}
+						{"_bramble_id": "GADGET2", "_bramble__typename": "Gadget", "owner": null}
 					]
 				]
 			}
@@ -163,6 +172,7 @@ func TestMergeExecutionResults(t *testing.T) {
 		inputMapB := jsonToInterfaceSlice(`[
 			{
 				"_bramble_id": "OWNER1",
+				"_bramble__typename": "Owner",
 				"name": "008"
 			}
 		]`)
@@ -182,26 +192,32 @@ func TestMergeExecutionResults(t *testing.T) {
 					[
 						{
 							"_bramble_id": "GADGET1",
+							"_bramble__typename": "Gadget",
 							"owner": {
 								"_bramble_id": "OWNER1",
+								"_bramble__typename": "Owner",
 								"name": "008"
 							}
 						},
 						{
 							"_bramble_id": "GADGET3",
+							"_bramble__typename": "Gadget",
 							"owner": {
-								"_bramble_id": "OWNER3"
+								"_bramble_id": "OWNER3",
+								"_bramble__typename": "Owner"
 							}
 						}
 					],
 					[
 						{
 							"_bramble_id": "GADGET2",
+							"_bramble__typename": "Gadget",
 							"owner": null
 						}
 					]
 				],
-				"_bramble_id": "1"
+				"_bramble_id": "1",
+				"_bramble__typename": "Gizmo"
 			}
 		}`)
 
@@ -215,7 +231,8 @@ func TestMergeExecutionResults(t *testing.T) {
 				"id": "1",
 				"color": "Gizmo A",
 				"owner": {
-					"_bramble_id": "1"
+					"_bramble_id": "1",
+					"_bramble__typename": "Owner"
 				}
 			}
 		}`)
@@ -229,6 +246,7 @@ func TestMergeExecutionResults(t *testing.T) {
 		inputSliceB := jsonToInterfaceSlice(`[
 			{
 				"_bramble_id": "1",
+				"_bramble__typename": "Owner",
 				"name": "Owner A"
 			}
 		]`)
@@ -247,6 +265,7 @@ func TestMergeExecutionResults(t *testing.T) {
 				"color": "Gizmo A",
 				"owner": {
 					"_bramble_id": "1",
+					"_bramble__typename": "Owner",
 					"name": "Owner A"
 				}
 			}
@@ -263,21 +282,24 @@ func TestMergeExecutionResults(t *testing.T) {
 					"id": "1",
 					"color": "RED",
 					"owner": {
-						"_bramble_id": "4"
+						"_bramble_id": "4",
+						"_bramble__typename": "Owner"
 					}
 				},
 				{
 					"id": "2",
 					"color": "GREEN",
 					"owner": {
-						"_bramble_id": "5"
+						"_bramble_id": "5",
+						"_bramble__typename": "Owner"
 					}
 				},
 				{
 					"id": "3",
 					"color": "BLUE",
 					"owner": {
-						"_bramble_id": "6"
+						"_bramble_id": "6",
+						"_bramble__typename": "Owner"
 					}
 				}
 			]
@@ -292,14 +314,17 @@ func TestMergeExecutionResults(t *testing.T) {
 		inputSliceB := jsonToInterfaceSlice(`[
 			{
 				"_bramble_id": "4",
+				"_bramble__typename": "Owner",
 				"name": "Owner A"
 			},
 			{
 				"_bramble_id": "5",
+				"_bramble__typename": "Owner",
 				"name": "Owner B"
 			},
 			{
 				"_bramble_id": "6",
+				"_bramble__typename": "Owner",
 				"name": "Owner C"
 			}
 		]`)
@@ -319,6 +344,7 @@ func TestMergeExecutionResults(t *testing.T) {
 					"color": "RED",
 					"owner": {
 						"_bramble_id": "4",
+						"_bramble__typename": "Owner",
 						"name": "Owner A"
 					}
 				},
@@ -327,6 +353,7 @@ func TestMergeExecutionResults(t *testing.T) {
 					"color": "GREEN",
 					"owner": {
 						"_bramble_id": "5",
+						"_bramble__typename": "Owner",
 						"name": "Owner B"
 					}
 				},
@@ -335,6 +362,7 @@ func TestMergeExecutionResults(t *testing.T) {
 					"color": "BLUE",
 					"owner": {
 						"_bramble_id": "6",
+						"_bramble__typename": "Owner",
 						"name": "Owner C"
 					}
 				}
@@ -352,21 +380,24 @@ func TestMergeExecutionResults(t *testing.T) {
 					"id": "1",
 					"color": "RED",
 					"owner": {
-						"_bramble_id": "4"
+						"_bramble_id": "4",
+						"_bramble__typename": "Owner"
 					}
 				},
 				{
 					"id": "2",
 					"color": "GREEN",
 					"owner": {
-						"_bramble_id": "5"
+						"_bramble_id": "5",
+						"_bramble__typename": "Owner"
 					}
 				},
 				{
 					"id": "3",
 					"color": "BLUE",
 					"owner": {
-						"_bramble_id": "6"
+						"_bramble_id": "6",
+						"_bramble__typename": "Owner"
 					}
 				}
 			]
@@ -381,14 +412,17 @@ func TestMergeExecutionResults(t *testing.T) {
 		inputSliceB := jsonToInterfaceSlice(`[
 			{
 				"_bramble_id": "4",
+				"_bramble__typename": "Owner",
 				"name": "Owner A"
 			},
 			{
 				"_bramble_id": "5",
+				"_bramble__typename": "Owner",
 				"name": "Owner B"
 			},
 			{
 				"_bramble_id": "6",
+				"_bramble__typename": "Owner",
 				"name": "Owner C"
 			}
 		]`)
@@ -408,6 +442,7 @@ func TestMergeExecutionResults(t *testing.T) {
 					"color": "RED",
 					"owner": {
 						"_bramble_id": "4",
+						"_bramble__typename": "Owner",
 						"name": "Owner A"
 					}
 				},
@@ -416,6 +451,7 @@ func TestMergeExecutionResults(t *testing.T) {
 					"color": "GREEN",
 					"owner": {
 						"_bramble_id": "5",
+						"_bramble__typename": "Owner",
 						"name": "Owner B"
 					}
 				},
@@ -424,6 +460,7 @@ func TestMergeExecutionResults(t *testing.T) {
 					"color": "BLUE",
 					"owner": {
 						"_bramble_id": "6",
+						"_bramble__typename": "Owner",
 						"name": "Owner C"
 					}
 				}
@@ -439,23 +476,29 @@ func TestMergeExecutionResults(t *testing.T) {
 			"gizmos": [
 				{
 					"_bramble_id": "1",
+					"_bramble__typename": "Gizmo",
 					"color": "RED",
 					"owner": {
-						"_bramble_id": "4"
+						"_bramble_id": "4",
+						"_bramble__typename": "Owner"
 					}
 				},
 				{
 					"_bramble_id": "2",
+					"_bramble__typename": "Gizmo",
 					"color": "GREEN",
 					"owner": {
-						"_bramble_id": "5"
+						"_bramble_id": "5",
+						"_bramble__typename": "Owner"
 					}
 				},
 				{
 					"_bramble_id": "3",
+					"_bramble__typename": "Gizmo",
 					"color": "BLUE",
 					"owner": {
-						"_bramble_id": "6"
+						"_bramble_id": "6",
+						"_bramble__typename": "Owner"
 					}
 				}
 			]
@@ -470,14 +513,17 @@ func TestMergeExecutionResults(t *testing.T) {
 		inputSliceB := jsonToInterfaceSlice(`[
 			{
 				"_bramble_id": "4",
+				"_bramble__typename": "Owner",
 				"name": "Owner A"
 			},
 			{
 				"_bramble_id": "5",
+				"_bramble__typename": "Owner",
 				"name": "Owner B"
 			},
 			{
 				"_bramble_id": "6",
+				"_bramble__typename": "Owner",
 				"name": "Owner C"
 			}
 		]`)
@@ -494,25 +540,31 @@ func TestMergeExecutionResults(t *testing.T) {
 			"gizmos": [
 				{
 					"_bramble_id": "1",
+					"_bramble__typename": "Gizmo",
 					"color": "RED",
 					"owner": {
 						"_bramble_id": "4",
+						"_bramble__typename": "Owner",
 						"name": "Owner A"
 					}
 				},
 				{
 					"_bramble_id": "2",
+					"_bramble__typename": "Gizmo",
 					"color": "GREEN",
 					"owner": {
 						"_bramble_id": "5",
+						"_bramble__typename": "Owner",
 						"name": "Owner B"
 					}
 				},
 				{
 					"_bramble_id": "3",
+					"_bramble__typename": "Gizmo",
 					"color": "BLUE",
 					"owner": {
 						"_bramble_id": "6",
+						"_bramble__typename": "Owner",
 						"name": "Owner C"
 					}
 				}
@@ -527,12 +579,13 @@ func TestMergeExecutionResults(t *testing.T) {
 		inputMapA := jsonToInterfaceMap(`{
 			"gizmo": {
 				"_bramble_id": "1",
+				"_bramble__typename": "Gizmo",
 				"gadgets": [
 					[
-						{"_bramble_id": "GADGET1", "details": { "owner": {"_bramble_id": "OWNER1" }}}
+						{"_bramble_id": "GADGET1", "_bramble__typename": "Gadget", "details": { "owner": {"_bramble_id": "OWNER1", "_bramble__typename": "Owner" }}}
 					],
 					[
-						{"_bramble_id": "GADGET2", "details": null}
+						{"_bramble_id": "GADGET2", "_bramble__typename": "Gadget", "details": null}
 					]
 				]
 			}
@@ -547,6 +600,7 @@ func TestMergeExecutionResults(t *testing.T) {
 		inputMapB := jsonToInterfaceSlice(`[
 			{
 				"_bramble_id": "OWNER1",
+				"_bramble__typename": "Owner",
 				"name": "Alice"
 			}
 		]`)
@@ -566,9 +620,11 @@ func TestMergeExecutionResults(t *testing.T) {
 					[
 						{
 							"_bramble_id": "GADGET1",
+							"_bramble__typename": "Gadget",
 							"details": {
 								"owner": {
 									"_bramble_id": "OWNER1",
+									"_bramble__typename": "Owner",
 									"name": "Alice"
 								}
 							}
@@ -577,11 +633,13 @@ func TestMergeExecutionResults(t *testing.T) {
 					[
 						{
 							"_bramble_id": "GADGET2",
+							"_bramble__typename": "Gadget",
 							"details": null
 						}
 					]
 				],
-				"_bramble_id": "1"
+				"_bramble_id": "1",
+				"_bramble__typename": "Gizmo"
 			}
 		}`)
 
