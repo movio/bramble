@@ -2,7 +2,6 @@ package plugins
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	"sort"
@@ -33,6 +32,8 @@ type BrambleService @boundary {
 	schema: String!
 	status: String!
 	serviceUrl: String!
+	fields: [BrambleField!]!
+	types: [BrambleType!]!
 }
 type BrambleFieldArgument {
 	name: String!
@@ -66,6 +67,8 @@ type BrambleMetaQuery @namespace {
 	services: [BrambleService!]!
 	schema: BrambleSchema!
 	field(id: ID!): BrambleField
+	type(id: ID!): BrambleType
+	service(id: ID!): BrambleService
 }
 type Query {
 	service: Service!
@@ -82,6 +85,7 @@ type metaPluginResolver struct {
 		Version string
 		Schema  string
 	}
+	metaResolver     *metaResolver
 	executableSchema *bramble.ExecutableSchema
 }
 
@@ -96,11 +100,12 @@ func newMetaPluginResolver() *metaPluginResolver {
 			Version: "latest",
 			Schema:  metaPluginSchema,
 		},
+		metaResolver: &metaResolver{},
 	}
 }
 
-func (r *metaPluginResolver) Meta() *metaPluginResolver {
-	return r
+func (r *metaPluginResolver) Meta() *metaResolver {
+	return r.metaResolver
 }
 
 type brambleArg struct {
@@ -170,7 +175,7 @@ type brambleSchema struct {
 	Types []brambleType
 }
 
-func (r *metaPluginResolver) Schema() (*brambleSchema, error) {
+func (r *metaResolver) Schema() (*brambleSchema, error) {
 	schema := r.executableSchema.MergedSchema
 	var types brambleTypes
 	for name, def := range schema.Types {
@@ -200,37 +205,44 @@ func strToPtr(s string) *string {
 }
 
 func (r *metaPluginResolver) GetService(ctx context.Context, args struct{ ID graphql.ID }) *brambleService {
-	for _, service := range r.executableSchema.Services {
+	return r.metaResolver.GetService(ctx, args)
+}
+
+func (r *metaResolver) GetService(ctx context.Context, args struct{ ID graphql.ID }) *brambleService {
+	for _, service := range r.Services() {
 		if service.Name == string(args.ID) {
-			return &brambleService{
-				Name:       service.Name,
-				Version:    service.Version,
-				Schema:     service.SchemaSource,
-				Status:     service.Status,
-				ServiceURL: service.ServiceURL,
-			}
+			return &service
 		}
 	}
+
 	return nil
 }
 
-func (p *metaPluginResolver) GetType(ctx context.Context, args struct{ ID graphql.ID }) (*brambleType, error) {
-	typeName := string(args.ID)
-	var typeDef *ast.Definition
-	for _, def := range p.executableSchema.MergedSchema.Types {
-		if def.Name == typeName {
-			typeDef = def
-			break
-		}
-	}
-	if typeDef == nil {
-		return nil, nil
-	}
-	result := p.brambleType(typeName, typeDef)
-	return &result, nil
+func (r *metaPluginResolver) GetType(ctx context.Context, args struct{ ID graphql.ID }) (*brambleType, error) {
+	return r.metaResolver.GetType(ctx, args)
 }
 
-func (r *metaPluginResolver) brambleType(name string, def *ast.Definition) brambleType {
+func (r *metaResolver) GetType(ctx context.Context, args struct{ ID graphql.ID }) (*brambleType, error) {
+	typeName := string(args.ID)
+	for _, t := range r.getTypes(r.executableSchema.MergedSchema) {
+		if t.Name == typeName {
+			return &t, nil
+		}
+	}
+
+	return nil, nil
+}
+
+func (r *metaResolver) getTypes(schema *ast.Schema) []brambleType {
+	var result []brambleType
+	for _, def := range schema.Types {
+		result = append(result, r.brambleType(def.Name, def))
+	}
+
+	return result
+}
+
+func (r *metaResolver) brambleType(name string, def *ast.Definition) brambleType {
 	var fields brambleFields
 	for _, f := range def.Fields {
 		if strings.HasPrefix(f.Name, "__") {
@@ -279,29 +291,43 @@ func (r *metaPluginResolver) brambleType(name string, def *ast.Definition) bramb
 	}
 }
 
-func (p *metaPluginResolver) Field(ctx context.Context, args struct{ ID graphql.ID }) (*brambleField, error) {
-	return p.GetField(ctx, args)
+func (r *metaResolver) Field(ctx context.Context, args struct{ ID graphql.ID }) (*brambleField, error) {
+	return r.GetField(ctx, args)
 }
 
-func (p *metaPluginResolver) GetField(ctx context.Context, args struct{ ID graphql.ID }) (*brambleField, error) {
-	splitFieldName := strings.Split(string(args.ID), ".")
-	if len(splitFieldName) != 2 {
-		return nil, errors.New("invalid ID passed to query")
-	}
-	typeName := splitFieldName[0]
-	fieldName := splitFieldName[1]
-	for _, def := range p.executableSchema.MergedSchema.Types {
-		if def.Name != typeName {
-			continue
+func (r *metaResolver) Type(ctx context.Context, args struct{ ID graphql.ID }) (*brambleType, error) {
+	return r.GetType(ctx, args)
+}
+
+func (r *metaResolver) Service(ctx context.Context, args struct{ ID graphql.ID }) (*brambleService, error) {
+	return r.GetService(ctx, args), nil
+}
+
+type metaResolver struct {
+	executableSchema *bramble.ExecutableSchema
+}
+
+func (r *metaPluginResolver) GetField(ctx context.Context, args struct{ ID graphql.ID }) (*brambleField, error) {
+	return r.metaResolver.GetField(ctx, args)
+}
+
+func (r *metaResolver) GetField(ctx context.Context, args struct{ ID graphql.ID }) (*brambleField, error) {
+	for _, f := range r.getFields(r.executableSchema.MergedSchema) {
+		if f.ID == args.ID {
+			return &f, nil
 		}
-		var field *brambleField
+	}
+
+	return nil, nil
+}
+
+func (r *metaResolver) getFields(schema *ast.Schema) []brambleField {
+	var result []brambleField
+	for _, def := range schema.Types {
 		for _, f := range def.Fields {
-			if f.Name != fieldName {
-				continue
-			}
 			var svcName string
-			if svcURL, err := p.executableSchema.Locations.URLFor(def.Name, "", f.Name); err == nil {
-				svc := p.executableSchema.Services[svcURL]
+			if svcURL, err := r.executableSchema.Locations.URLFor(def.Name, "", f.Name); err == nil {
+				svc := r.executableSchema.Services[svcURL]
 				svcName = svc.Name
 			}
 			var args []brambleArg
@@ -311,18 +337,19 @@ func (p *metaPluginResolver) GetField(ctx context.Context, args struct{ ID graph
 					Type: a.Type.String(),
 				})
 			}
-			field = &brambleField{
+
+			result = append(result, brambleField{
 				ID:          graphql.ID(def.Name + "." + f.Name),
 				Name:        f.Name,
 				Type:        f.Type.String(),
 				Service:     svcName,
 				Description: strToPtr(f.Description),
 				Arguments:   args,
-			}
-			return field, nil
+			})
 		}
 	}
-	return nil, nil
+
+	return result
 }
 
 type brambleService struct {
@@ -331,6 +358,8 @@ type brambleService struct {
 	Schema     string
 	Status     string
 	ServiceURL string
+	Fields     []brambleField
+	Types      []brambleType
 }
 
 func (s brambleService) Id() graphql.ID {
@@ -355,7 +384,7 @@ func (s externalBrambleServices) Swap(i, j int) {
 	s[i], s[j] = s[j], s[i]
 }
 
-func (r *metaPluginResolver) Services() []brambleService {
+func (r *metaResolver) Services() []brambleService {
 	var services externalBrambleServices
 	for _, element := range r.executableSchema.Services {
 		services = append(services, brambleService{
@@ -364,6 +393,8 @@ func (r *metaPluginResolver) Services() []brambleService {
 			Schema:     element.SchemaSource,
 			Status:     element.Status,
 			ServiceURL: element.ServiceURL,
+			Fields:     r.getFields(element.Schema),
+			Types:      r.getTypes(element.Schema),
 		})
 	}
 	sort.Sort(services)
@@ -383,18 +414,19 @@ func NewMetaPlugin() *MetaPlugin {
 
 func (p *MetaPlugin) Init(s *bramble.ExecutableSchema) {
 	p.resolver.executableSchema = s
+	p.resolver.metaResolver.executableSchema = s
 }
 
-func (i *MetaPlugin) ID() string {
+func (p *MetaPlugin) ID() string {
 	return "meta"
 }
 
-func (i *MetaPlugin) GraphqlQueryPath() (bool, string) {
+func (p *MetaPlugin) GraphqlQueryPath() (bool, string) {
 	return true, "bramble-meta-plugin-query"
 }
 
-func (i *MetaPlugin) SetupPrivateMux(mux *http.ServeMux) {
-	_, path := i.GraphqlQueryPath()
-	s := graphql.MustParseSchema(metaPluginSchema, i.resolver, graphql.UseFieldResolvers())
+func (p *MetaPlugin) SetupPrivateMux(mux *http.ServeMux) {
+	_, path := p.GraphqlQueryPath()
+	s := graphql.MustParseSchema(metaPluginSchema, p.resolver, graphql.UseFieldResolvers())
 	mux.Handle(fmt.Sprintf("/%s", path), &relay.Handler{Schema: s})
 }
