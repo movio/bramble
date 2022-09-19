@@ -207,14 +207,16 @@ func (s *ExecutableSchema) ExecuteQuery(ctx context.Context) *graphql.Response {
 		errs = append(errs, result.Errors...)
 	}
 
-	introspectionData := resolveIntrospectionFields(ctx, operation.SelectionSet, filteredSchema)
-	if len(introspectionData) > 0 {
-		results = append([]executionResult{
-			{
-				ServiceURL: internalServiceName,
-				Data:       introspectionData,
-			},
-		}, results...)
+	if !operationCtx.DisableIntrospection {
+		introspectionData := resolveIntrospectionFields(ctx, operation.SelectionSet, filteredSchema)
+		if len(introspectionData) > 0 {
+			results = append([]executionResult{
+				{
+					ServiceURL: internalServiceName,
+					Data:       introspectionData,
+				},
+			}, results...)
+		}
 	}
 
 	timings["execution"] = time.Since(executionStart).Round(time.Millisecond).String()

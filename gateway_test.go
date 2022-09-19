@@ -65,7 +65,7 @@ func TestGatewayQuery(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	req.Header.Set("Accept", "application/json; charset=utf-8")
 
-	gtw.Router().ServeHTTP(rec, req)
+	gtw.Router(&Config{}).ServeHTTP(rec, req)
 	assert.Equal(t, http.StatusOK, rec.Code)
 	assert.JSONEq(t, `{"data": { "test": "Hello" }}`, rec.Body.String())
 }
@@ -74,7 +74,7 @@ func TestRequestJSONBodyLogging(t *testing.T) {
 	logrusLock.Lock()
 	defer logrusLock.Unlock()
 
-	server := NewGateway(NewExecutableSchema(nil, 50, nil), nil).Router()
+	server := NewGateway(NewExecutableSchema(nil, 50, nil), nil).Router(&Config{})
 
 	body := map[string]interface{}{
 		"foo": "bar",
@@ -106,7 +106,7 @@ func TestRequestInvalidJSONBodyLogging(t *testing.T) {
 	logrusLock.Lock()
 	defer logrusLock.Unlock()
 
-	server := NewGateway(nil, nil).Router()
+	server := NewGateway(nil, nil).Router(&Config{})
 
 	body := `{ "invalid": "json`
 	jr, jw := io.Pipe()
@@ -135,7 +135,7 @@ func TestRequestTextBodyLogging(t *testing.T) {
 	logrusLock.Lock()
 	defer logrusLock.Unlock()
 
-	server := NewGateway(nil, nil).Router()
+	server := NewGateway(nil, nil).Router(&Config{})
 
 	body := `the request body`
 	jr, jw := io.Pipe()

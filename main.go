@@ -48,7 +48,7 @@ func Main() {
 
 	go runHandler(ctx, &wg, "metrics", cfg.MetricAddress(), NewMetricsHandler())
 	go runHandler(ctx, &wg, "private", cfg.PrivateAddress(), gtw.PrivateRouter())
-	go runHandler(ctx, &wg, "public", cfg.GatewayAddress(), gtw.Router())
+	go runHandler(ctx, &wg, "public", cfg.GatewayAddress(), gtw.Router(cfg))
 
 	wg.Wait()
 }
