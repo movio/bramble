@@ -4,7 +4,7 @@ services:
     build:
       context: examples/gqlgen-service
     healthcheck:
-      test: curl --fail http://localhost:8080/health || exit 1
+      test: wget -qO - http://localhost:8080/health
       interval: 5s
       timeout: 1s
       retries: 5
@@ -12,7 +12,7 @@ services:
       - 8080
   gophers-server:
     healthcheck:
-      test: curl --fail http://localhost:8080/health || exit 1
+      test: wget -qO - http://localhost:8080/health
       interval: 5s
       timeout: 1s
       retries: 5
@@ -22,7 +22,7 @@ services:
       - 8080
   nodejs-server:
     healthcheck:
-      test: curl --fail http://localhost:8080/health || exit 1
+      test: wget -qO - http://localhost:8080/health
       interval: 5s
       timeout: 1s
       retries: 5

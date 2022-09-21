@@ -1,5 +1,8 @@
 .git
-docs
-contrib
 Dockerfile
 Makefile
+bramble
+contrib
+docs
+examples
+testsrv
