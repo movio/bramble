@@ -25,6 +25,7 @@ type PluginConfig struct {
 type Config struct {
 	IdFieldName            string    `json:"id-field-name"`
 	GatewayListenAddress   string    `json:"gateway-address"`
+	DisableIntrospection   bool      `json:"disable-introspection"`
 	MetricsListenAddress   string    `json:"metrics-address"`
 	PrivateListenAddress   string    `json:"private-address"`
 	GatewayPort            int       `json:"gateway-port"`

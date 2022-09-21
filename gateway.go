@@ -36,7 +36,7 @@ func (g *Gateway) UpdateSchemas(interval time.Duration) {
 }
 
 // Router returns the public http handler
-func (g *Gateway) Router() http.Handler {
+func (g *Gateway) Router(cfg *Config) http.Handler {
 	mux := http.NewServeMux()
 
 	// Duplicated from `handler.NewDefaultServer` minus
@@ -46,7 +46,9 @@ func (g *Gateway) Router() http.Handler {
 	gatewayHandler.AddTransport(transport.GET{})
 	gatewayHandler.AddTransport(transport.POST{})
 	gatewayHandler.AddTransport(transport.MultipartForm{})
-	gatewayHandler.Use(extension.Introspection{})
+	if !cfg.DisableIntrospection {
+		gatewayHandler.Use(extension.Introspection{})
+	}
 
 	mux.Handle("/query",
 		applyMiddleware(
