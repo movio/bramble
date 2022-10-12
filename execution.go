@@ -291,14 +291,16 @@ func (q *queryExecution) createGQLErrors(step *QueryPlanStep, err error) gqlerro
 // have insertionPoint: ["foo", "bar", "movies", "movie", "compTitles"], with the below example as the boundary result we're
 // crawling for ids:
 // [
-// 	 {
-//     "_bramble_id": "MOVIE1",
-//     "compTitles": [
-//       {
-//   	   "_bramble_id": "1"
-// 		 }
-//	   ]
-//   }
+//
+//		 {
+//	    "_bramble_id": "MOVIE1",
+//	    "compTitles": [
+//	      {
+//	  	   "_bramble_id": "1"
+//			 }
+//		   ]
+//	  }
+//
 // ]
 //
 // We therefore cannot use the insertionPoint as is in order to extract the boundary ids for the next child step.
@@ -467,9 +469,9 @@ func batchBy(items []string, batchSize int) (batches [][]string) {
 
 // When formatting the response data, the shape of the selection set has to potentially be modified to more closely resemble the shape
 // of the response. This only happens when running into fragments, there are two cases we need to deal with:
-//   1. the selection set of the target fragment has to be unioned with the selection set at the level for which the target fragment is referenced
-//   2. if the target fragments are an implementation of an abstract type, we need to use the __typename from the response body to check which
-//   implementation was resolved. Any fragments that do not match are dropped from the selection set.
+//  1. the selection set of the target fragment has to be unioned with the selection set at the level for which the target fragment is referenced
+//  2. if the target fragments are an implementation of an abstract type, we need to use the __typename from the response body to check which
+//     implementation was resolved. Any fragments that do not match are dropped from the selection set.
 func unionAndTrimSelectionSet(responseObjectTypeName string, schema *ast.Schema, selectionSet ast.SelectionSet) ast.SelectionSet {
 	filteredSelectionSet := eliminateUnwantedFragments(responseObjectTypeName, schema, selectionSet)
 	return mergeWithTopLevelFragmentFields(filteredSelectionSet)
