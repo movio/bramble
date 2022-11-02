@@ -156,9 +156,10 @@ func TestQueryError(t *testing.T) {
 					{Line: 2, Column: 4},
 				},
 				Extensions: map[string]interface{}{
-					"code":         "NOT_FOUND",
-					"selectionSet": `{ movie(id: "1") { id title } }`,
-					"serviceName":  "",
+					"code":          "NOT_FOUND",
+					"selectionSet":  `{ movie(id: "1") { id title } }`,
+					"selectionPath": ast.Path{ast.PathName("movie")},
+					"serviceName":   "",
 				},
 			},
 			&gqlerror.Error{
@@ -230,7 +231,6 @@ func TestFederatedQueryFragmentSpreads(t *testing.T) {
 						}
 					}
 				}`))
-
 			} else {
 				w.Write([]byte(`
 				{
@@ -251,7 +251,6 @@ func TestFederatedQueryFragmentSpreads(t *testing.T) {
 						]
 					}
 				}`))
-
 			}
 		}),
 	}
@@ -1469,7 +1468,6 @@ func TestNestingNullableBoundaryTypes(t *testing.T) {
 
 		f.checkSuccess(t)
 	})
-
 }
 
 func TestQueryExecutionWithTypename(t *testing.T) {
