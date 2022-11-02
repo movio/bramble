@@ -195,7 +195,7 @@ func (s *ExecutableSchema) ExecuteQuery(ctx context.Context) *graphql.Response {
 
 	executionStart := time.Now()
 
-	qe := newQueryExecution(ctx, s.GraphqlClient, filteredSchema, s.BoundaryQueries, int32(s.MaxRequestsPerQuery))
+	qe := newQueryExecution(ctx, operationCtx.OperationName, s.GraphqlClient, filteredSchema, s.BoundaryQueries, int32(s.MaxRequestsPerQuery))
 	results, executeErrs := qe.Execute(plan)
 	if len(executeErrs) > 0 {
 		return &graphql.Response{

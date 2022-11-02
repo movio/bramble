@@ -170,6 +170,11 @@ func (r *Request) WithHeaders(headers http.Header) *Request {
 	return r
 }
 
+func (r *Request) WithOperationName(operationName string) *Request {
+	r.OperationName = operationName
+	return r
+}
+
 // Response is a GraphQL response
 type Response struct {
 	Errors GraphqlErrors `json:"errors"`

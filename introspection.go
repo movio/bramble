@@ -31,8 +31,8 @@ func NewService(serviceURL string) *Service {
 
 // Update queries the service's schema, name and version and updates its status.
 func (s *Service) Update() (bool, error) {
-	req := NewRequest("query brambleServicePoll { service { name, version, schema} }")
-	req.OperationName = "brambleServicePoll"
+	req := NewRequest("query brambleServicePoll { service { name, version, schema} }").
+		WithOperationName("brambleServicePoll")
 	response := struct {
 		Service struct {
 			Name    string `json:"name"`
