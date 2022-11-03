@@ -459,7 +459,7 @@ func buildBoundaryQueryDocuments(ctx context.Context, schema *ast.Schema, step *
 			selections = append(selections, selection)
 			selectionIndex++
 		}
-		document := "{ " + strings.Join(selections, " ") + " }"
+		document := fmt.Sprintf("query %s { %s }", operation, strings.Join(selections, " "))
 		documents = append(documents, document)
 	}
 

@@ -3572,15 +3572,12 @@ func assertQueriesEqual(t *testing.T, schema, expected, actual string) bool {
 }
 
 func testContextWithoutVariables(op *ast.OperationDefinition) context.Context {
-	operationName := ""
-	if op != nil {
-		operationName = op.Name
-	} else {
+	if op == nil {
 		op = &ast.OperationDefinition{}
 	}
 
 	return AddPermissionsToContext(graphql.WithOperationContext(context.Background(), &graphql.OperationContext{
-		OperationName: operationName,
+		OperationName: op.Name,
 		Variables:     map[string]interface{}{},
 		Operation:     op,
 	}), OperationPermissions{
@@ -3591,15 +3588,12 @@ func testContextWithoutVariables(op *ast.OperationDefinition) context.Context {
 }
 
 func testContextWithNoPermissions(op *ast.OperationDefinition) context.Context {
-	operationName := ""
-	if op != nil {
-		operationName = op.Name
-	} else {
+	if op == nil {
 		op = &ast.OperationDefinition{}
 	}
 
 	return AddPermissionsToContext(graphql.WithOperationContext(context.Background(), &graphql.OperationContext{
-		OperationName: operationName,
+		OperationName: op.Name,
 		Variables:     map[string]interface{}{},
 		Operation:     op,
 	}), OperationPermissions{
@@ -3610,15 +3604,12 @@ func testContextWithNoPermissions(op *ast.OperationDefinition) context.Context {
 }
 
 func testContextWithVariables(vars map[string]interface{}, op *ast.OperationDefinition) context.Context {
-	operationName := ""
-	if op != nil {
-		operationName = op.Name
-	} else {
+	if op == nil {
 		op = &ast.OperationDefinition{}
 	}
 
 	return AddPermissionsToContext(graphql.WithResponseContext(graphql.WithOperationContext(context.Background(), &graphql.OperationContext{
-		OperationName: operationName,
+		OperationName: op.Name,
 		Variables:     vars,
 		Operation:     op,
 	}), graphql.DefaultErrorPresenter, graphql.DefaultRecover), OperationPermissions{

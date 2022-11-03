@@ -53,7 +53,7 @@ func TestBuildBoundaryQueryDocuments(t *testing.T) {
 		Then:           nil,
 	}
 	expected := []string{`query operationName { _result: getOwners(ids: ["1", "2", "3"]) { _bramble_id: id name } }`}
-	ctx := testContextWithoutVariables(nil)
+	ctx := testContextWithoutVariables(&ast.OperationDefinition{Name: "operationName"})
 	docs, vars, err := buildBoundaryQueryDocuments(ctx, schema, step, ids, boundaryField, 1)
 	require.NoError(t, err)
 	require.Equal(t, expected, docs)
@@ -145,7 +145,7 @@ func TestBuildNonArrayBoundaryQueryDocuments(t *testing.T) {
 		Then:           nil,
 	}
 	expected := []string{`query name { _0: getOwner(id: "1") { _bramble_id: id name } _1: getOwner(id: "2") { _bramble_id: id name } _2: getOwner(id: "3") { _bramble_id: id name } }`}
-	ctx := testContextWithoutVariables(nil)
+	ctx := testContextWithoutVariables(&ast.OperationDefinition{Name: "name"})
 	docs, vars, err := buildBoundaryQueryDocuments(ctx, schema, step, ids, boundaryField, 10)
 	require.NoError(t, err)
 	require.Equal(t, expected, docs)
@@ -238,7 +238,7 @@ func TestBuildBatchedNonArrayBoundaryQueryDocuments(t *testing.T) {
 		Then:           nil,
 	}
 	expected := []string{`query op { _0: getOwner(id: "1") { _bramble_id: id name } _1: getOwner(id: "2") { _bramble_id: id name } }`, `query op { _2: getOwner(id: "3") { _bramble_id: id name } }`}
-	ctx := testContextWithoutVariables(nil)
+	ctx := testContextWithoutVariables(&ast.OperationDefinition{Name: "op"})
 	docs, vars, err := buildBoundaryQueryDocuments(ctx, schema, step, ids, boundaryField, 2)
 	require.NoError(t, err)
 	require.Equal(t, expected, docs)
