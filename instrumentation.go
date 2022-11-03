@@ -50,10 +50,44 @@ func (e *event) addFields(fields EventFields) {
 
 func (e *event) finish() {
 	e.writeLock.Do(func() {
-		log.WithFields(log.Fields{
+
+		var logEntry = log.WithFields(log.Fields{
 			"timestamp": e.timestamp.Format(time.RFC3339Nano),
 			"duration":  time.Since(e.timestamp).String(),
-		}).WithFields(log.Fields(e.fields)).Info(e.name)
+		}).WithFields(log.Fields(e.fields))
+
+		responseStatusCandidate := e.fields["response.status"]
+
+		if responseStatusCandidate == nil {
+			logEntry.Info(e.name)
+			return
+		}
+
+		responseStatusCode, ok := responseStatusCandidate.(int)
+
+		if !ok {
+			logEntry.Info(e.name)
+			return
+		}
+
+		if responseStatusCode >= 100 && responseStatusCode <= 199 {
+			// informational responses
+			logEntry.Debug(e.name)
+		} else if responseStatusCode >= 200 && responseStatusCode <= 299 {
+			// successful responses
+			logEntry.Debug(e.name)
+		} else if responseStatusCode >= 300 && responseStatusCode <= 399 {
+			// redirection messages
+			logEntry.Debug(e.name)
+		} else if responseStatusCode >= 400 && responseStatusCode <= 499 {
+			// client error responses
+			logEntry.Error(e.name)
+		} else if responseStatusCode >= 500 && responseStatusCode <= 599 {
+			// server error responses
+			logEntry.Error(e.name)
+		} else {
+			logEntry.Info(e.name)
+		}
 	})
 }
 
