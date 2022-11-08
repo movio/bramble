@@ -1,6 +1,6 @@
 version: "3"
 services:
-  gqlgen-server:
+  gqlgen-service:
     build:
       context: examples/gqlgen-service
     healthcheck:
@@ -10,7 +10,7 @@ services:
       retries: 5
     expose:
       - 8080
-  gophers-server:
+  graph-gophers-service:
     healthcheck:
       test: wget -qO - http://localhost:8080/health
       interval: 5s
@@ -20,7 +20,7 @@ services:
       context: examples/graph-gophers-service
     expose:
       - 8080
-  nodejs-server:
+  nodejs-service:
     healthcheck:
       test: wget -qO - http://localhost:8080/health
       interval: 5s
@@ -33,16 +33,16 @@ services:
   gateway:
     build:
       context: .
-    volumes:
-      - ./examples/example-config.json:/config.json
+    environment:
+      - BRAMBLE_SERVICE_LIST=http://gqlgen-service:8080/query http://graph-gophers-service:8080/query http://nodejs-service:8080/query
     ports:
       - 8082:8082
       - 8083:8083
       - 8084:8084
     depends_on:
-      gqlgen-server:
+      gqlgen-service:
         condition: service_healthy
-      gophers-server:
+      graph-gophers-service:
         condition: service_healthy
-      nodejs-server:
+      nodejs-service:
         condition: service_healthy
