@@ -2,6 +2,7 @@ package bramble
 
 import (
 	"net/http"
+	"net/http/pprof"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -85,6 +86,7 @@ func RegisterMetrics() {
 func NewMetricsHandler() http.Handler {
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
+	mux.HandleFunc("/debug/pprof/", pprof.Index)
 
 	return mux
 }
