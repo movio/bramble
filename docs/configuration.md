@@ -1,6 +1,6 @@
 # Configuration
 
-Bramble can be configured by passing one or more JSON config file with the `-conf` parameter.
+Bramble can be configured by passing one or more JSON config file with the `-config` parameter.
 
 Config files are also hot-reloaded on change (see below for list of supported options).
 
@@ -11,7 +11,7 @@ Sample configuration:
   "services": ["http://service1/query", "http://service2/query"],
   "gateway-port": 8082,
   "private-port": 8083,
-  "metrics-port": 8084,
+  "metrics-port": 9009,
   "log-level": "info",
   "poll-interval": "5s",
   "max-requests-per-query": 50,
@@ -38,6 +38,7 @@ Sample configuration:
 
   - **Required**
   - Supports hot-reload: Yes
+  - Configurable also by `BRAMBLE_SERVICE_LIST` environment variable set to a space separated list of urls which will be appended to the list
 
 - `gateway-port`: public port for the gateway, this is where the query endpoint
   is exposed. Plugins can expose additional endpoints on this port.
@@ -52,7 +53,7 @@ Sample configuration:
 
 - `metrics-port`: Port used to expose Prometheus metrics.
 
-  - Default: 8084
+  - Default: 9009
   - Supports hot-reload: No
 
 - `log-level`: Log level, one of `debug`|`info`|`error`|`fatal`.
@@ -74,10 +75,14 @@ Sample configuration:
   - Supports hot-reload: No
 
 - `max-service-response-size`: The max response size that Bramble can receive from federated services
+
   - Default: 1MB
   - Supports hot-reload: No
 
-- `id-field-name`: Optional customisation of the field name used to cross-reference boundary types. Defaults to `id`.
+- `id-field-name`: Optional customisation of the field name used to cross-reference boundary types.
+
+  - Default: `id`
+  - Supports hot-reload: No
 
 - `plugins`: Optional list of plugins to enable. See [plugins](plugins.md) for plugins-specific config.
 
