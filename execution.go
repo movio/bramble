@@ -265,12 +265,13 @@ func (q *queryExecution) createGQLErrors(step *QueryPlanStep, err error) gqlerro
 				extensions = make(map[string]interface{})
 			}
 			extensions["selectionSet"] = formatSelectionSetSingleLine(q.ctx, q.schema, step.SelectionSet)
+			extensions["selectionPath"] = path
 			extensions["serviceName"] = step.ServiceName
 			extensions["serviceUrl"] = step.ServiceURL
 
 			outputErrs = append(outputErrs, &gqlerror.Error{
 				Message:    ge.Message,
-				Path:       path,
+				Path:       ge.Path,
 				Locations:  locs,
 				Extensions: extensions,
 			})
@@ -509,7 +510,6 @@ func eliminateUnwantedFragments(responseObjectTypeName string, schema *ast.Schem
 	}
 
 	return filteredSelectionSet
-
 }
 
 func includeFragment(responseObjectTypeName string, schema *ast.Schema, objectDefinition *ast.Definition, typeCondition string) bool {
