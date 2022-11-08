@@ -22,4 +22,4 @@ EXPOSE 8082
 EXPOSE 8083
 EXPOSE 8084
 
-CMD [ "/bramble", "-config", "/config.json" ]
+ENTRYPOINT [ "/bramble" ]

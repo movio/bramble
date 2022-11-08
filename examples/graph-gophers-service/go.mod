@@ -1,13 +1,10 @@
 module github.com/movio/bramble/examples/graph-gophers-service
 
-go 1.17
+go 1.19
 
 require (
-	github.com/gorilla/mux v1.8.0
-	github.com/graph-gophers/graphql-go v1.3.0
+	github.com/go-faker/faker/v4 v4.0.0-beta.3
+	github.com/graph-gophers/graphql-go v1.4.0
 )
 
-require (
-	github.com/opentracing/opentracing-go v1.1.0 // indirect
-	github.com/stretchr/testify v1.7.0 // indirect
-)
+require golang.org/x/text v0.3.7 // indirect

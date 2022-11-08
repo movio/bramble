@@ -1,12 +1,12 @@
+//go:generate go run github.com/99designs/gqlgen
 package main
 
 import (
 	_ "embed"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
-
-	"log"
 )
 
 func main() {
@@ -19,6 +19,6 @@ func main() {
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, "OK")
 	})
-	log.Printf("example graph-gophers-service running on %s", addr)
-	http.ListenAndServe(addr, nil)
+	log.Printf("example gqlgen-service running on %s", addr)
+	log.Fatal(http.ListenAndServe(addr, nil))
 }

@@ -2,48 +2,63 @@ package main
 
 import (
 	"context"
-	"math/rand"
-	"strconv"
-	"strings"
+	_ "embed"
+	"fmt"
+	"net/http"
 
-	"github.com/vektah/gqlparser/v2/formatter"
+	"github.com/99designs/gqlgen/graphql"
+	"github.com/99designs/gqlgen/graphql/handler"
 )
 
-type Resolver struct{}
+var name = "gqlgen-service"
+var version = "0.1.0"
+
+//go:embed schema.graphql
+var schema string
+
+func newResolver() http.Handler {
+	c := Config{
+		Resolvers: &Resolver{
+			gizmos: generateGizmos(),
+			service: Service{
+				Name:    name,
+				Version: version,
+				Schema:  schema,
+			},
+		},
+		Directives: DirectiveRoot{
+			// Support the @boundary directive as a no-op
+			Boundary: func(ctx context.Context, obj interface{}, next graphql.Resolver) (res interface{}, err error) {
+				return next(ctx)
+			},
+		},
+	}
+	return handler.NewDefaultServer(NewExecutableSchema(c))
+}
+
+type Resolver struct {
+	gizmos  map[string]*Gizmo
+	service Service
+}
 
 func (r *Resolver) Query() QueryResolver {
-	return &queryResolver{r}
+	return r
 }
 
-type queryResolver struct{ *Resolver }
-
-func (r *queryResolver) Service(ctx context.Context) (*Service, error) {
-	s := new(strings.Builder)
-	f := formatter.NewFormatter(s)
-	// parsedSchema is in the generated code
-	f.FormatSchema(parsedSchema)
-
-	service := Service{
-		Name:    "gqlgen-service",
-		Version: "0.1.0",
-		Schema:  s.String(),
-	}
-	return &service, nil
+func (r *Resolver) Service(ctx context.Context) (*Service, error) {
+	return &r.service, nil
 }
 
-func (r *queryResolver) Foo(ctx context.Context, id string) (*Foo, error) {
-	foo := Foo{
-		ID:     id,
-		Gqlgen: true,
+func (r *Resolver) Gizmo(ctx context.Context, id string) (*Gizmo, error) {
+	if gizmo, ok := r.gizmos[id]; ok {
+		return gizmo, nil
 	}
-	return &foo, nil
+	return nil, fmt.Errorf("no gizmo found with id: %s", id)
 }
 
-func (r *queryResolver) RandomFoo(ctx context.Context) (*Foo, error) {
-	id := strconv.Itoa(rand.Intn(100))
-	foo := Foo{
-		ID:     id,
-		Gqlgen: true,
+func (r *Resolver) RandomGizmo(ctx context.Context) (*Gizmo, error) {
+	for _, gizmo := range r.gizmos {
+		return gizmo, nil
 	}
-	return &foo, nil
+	return nil, fmt.Errorf("failed to find a gizmo")
 }
