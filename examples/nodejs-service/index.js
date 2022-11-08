@@ -4,13 +4,13 @@ var { buildSchema } = require("graphql");
 var fs = require("fs").promises;
 
 const defaultPort = 8080;
-class Foo {
+class Gizmo {
   constructor(id) {
     this.id = id;
-    this.nodejs = true;
+    this.rating = Math.floor(Math.random() * 100);
   }
   static get(id) {
-    return new Foo(id);
+    return new Gizmo(id);
   }
 }
 
@@ -21,10 +21,10 @@ async function setup() {
   let resolver = {
     service: {
       name: "nodejs-service",
-      version: "1.0.0",
+      version: "0.1.0",
       schema: schemaSource,
     },
-    foo: (args) => Foo.get(args.id),
+    gizmo: (args) => Gizmo.get(args.id),
   };
 
   let app = express();
@@ -52,7 +52,7 @@ async function setup() {
       port = defaultPort;
     }
     app.listen(port, () =>
-      console.log(`example nodejs-service running on http://localhost:${port}/`)
+      console.log(`example nodejs-service running on :${port}`)
     );
   } catch (e) {
     console.log(e);
