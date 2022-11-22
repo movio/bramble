@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"regexp"
@@ -2267,7 +2266,7 @@ func TestQueryExecutionMultipleObjects(t *testing.T) {
 					movies: [Movie!]
 				}`,
 				handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					body, _ := ioutil.ReadAll(r.Body)
+					body, _ := io.ReadAll(r.Body)
 					if strings.Contains(string(body), "movies") {
 						w.Write([]byte(`{
 							"data": {
@@ -2722,7 +2721,7 @@ func TestQueryExecutionWithUnions(t *testing.T) {
 					animals: [Animal]!
 				}`,
 				handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					b, _ := ioutil.ReadAll(r.Body)
+					b, _ := io.ReadAll(r.Body)
 					if strings.Contains(string(b), "animals") {
 						w.Write([]byte(`{
 							"data": {
@@ -2839,7 +2838,7 @@ func TestQueryExecutionWithNamespaces(t *testing.T) {
 					}
 				`,
 				handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					b, _ := ioutil.ReadAll(r.Body)
+					b, _ := io.ReadAll(r.Body)
 
 					if strings.Contains(string(b), "CA7") {
 						w.Write([]byte(`{

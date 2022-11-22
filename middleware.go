@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"strings"
 
@@ -78,7 +77,7 @@ func monitoringMiddleware(h http.Handler) http.Handler {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		r.Body = ioutil.NopCloser(&buf)
+		r.Body = io.NopCloser(&buf)
 
 		r = r.WithContext(ctx)
 
