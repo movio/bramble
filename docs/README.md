@@ -44,7 +44,7 @@ To build the `bramble` command:
 
 ```bash
 go build -o bramble ./cmd
-./bramble -conf config.json
+./bramble -config config.json
 ```
 
 To run the tests:
