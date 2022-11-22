@@ -122,8 +122,8 @@ func TestFormatSelectionSetWithObjectVariable(t *testing.T) {
 		"subObject": map[string]interface{}{
 			"genre": "ACTION",
 		},
-	}}, nil), schema, query.Operations[0].SelectionSet)
-	assert.Equal(t, `{ search(input: {genre: ACTION genreList: [ACTION, COMEDY] stringList: ["abc", "123"] intList: [123] subObject: {genre: ACTION}}) { genre } }`, res)
+	}}, query.Operations[0]), schema, query.Operations[0].SelectionSet)
+	assert.Equal(t, `{ search(input: $input) { genre } }`, res)
 }
 
 func TestFormatSelectionSetWithListOfObjectVariable(t *testing.T) {
@@ -145,7 +145,7 @@ func TestFormatSelectionSetWithListOfObjectVariable(t *testing.T) {
 	res := formatSelectionSetSingleLine(testContextWithVariables(map[string]interface{}{"input": []interface{}{
 		map[string]interface{}{"name": "name", "value": "value"},
 	}}, nil), schema, query.Operations[0].SelectionSet)
-	assert.Equal(t, `{ search(input: [{name: "name" value: "value"}]) }`, res)
+	assert.Equal(t, `{ search(input: $input) }`, res)
 }
 
 func TestFormatSelectionSetWithListContainingVariable(t *testing.T) {
@@ -164,7 +164,7 @@ func TestFormatSelectionSetWithListContainingVariable(t *testing.T) {
 	}`)
 
 	res := formatSelectionSetSingleLine(testContextWithVariables(map[string]interface{}{"id": 1234}, nil), schema, query.Operations[0].SelectionSet)
-	assert.Equal(t, `{ moviesByIds(ids: [1234]) { id } }`, res)
+	assert.Equal(t, `{ moviesByIds(ids: [$id]) { id } }`, res)
 }
 
 func TestFormatSelectionSetWithEnum(t *testing.T) {
@@ -218,7 +218,7 @@ func TestFormatSelectionSetWithEnumVariable(t *testing.T) {
 	}`)
 
 	res := formatSelectionSetSingleLine(testContextWithVariables(map[string]interface{}{"genre": "ACTION"}, nil), schema, query.Operations[0].SelectionSet)
-	assert.Equal(t, `{ search(input: {genre:ACTION}) { genre } }`, res)
+	assert.Equal(t, `{ search(input: {genre:$genre}) { genre } }`, res)
 }
 
 func TestFormatSelectionSetWithNullEnumVariable(t *testing.T) {
@@ -245,7 +245,7 @@ func TestFormatSelectionSetWithNullEnumVariable(t *testing.T) {
 	}`)
 
 	res := formatSelectionSetSingleLine(testContextWithVariables(map[string]interface{}{"genre": nil}, nil), schema, query.Operations[0].SelectionSet)
-	assert.Equal(t, `{ search(input: {genre:null}) { genre } }`, res)
+	assert.Equal(t, `{ search(input: {genre:$genre}) { genre } }`, res)
 }
 
 func TestFormatSelectionSetInlineFragment(t *testing.T) {
@@ -369,6 +369,238 @@ func TestFormatEnum(t *testing.T) {
 		"e": "English",
 	}
 
-	assert.Equal(t, "French", formatArgument(schema, &ast.Value{Kind: ast.Variable, Raw: "f", ExpectedType: typ}, vars))
-	assert.Equal(t, "English", formatArgument(schema, &ast.Value{Kind: ast.Variable, Raw: "e", ExpectedType: typ}, vars))
+	assert.Equal(t, "$f", formatArgument(schema, &ast.Value{Kind: ast.Variable, Raw: "f", ExpectedType: typ}, vars))
+	assert.Equal(t, "$e", formatArgument(schema, &ast.Value{Kind: ast.Variable, Raw: "e", ExpectedType: typ}, vars))
+}
+
+func TestFormatDocument(t *testing.T) {
+	schema := loadSchema(`
+	type Movie {
+		id: ID!
+		title: String!
+	}
+
+	type Query {
+		search(id: ID!): Movie
+	}
+	`)
+
+	query := gqlparser.MustLoadQuery(schema, `query {
+		search(id: "123") { id title }
+	}`)
+
+	operationDefinition := query.Operations[0]
+	res, vars := formatDocument(
+		testContextWithVariables(map[string]interface{}{"id": "123"}, operationDefinition),
+		schema,
+		string(operationDefinition.Operation),
+		operationDefinition.SelectionSet,
+	)
+	assert.Equal(t, `query {    search(id: "123") {        id        title    } }`, res)
+	assert.Equal(t, (map[string]interface{})(nil), vars)
+}
+
+func TestFormatDocumentWithOperationName(t *testing.T) {
+	schema := loadSchema(`
+	type Movie {
+		id: ID!
+		title: String!
+	}
+
+	type Query {
+		search(id: ID!): Movie
+	}
+	`)
+
+	query := gqlparser.MustLoadQuery(schema, `query search {
+		search(id: "123") { id title }
+	}`)
+
+	operationDefinition := query.Operations[0]
+	res, vars := formatDocument(
+		testContextWithVariables(map[string]interface{}{"id": "123"}, operationDefinition),
+		schema,
+		string(operationDefinition.Operation),
+		operationDefinition.SelectionSet,
+	)
+	assert.Equal(t, `query search{    search(id: "123") {        id        title    } }`, res)
+	assert.Equal(t, (map[string]interface{})(nil), vars)
+}
+
+func TestFormatDocumentWithVariable(t *testing.T) {
+	schema := loadSchema(`
+	type Movie {
+		id: ID!
+		title: String!
+	}
+
+	type Query {
+		search(id: ID!): Movie
+	}
+	`)
+
+	query := gqlparser.MustLoadQuery(schema, `query search($id: ID!) {
+		search(id: $id) { id title }
+	}`)
+
+	operationDefinition := query.Operations[0]
+	res, vars := formatDocument(
+		testContextWithVariables(map[string]interface{}{"id": "123", "extra": "ignore"}, operationDefinition),
+		schema,
+		string(operationDefinition.Operation),
+		operationDefinition.SelectionSet,
+	)
+	assert.Equal(t, `query search($id: ID!){    search(id: $id) {        id        title    } }`, res)
+	assert.Equal(t, map[string]interface{}{"id": "123"}, vars)
+}
+
+func TestFormatDocumentWithListVariable(t *testing.T) {
+	schema := loadSchema(`
+	type Movie {
+		id: ID!
+		title: String!
+	}
+
+	type Query {
+		search(ids: [ID!]): Movie
+	}
+	`)
+
+	query := gqlparser.MustLoadQuery(schema, `query search($ids: [ID!]) {
+		search(ids: $ids) { id title }
+	}`)
+
+	operationDefinition := query.Operations[0]
+	res, vars := formatDocument(
+		testContextWithVariables(map[string]interface{}{"ids": `["123", "456"]`, "extra": "ignore"}, operationDefinition),
+		schema,
+		string(operationDefinition.Operation),
+		operationDefinition.SelectionSet,
+	)
+	assert.Equal(t, `query search($ids: [ID!]){    search(ids: $ids) {        id        title    } }`, res)
+	assert.Equal(t, map[string]interface{}{"ids": `["123", "456"]`}, vars)
+}
+
+func TestFormatDocumentWithVariableWithinList(t *testing.T) {
+	schema := loadSchema(`
+	type Movie {
+		id: ID!
+		title: String!
+	}
+
+	type Query {
+		search(ids: [ID!]): Movie
+	}
+	`)
+
+	query := gqlparser.MustLoadQuery(schema, `query search($id: ID!) {
+		search(ids: ["123", $id, "789"]) { id title }
+	}`)
+
+	operationDefinition := query.Operations[0]
+	res, vars := formatDocument(
+		testContextWithVariables(map[string]interface{}{"id": "123", "extra": "ignore"}, operationDefinition),
+		schema,
+		string(operationDefinition.Operation),
+		operationDefinition.SelectionSet,
+	)
+	assert.Equal(t, `query search($id: ID!){    search(ids: ["123",$id,"789"]) {        id        title    } }`, res)
+	assert.Equal(t, map[string]interface{}{"id": "123"}, vars)
+}
+
+func TestFormatDocumentWithInputVariable(t *testing.T) {
+	schema := loadSchema(`
+	type Movie {
+		id: ID!
+		title: String!
+	}
+
+	input Filter {
+		id: ID!
+	}
+
+	type Query {
+		search(filter: Filter): Movie
+	}
+	`)
+
+	query := gqlparser.MustLoadQuery(schema, `query search($filter: Filter) {
+		search(filter: $filter) { id title }
+	}`)
+
+	operationDefinition := query.Operations[0]
+	res, vars := formatDocument(
+		testContextWithVariables(map[string]interface{}{"filter": `{id: "123"}`, "extra": "ignore"}, operationDefinition),
+		schema,
+		string(operationDefinition.Operation),
+		operationDefinition.SelectionSet,
+	)
+	assert.Equal(t, `query search($filter: Filter){    search(filter: $filter) {        id        title    } }`, res)
+	assert.Equal(t, map[string]interface{}{"filter": `{id: "123"}`}, vars)
+}
+
+func TestFormatDocumentWithVariableWithinInput(t *testing.T) {
+	schema := loadSchema(`
+	type Movie {
+		id: ID!
+		title: String!
+	}
+
+	input Filter {
+		id: ID!
+	}
+
+	type Query {
+		search(filter: Filter): Movie
+	}
+	`)
+
+	query := gqlparser.MustLoadQuery(schema, `query search($id: ID!) {
+		search(filter: {id: $id}) { id title }
+	}`)
+
+	operationDefinition := query.Operations[0]
+	res, vars := formatDocument(
+		testContextWithVariables(map[string]interface{}{"id": "123", "extra": "ignore"}, operationDefinition),
+		schema,
+		string(operationDefinition.Operation),
+		operationDefinition.SelectionSet,
+	)
+	assert.Equal(t, `query search($id: ID!){    search(filter: {id:$id}) {        id        title    } }`, res)
+	assert.Equal(t, map[string]interface{}{"id": "123"}, vars)
+}
+
+func TestFormatDocumentWithVariableWithinNestedInput(t *testing.T) {
+	schema := loadSchema(`
+	type Movie {
+		id: ID!
+		title: String!
+	}
+
+	input SubFilter {
+		id: ID!
+	}
+
+	input Filter {
+		sub: SubFilter
+	}
+
+	type Query {
+		search(filter: Filter): Movie
+	}
+	`)
+
+	query := gqlparser.MustLoadQuery(schema, `query search($id: ID!) {
+		search(filter: {sub: {id: $id}}) { id title }
+	}`)
+
+	operationDefinition := query.Operations[0]
+	res, vars := formatDocument(
+		testContextWithVariables(map[string]interface{}{"id": "123", "extra": "ignore"}, operationDefinition),
+		schema,
+		string(operationDefinition.Operation),
+		operationDefinition.SelectionSet,
+	)
+	assert.Equal(t, `query search($id: ID!){    search(filter: {sub:{id:$id}}) {        id        title    } }`, res)
+	assert.Equal(t, map[string]interface{}{"id": "123"}, vars)
 }
