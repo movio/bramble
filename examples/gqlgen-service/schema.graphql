@@ -1,5 +1,5 @@
 """
-This is the prerequsite schema required for fedaration by the gateway
+This is the prerequisite schema required for federation by the gateway
 """
 directive @boundary on OBJECT | FIELD_DEFINITION
 
