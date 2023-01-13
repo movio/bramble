@@ -6,7 +6,7 @@
   "log-level": "info",
   "poll-interval": "5s",
   "max-requests-per-query": 50,
-  "max-client-response-size": 1048576,
+  "max-service-response-size": 1048576,
   "disable-introspection": false,
   "plugins": [
     {
