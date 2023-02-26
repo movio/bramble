@@ -1,9 +1,0 @@
-*.go        internal_tools/graphql_gateway/server/main
-Makefile    internal_tools/graphql_gateway/server/build_config
-Dockerfile  internal_tools/graphql_gateway/server/build_config
-go.mod      internal_tools/graphql_gateway/server/build_config
-.drone.yml  internal_tools/graphql_gateway/server/ci_config
-*.jsonnet   internal_tools/graphql_gateway/server/ci_config
-docs        internal_tools/graphql_gateway/server/documentation
-examples    internal_tools/graphql_gateway/server/documentation
-plugins     internal_tools/graphql_gateway/server/plugins
