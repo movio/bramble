@@ -79,8 +79,6 @@ func (s *ExecutableSchema) UpdateSchema(forceRebuild bool) error {
 		}
 	}()
 
-	promServiceUpdateError.Reset()
-
 	for url, s := range s.Services {
 		logger := log.WithField("url", url)
 		updated, err := s.Update()
