@@ -27,6 +27,7 @@ func NewGateway(executableSchema *ExecutableSchema, plugins []Plugin) *Gateway {
 
 // UpdateSchemas periodically updates the execute schema
 func (g *Gateway) UpdateSchemas(interval time.Duration) {
+	time.Sleep(interval)
 	for range time.Tick(interval) {
 		err := g.ExecutableSchema.UpdateSchema(false)
 		if err != nil {
