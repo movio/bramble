@@ -16,6 +16,8 @@ RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-X 'github.com/movio/bramble.Ver
 
 FROM gcr.io/distroless/static
 
+LABEL org.opencontainers.image.source="https://github.com/movio/bramble"
+
 COPY --from=builder /workspace/bramble .
 
 EXPOSE 8082
