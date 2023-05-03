@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/99designs/gqlgen/graphql"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -28,6 +29,7 @@ type Plugin interface {
 	WrapGraphQLClientTransport(http.RoundTripper) http.RoundTripper
 
 	InterceptRequest(ctx context.Context, operationName, rawQuery string, variables map[string]interface{})
+	InterceptResponse(ctx context.Context, operationName, rawQuery string, variables map[string]interface{}, response *graphql.Response) *graphql.Response
 }
 
 // BasePlugin is an empty plugin. It can be embedded by any plugin as a way to avoid
@@ -56,6 +58,12 @@ func (p *BasePlugin) GraphqlQueryPath() (bool, string) {
 // InterceptRequest is called before bramble starts executing a request.
 // It can be used to inspect the unmarshalled GraphQL request bramble receives.
 func (p *BasePlugin) InterceptRequest(ctx context.Context, operationName, rawQuery string, variables map[string]interface{}) {
+}
+
+// InterceptResponse is called after bramble has finished executing a request.
+// It can be used to inspect and/or modify the response bramble will return.
+func (p *BasePlugin) InterceptResponse(ctx context.Context, operationName, rawQuery string, variables map[string]interface{}, response *graphql.Response) *graphql.Response {
+	return response
 }
 
 // ApplyMiddlewarePublicMux ...
