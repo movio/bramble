@@ -234,6 +234,9 @@ func (r *metaResolver) GetType(ctx context.Context, args struct{ ID graphql.ID }
 }
 
 func (r *metaResolver) getTypes(schema *ast.Schema) []brambleType {
+	if schema == nil {
+		return nil
+	}
 	var result []brambleType
 	for _, def := range schema.Types {
 		result = append(result, r.brambleType(def.Name, def))
@@ -322,6 +325,9 @@ func (r *metaResolver) GetField(ctx context.Context, args struct{ ID graphql.ID 
 }
 
 func (r *metaResolver) getFields(schema *ast.Schema) []brambleField {
+	if schema == nil {
+		return nil
+	}
 	var result []brambleField
 	for _, def := range schema.Types {
 		for _, f := range def.Fields {
