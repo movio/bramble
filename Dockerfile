@@ -2,17 +2,17 @@ FROM golang:1.17-alpine3.15 AS builder
 
 ARG VERSION=SNAPSHOT
 ENV GO111MODULE=on
-ENV CGO_ENABLED=0
+ENV CGO_ENABLED=0 GOOS=linux
 
 WORKDIR /workspace
 
 COPY go.mod go.sum /workspace/
 
-RUN go mod download
+RUN --mount=type=cache,target=/go/pkg/mod go mod download
 
 COPY . /workspace/
 
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-X 'github.com/movio/bramble.Version=$VERSION'" -o bramble ./cmd/bramble
+RUN --mount=type=cache,target=/root/.cache/go-build go build -ldflags="-X 'github.com/movio/bramble.Version=$VERSION'" -o bramble ./cmd/bramble
 
 FROM gcr.io/distroless/static
 
