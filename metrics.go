@@ -15,10 +15,20 @@ var (
 		Help: "A gauge representing the current status of remote services schemas",
 	})
 
-	promServiceUpdateError = prometheus.NewCounterVec(
+	promServiceUpdateErrorCounter = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
+			Name: "service_update_error_total",
+			Help: "A counter indicating how many times services have failed to update",
+		},
+		[]string{
+			"service",
+		},
+	)
+
+	promServiceUpdateErrorGauge = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
 			Name: "service_update_error",
-			Help: "A counter indicating what services have failed to update",
+			Help: "A gauge indicating what services are failing to update",
 		},
 		[]string{
 			"service",
@@ -74,7 +84,8 @@ var (
 // RegisterMetrics register the prometheus metrics.
 func RegisterMetrics() {
 	prometheus.MustRegister(promInvalidSchema)
-	prometheus.MustRegister(promServiceUpdateError)
+	prometheus.MustRegister(promServiceUpdateErrorCounter)
+	prometheus.MustRegister(promServiceUpdateErrorGauge)
 	prometheus.MustRegister(promHTTPInFlightGauge)
 	prometheus.MustRegister(promHTTPRequestCounter)
 	prometheus.MustRegister(promHTTPResponseDurations)

@@ -83,12 +83,14 @@ func (s *ExecutableSchema) UpdateSchema(forceRebuild bool) error {
 		logger := log.WithField("url", url)
 		updated, err := s.Update()
 		if err != nil {
-			promServiceUpdateError.WithLabelValues(s.ServiceURL).Inc()
+			promServiceUpdateErrorCounter.WithLabelValues(s.ServiceURL).Inc()
+			promServiceUpdateErrorGauge.WithLabelValues(s.ServiceURL).Set(1)
 			invalidSchema, forceRebuild = true, true
 			logger.WithError(err).Error("unable to update service")
 			// Ignore this service in this update
 			continue
 		}
+		promServiceUpdateErrorGauge.WithLabelValues(s.ServiceURL).Set(0)
 		logger = log.WithFields(log.Fields{
 			"version": s.Version,
 			"service": s.Name,
