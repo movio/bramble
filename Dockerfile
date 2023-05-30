@@ -1,7 +1,6 @@
-FROM golang:1.17-alpine3.15 AS builder
+FROM golang:1.20-alpine3.18 AS builder
 
 ARG VERSION=SNAPSHOT
-ENV GO111MODULE=on
 ENV CGO_ENABLED=0 GOOS=linux
 
 WORKDIR /workspace
