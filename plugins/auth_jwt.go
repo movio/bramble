@@ -122,7 +122,7 @@ func (p *JWTPlugin) ApplyMiddlewarePublicMux(h http.Handler) http.Handler {
 		var claims Claims
 		_, err = jwt.ParseWithClaims(tokenStr, &claims, func(token *jwt.Token) (interface{}, error) {
 			if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
-				return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
+				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 			}
 
 			keyID, _ := token.Header["kid"].(string)
