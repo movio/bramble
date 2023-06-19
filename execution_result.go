@@ -321,28 +321,22 @@ func formatResponseDataRec(schema *ast.Schema, selectionSet ast.SelectionSet, re
 		filteredSelectionSet := unionAndTrimSelectionSet(objectTypename, schema, selectionSet)
 
 		for i, selection := range filteredSelectionSet {
+			var innerBody []byte
 			switch selection := selection.(type) {
 			case *ast.InlineFragment:
-				innerBody := formatResponseDataRec(schema, selection.SelectionSet, result, true)
-				buf.Write(innerBody)
-
+				innerBody = formatResponseDataRec(schema, selection.SelectionSet, result, true)
 			case *ast.FragmentSpread:
-				innerBody := formatResponseDataRec(schema, selection.Definition.SelectionSet, result, true)
-				buf.Write(innerBody)
+				innerBody = formatResponseDataRec(schema, selection.Definition.SelectionSet, result, true)
 			case *ast.Field:
 				field := selection
+				var innerBuf bytes.Buffer
+				fmt.Fprintf(&innerBuf, `"%s":`, field.Alias)
 				fieldData, ok := result[field.Alias]
-				buf.WriteString(fmt.Sprintf(`"%s":`, field.Alias))
 				if !ok {
-					buf.WriteString("null")
-					if i < len(filteredSelectionSet)-1 {
-						buf.WriteString(",")
-					}
-					continue
-				}
-				if field.SelectionSet != nil && len(field.SelectionSet) > 0 {
-					innerBody := formatResponseDataRec(schema, field.SelectionSet, fieldData, false)
-					buf.Write(innerBody)
+					innerBuf.WriteString("null")
+				} else if field.SelectionSet != nil && len(field.SelectionSet) > 0 {
+					val := formatResponseDataRec(schema, field.SelectionSet, fieldData, false)
+					innerBuf.Write(val)
 				} else {
 					fieldJSON, err := json.Marshal(&fieldData)
 					if err != nil {
@@ -350,12 +344,15 @@ func formatResponseDataRec(schema *ast.Schema, selectionSet ast.SelectionSet, re
 						// from downstream services as JSON. We should never get to this point with invalid JSON.
 						log.Panicf("invalid json when formatting response: %v", err)
 					}
-
-					buf.Write(fieldJSON)
+					innerBuf.Write(fieldJSON)
 				}
+				innerBody = innerBuf.Bytes()
 			}
-			if i < len(filteredSelectionSet)-1 {
-				buf.WriteString(",")
+			if len(innerBody) > 0 {
+				if i > 0 {
+					buf.WriteString(",")
+				}
+				buf.Write(innerBody)
 			}
 		}
 		if !insideFragment {
