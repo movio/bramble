@@ -364,23 +364,21 @@ func formatResponseDataRec(schema *ast.Schema, selectionSet ast.SelectionSet, re
 	case []interface{}:
 		buf.WriteString("[")
 		for i, v := range result {
-			innerBody := formatResponseDataRec(schema, selectionSet, v, false)
-			buf.Write(innerBody)
-
-			if i < len(result)-1 {
+			if i > 0 {
 				buf.WriteString(",")
 			}
+			innerBody := formatResponseDataRec(schema, selectionSet, v, false)
+			buf.Write(innerBody)
 		}
 		buf.WriteString("]")
 	case []map[string]interface{}:
 		buf.WriteString("[")
 		for i, v := range result {
-			innerBody := formatResponseDataRec(schema, selectionSet, v, false)
-			buf.Write(innerBody)
-
-			if i < len(result)-1 {
+			if i > 0 {
 				buf.WriteString(",")
 			}
+			innerBody := formatResponseDataRec(schema, selectionSet, v, false)
+			buf.Write(innerBody)
 		}
 		buf.WriteString("]")
 	}
