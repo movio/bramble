@@ -320,7 +320,8 @@ func formatResponseDataRec(schema *ast.Schema, selectionSet ast.SelectionSet, re
 		objectTypename := extractAndCastTypenameField(result)
 		filteredSelectionSet := unionAndTrimSelectionSet(objectTypename, schema, selectionSet)
 
-		for i, selection := range filteredSelectionSet {
+		itemWritten := false
+		for _, selection := range filteredSelectionSet {
 			var innerBody []byte
 			switch selection := selection.(type) {
 			case *ast.InlineFragment:
@@ -349,10 +350,11 @@ func formatResponseDataRec(schema *ast.Schema, selectionSet ast.SelectionSet, re
 				innerBody = innerBuf.Bytes()
 			}
 			if len(innerBody) > 0 {
-				if i > 0 {
+				if itemWritten {
 					buf.WriteString(",")
 				}
 				buf.Write(innerBody)
+				itemWritten = true
 			}
 		}
 		if !insideFragment {

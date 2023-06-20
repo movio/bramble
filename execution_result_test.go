@@ -1637,6 +1637,170 @@ func TestFormatResponseBody(t *testing.T) {
 		require.JSONEq(t, expectedJSON, string(bodyJSON))
 	})
 
+	t.Run("multiple implementations with empty fragment spreads before other fields", func(t *testing.T) {
+		ddl := `
+			interface Gizmo {
+				id: ID!
+				name: String!
+			}
+
+			type Gadget implements Gizmo {
+				id: ID!
+				name: String!
+				owner: String!
+			}
+
+			type Tool implements Gizmo {
+				id: ID!
+				name: String!
+				category: String!
+			}
+
+			type Query {
+				gizmos: [Gizmo!]!
+			}
+		`
+
+		result := jsonToInterfaceMap(`{
+			"gizmos": [
+				{
+					"id": "GADGET1",
+					"name": "Gadget #1",
+					"owner": "Bob",
+					"__typename": "Gadget",
+					"_bramble__typename": "Gadget"
+				},
+				{
+					"id": "GADGET2",
+					"name": "Gadget #2",
+					"category": "Plastic",
+					"__typename": "Tool",
+					"_bramble__typename": "Tool"
+				}
+			]
+		}`)
+
+		schema := gqlparser.MustLoadSchema(&ast.Source{Name: "fixture", Input: ddl})
+
+		query := `
+		query Gizmo {
+			gizmos {
+				...GizmoDetails
+				id
+			}
+		}
+
+		fragment GizmoDetails on Gizmo {
+			... on Gadget {
+				name
+				owner
+			}
+		}`
+
+		expectedJSON := `
+		{
+			"gizmos": [
+				{
+					"id": "GADGET1",
+					"name": "Gadget #1",
+					"owner": "Bob"
+				},
+				{
+					"id": "GADGET2"
+				}
+			]
+		}`
+
+		document := gqlparser.MustLoadQuery(schema, query)
+		bodyJSON := formatResponseData(schema, document.Operations[0].SelectionSet, result)
+		require.JSONEq(t, expectedJSON, string(bodyJSON))
+	})
+
+	t.Run("multiple implementations with multiple empty fragment spreads around other fields", func(t *testing.T) {
+		ddl := `
+			interface Gizmo {
+				id: ID!
+				name: String!
+			}
+
+			type Gadget implements Gizmo {
+				id: ID!
+				name: String!
+				owner: String!
+			}
+
+			type Tool implements Gizmo {
+				id: ID!
+				name: String!
+				category: String!
+			}
+
+			type Query {
+				gizmos: [Gizmo!]!
+			}
+		`
+
+		result := jsonToInterfaceMap(`{
+			"gizmos": [
+				{
+					"id": "GADGET1",
+					"name": "Gadget #1",
+					"owner": "Bob",
+					"__typename": "Gadget",
+					"_bramble__typename": "Gadget"
+				},
+				{
+					"id": "GADGET2",
+					"name": "Gadget #2",
+					"category": "Plastic",
+					"__typename": "Tool",
+					"_bramble__typename": "Tool"
+				}
+			]
+		}`)
+
+		schema := gqlparser.MustLoadSchema(&ast.Source{Name: "fixture", Input: ddl})
+
+		query := `
+		query Gizmo {
+			gizmos {
+				...GizmoName
+				id
+				...GizmoDetails
+			}
+		}
+
+		fragment GizmoName on Gizmo {
+			... on Gadget {
+				name
+			}
+		}
+
+		fragment GizmoDetails on Gizmo {
+			... on Gadget {
+				owner
+			}
+		}`
+
+		expectedJSON := `
+		{
+			"gizmos": [
+				{
+					"id": "GADGET1",
+					"name": "Gadget #1",
+					"owner": "Bob"
+				},
+				{
+					"id": "GADGET2"
+				}
+			]
+		}`
+
+		document := gqlparser.MustLoadQuery(schema, query)
+		bodyJSON := formatResponseData(schema, document.Operations[0].SelectionSet, result)
+		require.JSONEq(t, expectedJSON, string(bodyJSON))
+	})
+
 	t.Run("multiple implementation fragment spreads (bottom fragment matches)", func(t *testing.T) {
 		ddl := `
 			interface Gizmo {
