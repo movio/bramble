@@ -54,17 +54,21 @@ func validateBoundaryObjects(schema *ast.Schema) error {
 				return err
 			}
 		}
-	} else {
-		if err := validateNodeInterface(schema); err != nil {
-			return err
-		}
-		if err := validateImplementsNode(schema); err != nil {
-			return err
-		}
 	}
 
 	if hasNodeQuery(schema) {
 		if err := validateNodeQuery(schema); err != nil {
+			return err
+		}
+	}
+	if hasNodesQuery(schema) {
+		if err := validateNodesQuery(schema); err != nil {
+			return err
+		}
+	}
+
+	if hasNodesQuery(schema) {
+		if err := validateNodesQuery(schema); err != nil {
 			return err
 		}
 	}
@@ -108,10 +112,16 @@ func validateServiceObject(schema *ast.Schema) error {
 			switch field.Name {
 			case "name", "version", "schema":
 				if !isNonNullableTypeNamed(field.Type, "String") {
-					return fmt.Errorf("the Service object should have a field called '%s' of type 'String!'", field.Name)
+					return fmt.Errorf(
+						"the Service object should have a field called '%s' of type 'String!'",
+						field.Name,
+					)
 				}
 			default:
-				return fmt.Errorf("the Service object should not have a field called %s", field.Name)
+				return fmt.Errorf(
+					"the Service object should not have a field called %s",
+					field.Name,
+				)
 			}
 		}
 		return nil
@@ -136,6 +146,32 @@ func validateServiceQuery(schema *ast.Schema) error {
 		return nil
 	}
 	return fmt.Errorf("the Query type is missing the 'service' field")
+}
+
+func validateNodesQuery(schema *ast.Schema) error {
+	if schema.Query == nil {
+		return fmt.Errorf("the schema is missing a Query type")
+	}
+	for _, f := range schema.Query.Fields {
+		if f.Name != nodesRootFieldName {
+			continue
+		}
+		if len(f.Arguments) != 1 {
+			return fmt.Errorf("the 'nodes' field of Query must take a single argument")
+		}
+		arg := f.Arguments[0]
+		if arg.Name != IdsFieldName {
+			return fmt.Errorf("the 'nodes' field of Query must take a single argument called 'ids'")
+		}
+		if !isIDsType(arg.Type) {
+			return fmt.Errorf("the 'nodes' field of Query must take a single argument of type 'ID!'")
+		}
+		if f.Type == nil || f.Type.Elem == nil || !isNullableTypeNamed(f.Type.Elem, nodeInterfaceName) {
+			return fmt.Errorf("the 'nodes' field of Query must be of type '[Node]!'")
+		}
+		return nil
+	}
+	return fmt.Errorf("the Query type is missing the 'nodes' field")
 }
 
 func validateNodeQuery(schema *ast.Schema) error {
@@ -198,7 +234,10 @@ func validateImplementsNode(schema *ast.Schema) error {
 		if implementsNode(schema, t) {
 			continue
 		}
-		return fmt.Errorf("object '%s' has the boundary directive but doesn't implement Node", t.Name)
+		return fmt.Errorf(
+			"object '%s' has the boundary directive but doesn't implement Node",
+			t.Name,
+		)
 	}
 	return nil
 }
@@ -210,6 +249,10 @@ func implementsNode(schema *ast.Schema, def *ast.Definition) bool {
 		}
 	}
 	return false
+}
+
+func hasNodesQuery(schema *ast.Schema) bool {
+	return schema.Query.Fields.ForName(nodesRootFieldName) != nil
 }
 
 func hasNodeQuery(schema *ast.Schema) bool {
@@ -247,7 +290,11 @@ func validateNamespaceDirective(schema *ast.Schema) error {
 	return fmt.Errorf("@namespace directive not found")
 }
 
-func validateNamespacesFields(schema *ast.Schema, currentType *ast.Definition, rootType string) error {
+func validateNamespacesFields(
+	schema *ast.Schema,
+	currentType *ast.Definition,
+	rootType string,
+) error {
 	if currentType == nil {
 		return nil
 	}
@@ -256,7 +303,11 @@ func validateNamespacesFields(schema *ast.Schema, currentType *ast.Definition, r
 		ft := schema.Types[f.Type.Name()]
 		if isNamespaceObject(ft) {
 			if !f.Type.NonNull {
-				return fmt.Errorf("namespace return type should be non nullable on %s.%s", currentType.Name, f.Name)
+				return fmt.Errorf(
+					"namespace return type should be non nullable on %s.%s",
+					currentType.Name,
+					f.Name,
+				)
 			}
 
 			err := validateNamespacesFields(schema, ft, rootType)
@@ -272,14 +323,20 @@ func validateNamespacesFields(schema *ast.Schema, currentType *ast.Definition, r
 // validateNamespaceTypesAscendence validates that namespace types are only used in other namespaces type or Query/Mutation/Subscription
 func validateNamespaceTypesAscendence(schema *ast.Schema) error {
 	for _, t := range schema.Types {
-		if isNamespaceObject(t) || t.Name == queryObjectName || t.Name == mutationObjectName || t.Name == subscriptionObjectName {
+		if isNamespaceObject(t) || t.Name == queryObjectName || t.Name == mutationObjectName ||
+			t.Name == subscriptionObjectName {
 			continue
 		}
 
 		for _, f := range t.Fields {
 			ft := schema.Types[f.Type.Name()]
 			if isNamespaceObject(ft) {
-				return fmt.Errorf("type %q (namespace type) is used for field %q in non-namespace object %q", ft.Name, f.Name, t.Name)
+				return fmt.Errorf(
+					"type %q (namespace type) is used for field %q in non-namespace object %q",
+					ft.Name,
+					f.Name,
+					t.Name,
+				)
 			}
 		}
 	}
@@ -370,7 +427,10 @@ func validateBoundaryFields(schema *ast.Schema) error {
 	}
 
 	if len(missingBoundaryQueries) > 0 {
-		return fmt.Errorf("missing boundary fields for the following types: %v", missingBoundaryQueries)
+		return fmt.Errorf(
+			"missing boundary fields for the following types: %v",
+			missingBoundaryQueries,
+		)
 	}
 
 	return nil
@@ -388,7 +448,11 @@ func validateBoundaryObjectsFormat(schema *ast.Schema) error {
 		}
 
 		if idField.Type.String() != "ID!" {
-			return fmt.Errorf(`%q field should have type "ID!" in boundary type %q`, IdFieldName, t.Name)
+			return fmt.Errorf(
+				`%q field should have type "ID!" in boundary type %q`,
+				IdFieldName,
+				t.Name,
+			)
 		}
 	}
 

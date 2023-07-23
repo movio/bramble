@@ -405,13 +405,21 @@ func hasIDField(t *ast.Definition) bool {
 }
 
 func isNodeField(f *ast.FieldDefinition) bool {
-	if f.Name != nodeRootFieldName || len(f.Arguments) != 1 {
+	if (f.Name != nodeRootFieldName && f.Name != nodesRootFieldName) || len(f.Arguments) != 1 {
 		return false
 	}
 	arg := f.Arguments[0]
-	return arg.Name == IdFieldName &&
+
+	isNode := (arg.Name == IdFieldName &&
 		isIDType(arg.Type) &&
-		isNullableTypeNamed(f.Type, nodeInterfaceName)
+		isNullableTypeNamed(f.Type, nodeInterfaceName))
+
+	isNodes := (arg.Name == IdsFieldName &&
+		isIDsType(arg.Type) &&
+		f.Type != nil &&
+		isNullableTypeNamed(f.Type.Elem, nodeInterfaceName))
+
+	return isNode || isNodes
 }
 
 func isIDField(f *ast.FieldDefinition) bool {
