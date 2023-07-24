@@ -49,7 +49,7 @@ bramble config.json
 ### Docker
 
 ```
-docker run -p 8082:8082 -v $(PWD)/config.json:/config.json ghcr.io/movio/bramble
+docker run -p 8082:8082 -v $(PWD)/config.json:/config.json ghcr.io/movio/bramble -config config.json
 ```
 
 ## Querying Bramble
