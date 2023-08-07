@@ -7,15 +7,11 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
-	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-// can only run one test at a time that takes over the logrus output
-var logrusLock = sync.Mutex{}
 
 func TestGatewayQuery(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -71,9 +67,6 @@ func TestGatewayQuery(t *testing.T) {
 }
 
 func TestRequestJSONBodyLogging(t *testing.T) {
-	logrusLock.Lock()
-	defer logrusLock.Unlock()
-
 	server := NewGateway(NewExecutableSchema(nil, 50, nil), nil).Router(&Config{})
 
 	body := map[string]interface{}{
@@ -103,9 +96,6 @@ func TestRequestJSONBodyLogging(t *testing.T) {
 }
 
 func TestRequestInvalidJSONBodyLogging(t *testing.T) {
-	logrusLock.Lock()
-	defer logrusLock.Unlock()
-
 	server := NewGateway(nil, nil).Router(&Config{})
 
 	body := `{ "invalid": "json`
@@ -132,9 +122,6 @@ func TestRequestInvalidJSONBodyLogging(t *testing.T) {
 }
 
 func TestRequestTextBodyLogging(t *testing.T) {
-	logrusLock.Lock()
-	defer logrusLock.Unlock()
-
 	server := NewGateway(nil, nil).Router(&Config{})
 
 	body := `the request body`
