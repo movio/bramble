@@ -660,6 +660,7 @@ func strToSelectionSet(schema *ast.Schema, query string) ast.SelectionSet {
 }
 
 func assertSelectionSetsEqual(t *testing.T, schema *ast.Schema, expected, actual ast.SelectionSet) {
+	t.Helper()
 	expectedStr := formatSelectionSet(testContextWithoutVariables(nil), schema, expected)
 	actualStr := formatSelectionSet(testContextWithoutVariables(nil), schema, actual)
 

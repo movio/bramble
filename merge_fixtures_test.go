@@ -136,6 +136,7 @@ func assertSchemaIntrospectionTypes(t *testing.T, schema *ast.Schema) {
 }
 
 func assertSchemaBuiltinDirectives(t *testing.T, schema *ast.Schema) {
+	t.Helper()
 	emptyAST := gqlparser.MustLoadSchema(&ast.Source{Name: "empty", Input: ""})
 	builtInDirectives := []string{"skip", "include", "deprecated"}
 	for _, d := range builtInDirectives {
