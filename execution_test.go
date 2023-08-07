@@ -3383,8 +3383,7 @@ func TestSchemaUpdate_serviceError(t *testing.T) {
 		},
 	}
 
-	executableSchema, cleanup := f.setup(t)
-	defer cleanup()
+	executableSchema := f.setup(t)
 
 	foundGizmo, foundGadget := false, false
 
@@ -3439,14 +3438,13 @@ func (f *queryExecutionFixture) checkSuccess(t *testing.T) {
 	jsonEqWithOrder(t, f.expected, string(f.resp.Data))
 }
 
-func (f *queryExecutionFixture) setup(t *testing.T) (*ExecutableSchema, func()) {
+func (f *queryExecutionFixture) setup(t *testing.T) *ExecutableSchema {
 	var services []*Service
 	var schemas []*ast.Schema
-	var serverCloses []func()
 
 	for _, s := range f.services {
 		serv := httptest.NewServer(s.handler)
-		serverCloses = append(serverCloses, serv.Close)
+		t.Cleanup(serv.Close)
 
 		schema := gqlparser.MustLoadSchema(&ast.Source{Input: s.schema})
 		service := NewService(serv.URL)
@@ -3471,16 +3469,11 @@ func (f *queryExecutionFixture) setup(t *testing.T) (*ExecutableSchema, func()) 
 		es.GraphqlClient.HTTPClient.Timeout = 10 * time.Millisecond
 	}
 
-	return es, func() {
-		for _, close := range serverCloses {
-			close()
-		}
-	}
+	return es
 }
 
 func (f *queryExecutionFixture) run(t *testing.T) {
-	es, cleanup := f.setup(t)
-	defer cleanup()
+	es := f.setup(t)
 	query := gqlparser.MustLoadQuery(f.mergedSchema, f.query)
 	vars := f.variables
 	if vars == nil {
