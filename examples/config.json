@@ -1,0 +1,11 @@
+{
+  "plugins": [
+    {
+      "name": "limits",
+      "config": {
+        "max-request-bytes": 1048576,
+        "max-response-time": "2s"
+      }
+    }
+  ]
+}
