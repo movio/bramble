@@ -310,6 +310,7 @@ func (f *PlanTestFixture) Plan(t *testing.T, query string) (*QueryPlan, error) {
 }
 
 func (f *PlanTestFixture) Check(t *testing.T, query string, expectedJSON string) {
+	t.Helper()
 	plan, err := f.Plan(t, query)
 	require.NoError(t, err)
 	plan.SortSteps()
@@ -317,11 +318,13 @@ func (f *PlanTestFixture) Check(t *testing.T, query string, expectedJSON string)
 }
 
 func (f *PlanTestFixture) CheckError(t *testing.T, query string) {
+	t.Helper()
 	_, err := f.Plan(t, query)
 	require.Error(t, err)
 }
 
 func (f *PlanTestFixture) CheckUnorderedRootFieldSelections(t *testing.T, query string, expectedSelections []string) {
+	t.Helper()
 	ctx := graphql.WithOperationContext(context.Background(), &graphql.OperationContext{
 		Variables: map[string]interface{}{},
 	})

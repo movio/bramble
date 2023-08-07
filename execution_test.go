@@ -3532,6 +3532,7 @@ func jsonToInterfaceSlice(jsonString string) []interface{} {
 // jsonEqWithOrder checks that the JSON are equals, including the order of the
 // fields
 func jsonEqWithOrder(t *testing.T, expected, actual string) {
+	t.Helper()
 	d1 := json.NewDecoder(bytes.NewBufferString(expected))
 	d2 := json.NewDecoder(bytes.NewBufferString(actual))
 
@@ -3560,6 +3561,7 @@ func jsonEqWithOrder(t *testing.T, expected, actual string) {
 }
 
 func assertQueriesEqual(t *testing.T, schema, expected, actual string) bool {
+	t.Helper()
 	s := gqlparser.MustLoadSchema(&ast.Source{Input: schema})
 
 	var expectedBuf bytes.Buffer
