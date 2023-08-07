@@ -19,6 +19,6 @@ func main() {
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, "OK")
 	})
-	log.Printf("example gqlgen-service running on %s", addr)
+	log.Printf("example %s running on %s", name, addr)
 	log.Fatal(http.ListenAndServe(addr, nil))
 }

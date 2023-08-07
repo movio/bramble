@@ -19,6 +19,6 @@ func main() {
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, "OK")
 	})
-	log.Printf("example graph-gophers-service running on %s", addr)
+	log.Printf("example %s running on %s", name, addr)
 	http.ListenAndServe(addr, nil)
 }
