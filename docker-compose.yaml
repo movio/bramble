@@ -3,7 +3,7 @@ services:
   gqlgen-service:
     build:
       context: examples/gqlgen-service
-    healthcheck:
+    healthcheck: &healthcheck
       test: wget -qO - http://localhost:8080/health
       interval: 5s
       timeout: 1s
@@ -11,31 +11,19 @@ services:
     expose:
       - 8080
   graph-gophers-service:
-    healthcheck:
-      test: wget -qO - http://localhost:8080/health
-      interval: 5s
-      timeout: 1s
-      retries: 5
+    healthcheck: *healthcheck
     build:
       context: examples/graph-gophers-service
     expose:
       - 8080
   slow-service:
-    healthcheck:
-      test: wget -qO - http://localhost:8080/health
-      interval: 5s
-      timeout: 1s
-      retries: 5
+    healthcheck: *healthcheck
     build:
       context: examples/slow-service
     expose:
       - 8080
   nodejs-service:
-    healthcheck:
-      test: wget -qO - http://localhost:8080/health
-      interval: 5s
-      timeout: 1s
-      retries: 5
+    healthcheck: *healthcheck
     build:
       context: examples/nodejs-service
     expose:
