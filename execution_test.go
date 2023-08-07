@@ -168,7 +168,8 @@ func TestQueryError(t *testing.T) {
 		},
 	}
 
-	f.run(t)
+	es := f.setup(t)
+	f.run(t, es)
 }
 
 func TestFederatedQueryFragmentSpreads(t *testing.T) {
@@ -813,7 +814,10 @@ func TestQueryExecutionServiceTimeout(t *testing.T) {
 		},
 	}
 
-	f.run(t)
+	es := f.setup(t)
+	es.GraphqlClient.HTTPClient.Timeout = 10 * time.Millisecond
+
+	f.run(t, es)
 	jsonEqWithOrder(t, f.expected, string(f.resp.Data))
 }
 
@@ -916,7 +920,8 @@ func TestQueryExecutionNamespaceAndFragmentSpread(t *testing.T) {
 		}`,
 	}
 
-	f.run(t)
+	es := f.setup(t)
+	f.run(t, es)
 }
 
 func TestQueryExecutionWithNullResponse(t *testing.T) {
@@ -3432,7 +3437,8 @@ type queryExecutionFixture struct {
 }
 
 func (f *queryExecutionFixture) checkSuccess(t *testing.T) {
-	f.run(t)
+	es := f.setup(t)
+	f.run(t, es)
 
 	require.Empty(t, f.resp.Errors)
 	jsonEqWithOrder(t, f.expected, string(f.resp.Data))
@@ -3465,15 +3471,11 @@ func (f *queryExecutionFixture) setup(t *testing.T) *ExecutableSchema {
 	es.BoundaryQueries = buildBoundaryFieldsMap(services...)
 	es.Locations = buildFieldURLMap(services...)
 	es.IsBoundary = buildIsBoundaryMap(services...)
-	if t.Name() == "TestQueryExecutionServiceTimeout" {
-		es.GraphqlClient.HTTPClient.Timeout = 10 * time.Millisecond
-	}
 
 	return es
 }
 
-func (f *queryExecutionFixture) run(t *testing.T) {
-	es := f.setup(t)
+func (f *queryExecutionFixture) run(t *testing.T, es *ExecutableSchema) {
 	query := gqlparser.MustLoadQuery(f.mergedSchema, f.query)
 	vars := f.variables
 	if vars == nil {
