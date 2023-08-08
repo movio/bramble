@@ -31,9 +31,8 @@ services:
   gateway:
     build:
       context: .
-    command: ["-config", "config.json"]
-    volumes:
-      - ./examples/config.json:/config.json
+    configs: [gateway]
+    command: ["-config", "gateway"]
     environment:
       - BRAMBLE_SERVICE_LIST=http://gqlgen-service:8080/query http://graph-gophers-service:8080/query http://slow-service:8080/query http://nodejs-service:8080/query
     ports:
@@ -49,3 +48,6 @@ services:
         condition: service_healthy
       nodejs-service:
         condition: service_healthy
+configs:
+  gateway:
+    file: ./examples/gateway.json
