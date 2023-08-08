@@ -11,7 +11,7 @@ RUN --mount=type=cache,target=/go/pkg/mod go mod download
 
 COPY . /workspace/
 
-RUN --mount=type=cache,target=/root/.cache/go-build go build -ldflags="-X 'github.com/movio/bramble.Version=$VERSION'" -o bramble ./cmd/bramble
+RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build go build -ldflags="-X 'github.com/movio/bramble.Version=$VERSION'" -o bramble ./cmd/bramble
 
 FROM gcr.io/distroless/static
 
