@@ -33,7 +33,7 @@ func (a AllowedFields) IsAllowed(fieldName string) (bool, AllowedFields) {
 	return false, AllowedFields{}
 }
 
-// OperationPermissions represents the user permissions for all operation types
+// OperationPermissions represents the top level permissions for all operation types
 type OperationPermissions struct {
 	AllowedRootQueryFields        AllowedFields `json:"query"`
 	AllowedRootMutationFields     AllowedFields `json:"mutation"`
@@ -270,7 +270,8 @@ func filterFields(path []string, ss ast.SelectionSet, allowedFields AllowedField
 				res = append(res, s)
 				errs = append(errs, ferrs...)
 			} else {
-				errs = append(errs, gqlerror.Errorf("user do not have permission to access field %s.%s", strings.Join(path, "."), s.Name))
+				fieldPath := strings.Join(append(path, s.Name), ".")
+				errs = append(errs, gqlerror.Errorf("%s access disallowed", fieldPath))
 			}
 		case *ast.FragmentSpread:
 			var ferrs gqlerror.List

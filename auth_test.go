@@ -124,7 +124,7 @@ func TestFilterAuthorizedFields(t *testing.T) {
 		}
 		errs := perms.FilterAuthorizedFields(query.Operations[0])
 		require.Len(t, errs, 1)
-		assert.Equal(t, errs[0].Message, "user do not have permission to access field query.movies.compTitles")
+		assert.Equal(t, errs[0].Message, "query.movies.compTitles access disallowed")
 
 		assertSelectionSetsEqual(t, schema, strToSelectionSet(schema, `{
 		movies {
@@ -219,7 +219,7 @@ func TestFilterAuthorizedFields(t *testing.T) {
 		}
 		errs := perms.FilterAuthorizedFields(query.Operations[0])
 		require.Len(t, errs, 1)
-		assert.Equal(t, errs[0].Message, "user do not have permission to access field query.movies.compTitles")
+		assert.Equal(t, errs[0].Message, "query.movies.compTitles access disallowed")
 
 		assertSelectionSetsEqual(t, schema, strToSelectionSet(schema, `{
 		movies {

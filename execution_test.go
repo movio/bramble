@@ -49,7 +49,7 @@ func TestHonorsPermissions(t *testing.T) {
 	resp := es.ExecuteQuery(ctx)
 
 	permissionsError := &gqlerror.Error{
-		Message: "user do not have permission to access field query.cinema",
+		Message: "query.cinema access disallowed",
 	}
 
 	require.Contains(t, resp.Errors, permissionsError)
