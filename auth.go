@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/vektah/gqlparser/v2/ast"
 	"github.com/vektah/gqlparser/v2/gqlerror"
 )
@@ -52,6 +53,14 @@ func (f fieldList) Less(i, j int) bool {
 
 func (f fieldList) Swap(i, j int) {
 	f[i], f[j] = f[j], f[i]
+}
+
+func (a AllowedFields) String() string {
+	bytes, err := json.Marshal(a)
+	if err != nil {
+		return err.Error()
+	}
+	return string(bytes)
 }
 
 // MarshalJSON marshals to a JSON representation.
@@ -271,6 +280,10 @@ func filterFields(path []string, ss ast.SelectionSet, allowedFields AllowedField
 				errs = append(errs, ferrs...)
 			} else {
 				fieldPath := strings.Join(append(path, s.Name), ".")
+				log.WithFields(log.Fields{
+					"field":       fieldPath,
+					"permissions": allowedFields,
+				}).Debug("field access disallowed")
 				errs = append(errs, gqlerror.Errorf("%s access disallowed", fieldPath))
 			}
 		case *ast.FragmentSpread:
