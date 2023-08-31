@@ -245,9 +245,11 @@ func (c *Config) ConfigurePlugins() []Plugin {
 			log.Warnf("plugin %q not found", pl.Name)
 			continue
 		}
+
 		err := p.Configure(c, pl.Config)
 		if err != nil {
-			log.WithError(err).Fatalf("error unmarshalling config for plugin %q: %s", pl.Name, err)
+			log.WithError(err).Warnf("error unmarshalling config for plugin %q (skipping plugin)", pl.Name)
+			continue
 		}
 		enabledPlugins = append(enabledPlugins, p)
 	}
