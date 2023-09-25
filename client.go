@@ -140,6 +140,10 @@ func (c *GraphQLClient) Request(ctx context.Context, url string, request *Reques
 		Data: out,
 	}
 
+	if res.StatusCode != http.StatusOK {
+		return fmt.Errorf("unexpected status code: %d for url: %s", res.StatusCode, url)
+	}
+
 	err = json.NewDecoder(&limitReader).Decode(&graphqlResponse)
 	if err != nil {
 		if errors.Is(err, io.ErrUnexpectedEOF) {
