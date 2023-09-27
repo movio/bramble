@@ -593,7 +593,7 @@ func jsonMapToInterfaceMap(m map[string]json.RawMessage) map[string]interface{} 
 	return res
 }
 
-// mergeMaps merge dst into src, unmarshalling json.RawMessages when necessary
+// mergeMaps merge src into dst, unmarshalling json.RawMessages when necessary
 func mergeMaps(dst, src map[string]interface{}) {
 	for k, v := range dst {
 		if b, ok := src[k]; ok {
