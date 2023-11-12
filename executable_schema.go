@@ -593,7 +593,7 @@ func jsonMapToInterfaceMap(m map[string]json.RawMessage) map[string]interface{} 
 	return res
 }
 
-// mergeMaps merge dst into src, unmarshalling json.RawMessages when necessary
+// mergeMaps merge src into dst, unmarshalling json.RawMessages when necessary
 func mergeMaps(dst, src map[string]interface{}) {
 	for k, v := range dst {
 		if b, ok := src[k]; ok {
@@ -614,7 +614,7 @@ func mergeMaps(dst, src map[string]interface{}) {
 			case map[string]interface{}:
 				aValue = value
 			default:
-				panic("invalid merge")
+				panic(fmt.Sprintf("mergeMaps: dst value is %T not a map[string]interface{} or json.RawMessage", value))
 			}
 
 			switch value := b.(type) {
@@ -625,7 +625,7 @@ func mergeMaps(dst, src map[string]interface{}) {
 			case map[string]interface{}:
 				bValue = value
 			default:
-				panic("invalid merge")
+				panic(fmt.Sprintf("mergeMaps: src value is %T not a map[string]interface{} or json.RawMessage", value))
 			}
 
 			mergeMaps(aValue, bValue)

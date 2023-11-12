@@ -9,29 +9,29 @@ import (
 )
 
 type testSchema struct {
-	t      *testing.T
+	*testing.T
 	schema *ast.Schema
 }
 
 func withSchema(t *testing.T, schema string) *testSchema {
 	t.Helper()
 	return &testSchema{
-		t:      t,
+		T:      t,
 		schema: gqlparser.MustLoadSchema(&ast.Source{Name: "fixture", Input: schema}),
 	}
 }
 
 func (t *testSchema) assertValid(f func(*ast.Schema) error) {
-	t.t.Helper()
-	assert.NoError(t.t, f(t.schema))
+	t.Helper()
+	assert.NoError(t.T, f(t.schema))
 }
 
 func (t *testSchema) assertInvalid(err string, f func(*ast.Schema) error) {
-	t.t.Helper()
+	t.Helper()
 	e := f(t.schema)
-	assert.Error(t.t, e)
+	assert.Error(t.T, e)
 	if e != nil {
-		assert.Equal(t.t, err, e.Error())
+		assert.Equal(t.T, err, e.Error())
 	}
 }
 

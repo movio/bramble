@@ -25,6 +25,16 @@ var (
 		},
 	)
 
+	promServiceTimeoutErrorCounter = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "service_timeout_error_total",
+			Help: "A counter indicating how many times services have timed out",
+		},
+		[]string{
+			"service",
+		},
+	)
+
 	promServiceUpdateErrorGauge = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "service_update_error",
@@ -84,6 +94,7 @@ var (
 // RegisterMetrics register the prometheus metrics.
 func RegisterMetrics() {
 	prometheus.MustRegister(promInvalidSchema)
+	prometheus.MustRegister(promServiceTimeoutErrorCounter)
 	prometheus.MustRegister(promServiceUpdateErrorCounter)
 	prometheus.MustRegister(promServiceUpdateErrorGauge)
 	prometheus.MustRegister(promHTTPInFlightGauge)

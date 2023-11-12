@@ -168,7 +168,8 @@ func TestQueryError(t *testing.T) {
 		},
 	}
 
-	f.run(t)
+	es := f.setup(t)
+	f.run(t, es)
 }
 
 func TestFederatedQueryFragmentSpreads(t *testing.T) {
@@ -813,7 +814,10 @@ func TestQueryExecutionServiceTimeout(t *testing.T) {
 		},
 	}
 
-	f.run(t)
+	es := f.setup(t)
+	es.GraphqlClient.HTTPClient.Timeout = 10 * time.Millisecond
+
+	f.run(t, es)
 	jsonEqWithOrder(t, f.expected, string(f.resp.Data))
 }
 
@@ -916,7 +920,8 @@ func TestQueryExecutionNamespaceAndFragmentSpread(t *testing.T) {
 		}`,
 	}
 
-	f.run(t)
+	es := f.setup(t)
+	f.run(t, es)
 }
 
 func TestQueryExecutionWithNullResponse(t *testing.T) {
@@ -3383,8 +3388,7 @@ func TestSchemaUpdate_serviceError(t *testing.T) {
 		},
 	}
 
-	executableSchema, cleanup := f.setup(t)
-	defer cleanup()
+	executableSchema := f.setup(t)
 
 	foundGizmo, foundGadget := false, false
 
@@ -3433,20 +3437,20 @@ type queryExecutionFixture struct {
 }
 
 func (f *queryExecutionFixture) checkSuccess(t *testing.T) {
-	f.run(t)
+	es := f.setup(t)
+	f.run(t, es)
 
 	require.Empty(t, f.resp.Errors)
 	jsonEqWithOrder(t, f.expected, string(f.resp.Data))
 }
 
-func (f *queryExecutionFixture) setup(t *testing.T) (*ExecutableSchema, func()) {
+func (f *queryExecutionFixture) setup(t *testing.T) *ExecutableSchema {
 	var services []*Service
 	var schemas []*ast.Schema
-	var serverCloses []func()
 
 	for _, s := range f.services {
 		serv := httptest.NewServer(s.handler)
-		serverCloses = append(serverCloses, serv.Close)
+		t.Cleanup(serv.Close)
 
 		schema := gqlparser.MustLoadSchema(&ast.Source{Input: s.schema})
 		service := NewService(serv.URL)
@@ -3467,20 +3471,11 @@ func (f *queryExecutionFixture) setup(t *testing.T) (*ExecutableSchema, func()) 
 	es.BoundaryQueries = buildBoundaryFieldsMap(services...)
 	es.Locations = buildFieldURLMap(services...)
 	es.IsBoundary = buildIsBoundaryMap(services...)
-	if t.Name() == "TestQueryExecutionServiceTimeout" {
-		es.GraphqlClient.HTTPClient.Timeout = 10 * time.Millisecond
-	}
 
-	return es, func() {
-		for _, close := range serverCloses {
-			close()
-		}
-	}
+	return es
 }
 
-func (f *queryExecutionFixture) run(t *testing.T) {
-	es, cleanup := f.setup(t)
-	defer cleanup()
+func (f *queryExecutionFixture) run(t *testing.T, es *ExecutableSchema) {
 	query := gqlparser.MustLoadQuery(f.mergedSchema, f.query)
 	vars := f.variables
 	if vars == nil {
@@ -3532,6 +3527,7 @@ func jsonToInterfaceSlice(jsonString string) []interface{} {
 // jsonEqWithOrder checks that the JSON are equals, including the order of the
 // fields
 func jsonEqWithOrder(t *testing.T, expected, actual string) {
+	t.Helper()
 	d1 := json.NewDecoder(bytes.NewBufferString(expected))
 	d2 := json.NewDecoder(bytes.NewBufferString(actual))
 
@@ -3560,6 +3556,7 @@ func jsonEqWithOrder(t *testing.T, expected, actual string) {
 }
 
 func assertQueriesEqual(t *testing.T, schema, expected, actual string) bool {
+	t.Helper()
 	s := gqlparser.MustLoadSchema(&ast.Source{Input: schema})
 
 	var expectedBuf bytes.Buffer

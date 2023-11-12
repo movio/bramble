@@ -1,0 +1,50 @@
+"""
+This is the prerequisite schema required for federation by the gateway
+"""
+directive @boundary on OBJECT | FIELD_DEFINITION
+
+"""
+The `Service` type provides the gateway with a schema to merge into the graph
+and a name/version to reference the service by
+"""
+type Service {
+  """
+  name of the service
+  """
+  name: String!
+  """
+  the service version tag
+  """
+  version: String!
+  """
+  a string of the complete schema
+  """
+  schema: String!
+}
+
+type Query {
+  """
+  The service query is used by the gateway when the service is first registered
+  """
+  service: Service!
+
+  """
+  array getter for the `Gizmo` type
+  it will not be exposed in the federated schema
+  """
+  gizmos(ids: [ID!]!): [Gizmo]! @boundary
+}
+
+type Gizmo @boundary {
+  """
+  identifier field
+  required for `@boundary` types
+  """
+  id: ID!
+
+  """
+  delay the response of the `Gizmo` by `duration`
+  provided by `slow-service`
+  """
+  delay(duration: String! = "1ms"): String
+}

@@ -4,12 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"sync"
 	"testing"
 	"time"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
+
+// can only run one test at a time that takes over the logrus output
+var logrusLock = sync.Mutex{}
 
 func collectLogEvent(t *testing.T, f func()) map[string]interface{} {
 	t.Helper()
@@ -18,6 +22,8 @@ func collectLogEvent(t *testing.T, f func()) map[string]interface{} {
 	logger := log.StandardLogger()
 	prevOut := logger.Out
 	prevFmt := logger.Formatter
+	logrusLock.Lock()
+	defer logrusLock.Unlock()
 	logger.SetOutput(w)
 	logger.SetFormatter(&log.JSONFormatter{})
 	t.Cleanup(func() {
