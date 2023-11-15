@@ -46,20 +46,20 @@ func Main() {
 	var wg sync.WaitGroup
 	wg.Add(3)
 
-	go runHandler(ctx, &wg, "metrics", cfg.MetricAddress(), NewMetricsHandler())
-	go runHandler(ctx, &wg, "private", cfg.PrivateAddress(), gtw.PrivateRouter())
-	go runHandler(ctx, &wg, "public", cfg.GatewayAddress(), gtw.Router(cfg))
+	go runHandler(ctx, &wg, "metrics", cfg.MetricAddress(), cfg.DefaultTimeouts, NewMetricsHandler())
+	go runHandler(ctx, &wg, "private", cfg.PrivateAddress(), cfg.PrivateTimeouts, gtw.PrivateRouter())
+	go runHandler(ctx, &wg, "public", cfg.GatewayAddress(), cfg.GatewayTimeouts, gtw.Router(cfg))
 
 	wg.Wait()
 }
 
-func runHandler(ctx context.Context, wg *sync.WaitGroup, name, addr string, handler http.Handler) {
+func runHandler(ctx context.Context, wg *sync.WaitGroup, name, addr string, timeouts TimeoutConfig, handler http.Handler) {
 	srv := &http.Server{
 		Addr:         addr,
 		Handler:      handler,
-		ReadTimeout:  5 * time.Second,
-		WriteTimeout: 10 * time.Second,
-		IdleTimeout:  120 * time.Second,
+		ReadTimeout:  timeouts.ReadTimeoutDuration,
+		WriteTimeout: timeouts.WriteTimeoutDuration,
+		IdleTimeout:  timeouts.IdleTimeoutDuration,
 	}
 
 	go func() {
