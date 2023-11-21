@@ -333,8 +333,9 @@ func (r *metaResolver) getFields(schema *ast.Schema) []brambleField {
 		for _, f := range def.Fields {
 			var svcName string
 			if svcURL, err := r.executableSchema.Locations.URLFor(def.Name, "", f.Name); err == nil {
-				svc := r.executableSchema.Services[svcURL]
-				svcName = svc.Name
+				if svc := r.executableSchema.Services[svcURL]; svc != nil {
+					svcName = svc.Name
+				}
 			}
 			var args []brambleArg
 			for _, a := range f.Arguments {
