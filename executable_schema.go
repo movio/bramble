@@ -79,31 +79,44 @@ func (s *ExecutableSchema) UpdateSchema(forceRebuild bool) error {
 		}
 	}()
 
-	for url, s := range s.Services {
-		logger := log.WithField("url", url)
-		updated, err := s.Update()
-		if err != nil {
-			promServiceUpdateErrorCounter.WithLabelValues(s.ServiceURL).Inc()
-			promServiceUpdateErrorGauge.WithLabelValues(s.ServiceURL).Set(1)
-			invalidSchema, forceRebuild = true, true
-			logger.WithError(err).Error("unable to update service")
-			// Ignore this service in this update
-			continue
-		}
-		promServiceUpdateErrorGauge.WithLabelValues(s.ServiceURL).Set(0)
-		logger = log.WithFields(log.Fields{
-			"version": s.Version,
-			"service": s.Name,
-		})
+	var wg sync.WaitGroup
+	var mutex sync.Mutex
 
-		if updated {
-			logger.Info("service was updated")
-			updatedServices = append(updatedServices, s.Name)
-		}
+	for url_, s_ := range s.Services {
+		wg.Add(1)
+		var url = url_
+		var s = s_
+		go func() {
+			defer wg.Done()
+			logger := log.WithField("url", url)
+			updated, err := s.Update()
+			if err != nil {
+				promServiceUpdateErrorCounter.WithLabelValues(s.ServiceURL).Inc()
+				promServiceUpdateErrorGauge.WithLabelValues(s.ServiceURL).Set(1)
+				invalidSchema, forceRebuild = true, true
+				logger.WithError(err).Error("unable to update service")
+				// Ignore this service in this update
+				return
+			}
+			promServiceUpdateErrorGauge.WithLabelValues(s.ServiceURL).Set(0)
+			logger = log.WithFields(log.Fields{
+				"version": s.Version,
+				"service": s.Name,
+			})
 
-		services = append(services, s)
-		schemas = append(schemas, s.Schema)
+			mutex.Lock()
+			defer mutex.Unlock()
+			if updated {
+				logger.Info("service was updated")
+				updatedServices = append(updatedServices, s.Name)
+			}
+
+			services = append(services, s)
+			schemas = append(schemas, s.Schema)
+		}()
 	}
+
+	wg.Wait()
 
 	if len(updatedServices) > 0 || forceRebuild {
 		log.Info("rebuilding merged schema")
