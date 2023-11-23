@@ -82,8 +82,8 @@ func (s *ExecutableSchema) UpdateSchema(forceRebuild bool) error {
 	var wg sync.WaitGroup
 	var mutex sync.Mutex
 
+	wg.Add(len(s.Services))
 	for url_, s_ := range s.Services {
-		wg.Add(1)
 		var url = url_
 		var s = s_
 		go func() {
