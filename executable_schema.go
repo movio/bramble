@@ -11,6 +11,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/vektah/gqlparser/v2/ast"
 	"github.com/vektah/gqlparser/v2/gqlerror"
+	"golang.org/x/sync/errgroup"
 )
 
 func NewExecutableSchema(plugins []Plugin, maxRequestsPerQuery int64, client *GraphQLClient, services ...*Service) *ExecutableSchema {
@@ -79,15 +80,18 @@ func (s *ExecutableSchema) UpdateSchema(forceRebuild bool) error {
 		}
 	}()
 
-	var wg sync.WaitGroup
+	// Only fetch at most 64 services in parallel
+	rateLimit := make(chan struct{}, 64)
 	var mutex sync.Mutex
 
-	wg.Add(len(s.Services))
+	group := errgroup.Group{}
 	for url_, s_ := range s.Services {
 		var url = url_
 		var s = s_
-		go func() {
-			defer wg.Done()
+		group.Go(func() error {
+			rateLimit <- struct{}{}
+			defer func() { <-rateLimit }()
+
 			logger := log.WithField("url", url)
 			updated, err := s.Update()
 			if err != nil {
@@ -96,7 +100,7 @@ func (s *ExecutableSchema) UpdateSchema(forceRebuild bool) error {
 				invalidSchema, forceRebuild = true, true
 				logger.WithError(err).Error("unable to update service")
 				// Ignore this service in this update
-				return
+				return nil
 			}
 			promServiceUpdateErrorGauge.WithLabelValues(s.ServiceURL).Set(0)
 			logger = log.WithFields(log.Fields{
@@ -113,10 +117,11 @@ func (s *ExecutableSchema) UpdateSchema(forceRebuild bool) error {
 
 			services = append(services, s)
 			schemas = append(schemas, s.Schema)
-		}()
+			return nil
+		})
 	}
 
-	wg.Wait()
+	group.Wait()
 
 	if len(updatedServices) > 0 || forceRebuild {
 		log.Info("rebuilding merged schema")
