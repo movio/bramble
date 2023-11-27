@@ -81,17 +81,16 @@ func (s *ExecutableSchema) UpdateSchema(forceRebuild bool) error {
 	}()
 
 	// Only fetch at most 64 services in parallel
-	rateLimit := make(chan struct{}, 64)
 	var mutex sync.Mutex
 
 	group := errgroup.Group{}
+	// Avoid fetching more than 64 servides in parallel,
+	// as high concurrency can actually hurt performance
+	group.SetLimit(64)
 	for url_, s_ := range s.Services {
 		var url = url_
 		var s = s_
 		group.Go(func() error {
-			rateLimit <- struct{}{}
-			defer func() { <-rateLimit }()
-
 			logger := log.WithField("url", url)
 			updated, err := s.Update()
 			if err != nil {
