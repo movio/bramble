@@ -11,6 +11,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/vektah/gqlparser/v2/ast"
 	"github.com/vektah/gqlparser/v2/gqlerror"
+	"golang.org/x/sync/errgroup"
 )
 
 func NewExecutableSchema(plugins []Plugin, maxRequestsPerQuery int64, client *GraphQLClient, services ...*Service) *ExecutableSchema {
@@ -79,31 +80,47 @@ func (s *ExecutableSchema) UpdateSchema(forceRebuild bool) error {
 		}
 	}()
 
-	for url, s := range s.Services {
-		logger := log.WithField("url", url)
-		updated, err := s.Update()
-		if err != nil {
-			promServiceUpdateErrorCounter.WithLabelValues(s.ServiceURL).Inc()
-			promServiceUpdateErrorGauge.WithLabelValues(s.ServiceURL).Set(1)
-			invalidSchema, forceRebuild = true, true
-			logger.WithError(err).Error("unable to update service")
-			// Ignore this service in this update
-			continue
-		}
-		promServiceUpdateErrorGauge.WithLabelValues(s.ServiceURL).Set(0)
-		logger = log.WithFields(log.Fields{
-			"version": s.Version,
-			"service": s.Name,
+	// Only fetch at most 64 services in parallel
+	var mutex sync.Mutex
+
+	group := errgroup.Group{}
+	// Avoid fetching more than 64 servides in parallel,
+	// as high concurrency can actually hurt performance
+	group.SetLimit(64)
+	for url_, s_ := range s.Services {
+		var url = url_
+		var s = s_
+		group.Go(func() error {
+			logger := log.WithField("url", url)
+			updated, err := s.Update()
+			if err != nil {
+				promServiceUpdateErrorCounter.WithLabelValues(s.ServiceURL).Inc()
+				promServiceUpdateErrorGauge.WithLabelValues(s.ServiceURL).Set(1)
+				invalidSchema, forceRebuild = true, true
+				logger.WithError(err).Error("unable to update service")
+				// Ignore this service in this update
+				return nil
+			}
+			promServiceUpdateErrorGauge.WithLabelValues(s.ServiceURL).Set(0)
+			logger = log.WithFields(log.Fields{
+				"version": s.Version,
+				"service": s.Name,
+			})
+
+			mutex.Lock()
+			defer mutex.Unlock()
+			if updated {
+				logger.Info("service was updated")
+				updatedServices = append(updatedServices, s.Name)
+			}
+
+			services = append(services, s)
+			schemas = append(schemas, s.Schema)
+			return nil
 		})
-
-		if updated {
-			logger.Info("service was updated")
-			updatedServices = append(updatedServices, s.Name)
-		}
-
-		services = append(services, s)
-		schemas = append(schemas, s.Schema)
 	}
+
+	group.Wait()
 
 	if len(updatedServices) > 0 || forceRebuild {
 		log.Info("rebuilding merged schema")
