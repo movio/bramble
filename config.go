@@ -21,19 +21,31 @@ type PluginConfig struct {
 	Config json.RawMessage
 }
 
+type TimeoutConfig struct {
+	ReadTimeout          string        `json:"read"`
+	ReadTimeoutDuration  time.Duration `json:"-"`
+	WriteTimeout         string        `json:"write"`
+	WriteTimeoutDuration time.Duration `json:"-"`
+	IdleTimeout          string        `json:"idle"`
+	IdleTimeoutDuration  time.Duration `json:"-"`
+}
+
 // Config contains the gateway configuration
 type Config struct {
-	IdFieldName            string    `json:"id-field-name"`
-	GatewayListenAddress   string    `json:"gateway-address"`
-	DisableIntrospection   bool      `json:"disable-introspection"`
-	MetricsListenAddress   string    `json:"metrics-address"`
-	PrivateListenAddress   string    `json:"private-address"`
-	GatewayPort            int       `json:"gateway-port"`
-	MetricsPort            int       `json:"metrics-port"`
-	PrivatePort            int       `json:"private-port"`
-	Services               []string  `json:"services"`
-	LogLevel               log.Level `json:"loglevel"`
-	PollInterval           string    `json:"poll-interval"`
+	IdFieldName            string        `json:"id-field-name"`
+	GatewayListenAddress   string        `json:"gateway-address"`
+	DisableIntrospection   bool          `json:"disable-introspection"`
+	MetricsListenAddress   string        `json:"metrics-address"`
+	PrivateListenAddress   string        `json:"private-address"`
+	GatewayPort            int           `json:"gateway-port"`
+	MetricsPort            int           `json:"metrics-port"`
+	PrivatePort            int           `json:"private-port"`
+	DefaultTimeouts        TimeoutConfig `json:"default-timeouts"`
+	GatewayTimeouts        TimeoutConfig `json:"gateway-timeouts"`
+	PrivateTimeouts        TimeoutConfig `json:"private-timeouts"`
+	Services               []string      `json:"services"`
+	LogLevel               log.Level     `json:"loglevel"`
+	PollInterval           string        `json:"poll-interval"`
 	PollIntervalDuration   time.Duration
 	MaxRequestsPerQuery    int64 `json:"max-requests-per-query"`
 	MaxServiceResponseSize int64 `json:"max-service-response-size"`
@@ -116,6 +128,25 @@ func (c *Config) Load() error {
 		return fmt.Errorf("invalid poll interval: %w", err)
 	}
 
+	c.DefaultTimeouts.ReadTimeoutDuration, err = time.ParseDuration(c.DefaultTimeouts.ReadTimeout)
+	if err != nil {
+		return fmt.Errorf("invalid default read timeout: %w", err)
+	}
+	c.DefaultTimeouts.WriteTimeoutDuration, err = time.ParseDuration(c.DefaultTimeouts.WriteTimeout)
+	if err != nil {
+		return fmt.Errorf("invalid default write timeout: %w", err)
+	}
+	c.DefaultTimeouts.IdleTimeoutDuration, err = time.ParseDuration(c.DefaultTimeouts.IdleTimeout)
+	if err != nil {
+		return fmt.Errorf("invalid default idle timeout: %w", err)
+	}
+	if err = c.loadTimeouts(&c.GatewayTimeouts, "gateway", c.DefaultTimeouts); err != nil {
+		return err
+	}
+	if err = c.loadTimeouts(&c.PrivateTimeouts, "private", c.DefaultTimeouts); err != nil {
+		return err
+	}
+
 	services, err := c.buildServiceList()
 	if err != nil {
 		return err
@@ -124,6 +155,38 @@ func (c *Config) Load() error {
 
 	c.plugins = c.ConfigurePlugins()
 
+	return nil
+}
+
+func (c *Config) loadTimeouts(config *TimeoutConfig, name string, defaults TimeoutConfig) error {
+	var err error
+	if config.ReadTimeout != "" {
+		config.ReadTimeoutDuration, err = time.ParseDuration(config.ReadTimeout)
+		if err != nil {
+			return fmt.Errorf("invalid %s read timeout: %w", name, err)
+		}
+	}
+	if config.ReadTimeoutDuration == 0 {
+		config.ReadTimeoutDuration = defaults.ReadTimeoutDuration
+	}
+	if config.WriteTimeout != "" {
+		config.WriteTimeoutDuration, err = time.ParseDuration(config.WriteTimeout)
+		if err != nil {
+			return fmt.Errorf("invalid %s write timeout: %w", name, err)
+		}
+	}
+	if config.WriteTimeoutDuration == 0 {
+		config.WriteTimeoutDuration = defaults.WriteTimeoutDuration
+	}
+	if config.IdleTimeout != "" {
+		config.IdleTimeoutDuration, err = time.ParseDuration(config.IdleTimeout)
+		if err != nil {
+			return fmt.Errorf("invalid %s idle timeout: %w", name, err)
+		}
+	}
+	if config.IdleTimeoutDuration == 0 {
+		config.IdleTimeoutDuration = defaults.IdleTimeoutDuration
+	}
 	return nil
 }
 
@@ -219,6 +282,11 @@ func GetConfig(configFiles []string) (*Config, error) {
 	}
 
 	cfg := Config{
+		DefaultTimeouts: TimeoutConfig{
+			ReadTimeout:  "5s",
+			WriteTimeout: "10s",
+			IdleTimeout:  "120s",
+		},
 		GatewayPort:            8082,
 		PrivatePort:            8083,
 		MetricsPort:            9009,

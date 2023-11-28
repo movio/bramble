@@ -2,6 +2,7 @@ package bramble
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -38,4 +39,13 @@ func TestConfig(t *testing.T) {
 		cfg.PrivateListenAddress = "127.0.0.1:8084"
 		require.Equal(t, "http://127.0.0.1:8084/plugin", cfg.PrivateHttpAddress("plugin"))
 	})
+}
+
+func TestParseExampleConfig(t *testing.T) {
+	cfg, err := GetConfig([]string{"config.json.example"})
+	require.NoError(t, err)
+	require.Equal(t, 5*time.Second, cfg.DefaultTimeouts.ReadTimeoutDuration)
+	require.Equal(t, 120*time.Second, cfg.DefaultTimeouts.IdleTimeoutDuration)
+	require.Equal(t, 20*time.Second, cfg.GatewayTimeouts.WriteTimeoutDuration)
+	require.Equal(t, 10*time.Second, cfg.PrivateTimeouts.WriteTimeoutDuration)
 }

@@ -1,7 +1,17 @@
 {
   "services": ["http://localhost:4000/graphql"],
+  "default-timeouts": {
+    "read": "5s",
+    "idle": "120s"
+  },
   "gateway-port": 8082,
+  "gateway-timeouts": {
+    "write": "20s"
+  },
   "private-port": 8083,
+  "private-timeouts": {
+    "write": "10s"
+  },
   "metrics-port": 8084,
   "log-level": "info",
   "poll-interval": "5s",
