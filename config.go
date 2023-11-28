@@ -176,7 +176,6 @@ func (c *Config) loadTimeouts(config *TimeoutConfig, name string, defaults Timeo
 		}
 	}
 	if config.WriteTimeoutDuration == 0 {
-		fmt.Println("copying default write timeout")
 		config.WriteTimeoutDuration = defaults.WriteTimeoutDuration
 	}
 	if config.IdleTimeout != "" {
