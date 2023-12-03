@@ -29,6 +29,9 @@ func (p *RequestIdentifierPlugin) middleware(h http.Handler) http.HandlerFunc {
 		}
 
 		ctx := r.Context()
+
+		bramble.AddField(ctx, "request.id", requestID)
+
 		ctx = bramble.AddOutgoingRequestsHeaderToContext(ctx, BrambleRequestHeader, requestID)
 		h.ServeHTTP(rw, r.WithContext(ctx))
 	})
