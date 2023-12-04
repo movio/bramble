@@ -2,6 +2,7 @@ package plugins
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/gofrs/uuid"
 	"github.com/movio/bramble"
@@ -24,12 +25,13 @@ func (p *RequestIdentifierPlugin) ID() string {
 func (p *RequestIdentifierPlugin) middleware(h http.Handler) http.HandlerFunc {
 	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		requestID := r.Header.Get(BrambleRequestHeader)
-		if requestID == "" {
-			requestID = uuid.Must(uuid.NewV4()).String()
-		}
 
 		ctx := r.Context()
-
+		if strings.TrimSpace(requestID) == "" {
+			requestID = uuid.Must(uuid.NewV4()).String()
+		} else if id, err := uuid.FromString(requestID); err == nil {
+			requestID = id.String()
+		}
 		bramble.AddField(ctx, "request.id", requestID)
 
 		ctx = bramble.AddOutgoingRequestsHeaderToContext(ctx, BrambleRequestHeader, requestID)
