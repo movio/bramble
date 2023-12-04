@@ -21,10 +21,11 @@ type Service struct {
 }
 
 // NewService returns a new Service.
-func NewService(serviceURL string) *Service {
+func NewService(serviceURL string, opts ...ClientOpt) *Service {
+	opts = append(opts, WithUserAgent(GenerateUserAgent("update")))
 	s := &Service{
 		ServiceURL: serviceURL,
-		client:     NewClientWithoutKeepAlive(WithUserAgent(GenerateUserAgent("update"))),
+		client:     NewClientWithoutKeepAlive(opts...),
 	}
 	return s
 }

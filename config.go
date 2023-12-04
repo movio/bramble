@@ -331,9 +331,16 @@ func (c *Config) Init() error {
 		return fmt.Errorf("error building service list: %w", err)
 	}
 
+	serviceClientOptions := []ClientOpt{
+		WithMaxResponseSize(c.MaxServiceResponseSize),
+	}
+	if c.QueryHTTPClient != nil {
+		serviceClientOptions = append(serviceClientOptions, WithHTTPClient(c.QueryHTTPClient))
+	}
+
 	var services []*Service
 	for _, s := range c.Services {
-		services = append(services, NewService(s))
+		services = append(services, NewService(s, serviceClientOptions...))
 	}
 
 	queryClientOptions := []ClientOpt{WithMaxResponseSize(c.MaxServiceResponseSize), WithUserAgent(GenerateUserAgent("query"))}
