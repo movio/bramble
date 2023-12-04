@@ -56,7 +56,7 @@ func (s *ExecutableSchema) UpdateServiceList(services []string) error {
 		if svc, ok := s.Services[svcURL]; ok {
 			newServices[svcURL] = svc
 		} else {
-			newServices[svcURL] = NewService(svcURL)
+			newServices[svcURL] = NewService(svcURL, WithHTTPClient(s.GraphqlClient.HTTPClient))
 		}
 	}
 	s.Services = newServices
