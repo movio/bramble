@@ -533,7 +533,7 @@ func objectTypenameMatchesDifferentFragment(typename, fragmentTypeCondition stri
 }
 
 func mergeWithTopLevelFragmentFields(selectionSet ast.SelectionSet) ast.SelectionSet {
-	merged := newSelectionSetMerger()
+	merged := newSelectionSetMerger(len(selectionSet))
 
 	for _, selection := range selectionSet {
 		switch selection := selection.(type) {
@@ -556,9 +556,9 @@ type selectionSetMerger struct {
 	seenFields   map[string]*ast.Field
 }
 
-func newSelectionSetMerger() *selectionSetMerger {
+func newSelectionSetMerger(size int) *selectionSetMerger {
 	return &selectionSetMerger{
-		selectionSet: []ast.Selection{},
+		selectionSet: make(ast.SelectionSet, 0, size),
 		seenFields:   make(map[string]*ast.Field),
 	}
 }

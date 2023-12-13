@@ -5,3 +5,5 @@ config.json
 .idea
 .DS_Store
 coverage.out
+*.pprof
+*.test
