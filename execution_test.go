@@ -3436,7 +3436,7 @@ type queryExecutionFixture struct {
 	errors       gqlerror.List
 }
 
-func (f *queryExecutionFixture) checkSuccess(t *testing.T) {
+func (f *queryExecutionFixture) checkSuccess(t testing.TB) {
 	es := f.setup(t)
 	f.run(t, es)
 
@@ -3444,7 +3444,7 @@ func (f *queryExecutionFixture) checkSuccess(t *testing.T) {
 	jsonEqWithOrder(t, f.expected, string(f.resp.Data))
 }
 
-func (f *queryExecutionFixture) setup(t *testing.T) *ExecutableSchema {
+func (f *queryExecutionFixture) setup(t testing.TB) *ExecutableSchema {
 	var services []*Service
 	var schemas []*ast.Schema
 
@@ -3475,7 +3475,8 @@ func (f *queryExecutionFixture) setup(t *testing.T) *ExecutableSchema {
 	return es
 }
 
-func (f *queryExecutionFixture) run(t *testing.T, es *ExecutableSchema) {
+// execute runs the fixture but does not check the result
+func (f *queryExecutionFixture) execute(t testing.TB, es *ExecutableSchema) {
 	query := gqlparser.MustLoadQuery(f.mergedSchema, f.query)
 	vars := f.variables
 	if vars == nil {
@@ -3487,7 +3488,10 @@ func (f *queryExecutionFixture) run(t *testing.T, es *ExecutableSchema) {
 	}
 	f.resp = es.ExecuteQuery(ctx)
 	f.resp.Extensions = graphql.GetExtensions(ctx)
+}
 
+func (f *queryExecutionFixture) run(t testing.TB, es *ExecutableSchema) {
+	f.execute(t, es)
 	if len(f.errors) == 0 {
 		require.Empty(t, f.resp.Errors)
 		jsonEqWithOrder(t, f.expected, string(f.resp.Data))
@@ -3526,7 +3530,7 @@ func jsonToInterfaceSlice(jsonString string) []interface{} {
 
 // jsonEqWithOrder checks that the JSON are equals, including the order of the
 // fields
-func jsonEqWithOrder(t *testing.T, expected, actual string) {
+func jsonEqWithOrder(t testing.TB, expected, actual string) {
 	t.Helper()
 	d1 := json.NewDecoder(bytes.NewBufferString(expected))
 	d2 := json.NewDecoder(bytes.NewBufferString(actual))
@@ -3613,4 +3617,82 @@ func testContextWithVariables(vars map[string]interface{}, op *ast.OperationDefi
 		AllowedRootMutationFields:     AllowedFields{AllowAll: true},
 		AllowedRootSubscriptionFields: AllowedFields{AllowAll: true},
 	})
+}
+
+func BenchmarkExecutionSimple(b *testing.B) {
+	type movie struct {
+		ID        string `json:"id"`
+		Title     string `json:"title"`
+		BrambleID string `json:"_bramble_id"`
+		Typename  string `json:"_bramble__typename"`
+	}
+
+	const n = 500
+	movies := make([]movie, 0, n)
+	for i := 1; i <= n; i++ {
+		movie := movie{
+			ID:        fmt.Sprintf("MOVIE%d", i),
+			Title:     fmt.Sprintf("Movie #%d", i),
+			BrambleID: fmt.Sprintf("MOVIE%d", i),
+			Typename:  "Movie",
+		}
+
+		movies = append(movies, movie)
+	}
+
+	res, err := json.Marshal(map[string]any{
+		"data": map[string]any{
+			"ns": map[string]any{
+				"__bramble_typename": "Namespace",
+				"movies":             movies,
+			},
+		},
+	})
+	require.NoError(b, err)
+
+	f := &queryExecutionFixture{
+		services: []testService{
+			{
+				schema: `directive @boundary on OBJECT | FIELD_DEFINITION
+				directive @namespace on OBJECT
+
+				type Movie @boundary {
+					id: ID!
+					title: String
+				}
+
+				type Person @boundary {
+					id: ID!
+				}
+
+				type Namespace @namespace {
+					movies: [Movie!]!
+				}
+
+				type Query {
+					ns: Namespace!
+				}`,
+				handler: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+					_, err := w.Write(res)
+					require.NoError(b, err)
+				}),
+			},
+		},
+		query: `{
+			ns {
+				movies {
+					__typename
+					id
+					title
+				}
+			}
+		}`,
+	}
+
+	es := f.setup(b)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		f.execute(b, es)
+	}
 }
