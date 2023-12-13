@@ -485,7 +485,7 @@ func unionAndTrimSelectionSet(responseObjectTypeName string, schema *ast.Schema,
 }
 
 func eliminateUnwantedFragments(responseObjectTypeName string, schema *ast.Schema, selectionSet ast.SelectionSet) ast.SelectionSet {
-	var filteredSelectionSet ast.SelectionSet
+	filteredSelectionSet := make(ast.SelectionSet, 0, len(selectionSet))
 
 	for _, selection := range selectionSet {
 		var (
