@@ -1,6 +1,7 @@
 package bramble
 
 import (
+	"context"
 	"net/http"
 	"time"
 
@@ -8,6 +9,7 @@ import (
 	"github.com/99designs/gqlgen/graphql/handler/extension"
 	"github.com/99designs/gqlgen/graphql/handler/transport"
 	log "github.com/sirupsen/logrus"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 // Gateway contains the public and private routers
@@ -29,7 +31,7 @@ func NewGateway(executableSchema *ExecutableSchema, plugins []Plugin) *Gateway {
 func (g *Gateway) UpdateSchemas(interval time.Duration) {
 	time.Sleep(interval)
 	for range time.Tick(interval) {
-		err := g.ExecutableSchema.UpdateSchema(false)
+		err := g.ExecutableSchema.UpdateSchema(context.Background(), false)
 		if err != nil {
 			log.WithError(err).Error("error updating schemas")
 		}
@@ -51,12 +53,7 @@ func (g *Gateway) Router(cfg *Config) http.Handler {
 		gatewayHandler.Use(extension.Introspection{})
 	}
 
-	mux.Handle("/query",
-		applyMiddleware(
-			gatewayHandler,
-			debugMiddleware,
-		),
-	)
+	mux.Handle("/query", applyMiddleware(otelhttp.NewHandler(gatewayHandler, "/query"), debugMiddleware))
 
 	for _, plugin := range g.plugins {
 		plugin.SetupPublicMux(mux)

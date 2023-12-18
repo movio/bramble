@@ -11,6 +11,11 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/vektah/gqlparser/v2/ast"
 	"github.com/vektah/gqlparser/v2/gqlerror"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
+	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -30,6 +35,7 @@ func NewExecutableSchema(plugins []Plugin, maxRequestsPerQuery int64, client *Gr
 
 		GraphqlClient:       client,
 		plugins:             plugins,
+		tracer:              otel.GetTracerProvider().Tracer(instrumentationName),
 		MaxRequestsPerQuery: maxRequestsPerQuery,
 	}
 }
@@ -44,13 +50,23 @@ type ExecutableSchema struct {
 	GraphqlClient       *GraphQLClient
 	MaxRequestsPerQuery int64
 
+	tracer  trace.Tracer
 	mutex   sync.RWMutex
 	plugins []Plugin
 }
 
 // UpdateServiceList replaces the list of services with the provided one and
 // update the schema.
-func (s *ExecutableSchema) UpdateServiceList(services []string) error {
+func (s *ExecutableSchema) UpdateServiceList(ctx context.Context, services []string) error {
+	ctx, span := s.tracer.Start(ctx, "Federated Services Update",
+		trace.WithSpanKind(trace.SpanKindInternal),
+		trace.WithAttributes(
+			attribute.StringSlice("graphql.federation.services", services),
+		),
+	)
+
+	defer span.End()
+
 	newServices := make(map[string]*Service)
 	for _, svcURL := range services {
 		if svc, ok := s.Services[svcURL]; ok {
@@ -61,12 +77,12 @@ func (s *ExecutableSchema) UpdateServiceList(services []string) error {
 	}
 	s.Services = newServices
 
-	return s.UpdateSchema(true)
+	return s.UpdateSchema(ctx, true)
 }
 
 // UpdateSchema updates the schema from every service and then update the merged
 // schema.
-func (s *ExecutableSchema) UpdateSchema(forceRebuild bool) error {
+func (s *ExecutableSchema) UpdateSchema(ctx context.Context, forceRebuild bool) error {
 	var services []*Service
 	var schemas []*ast.Schema
 	var updatedServices []string
@@ -92,7 +108,7 @@ func (s *ExecutableSchema) UpdateSchema(forceRebuild bool) error {
 		s := s_
 		group.Go(func() error {
 			logger := log.WithField("url", url)
-			updated, err := s.Update()
+			updated, err := s.Update(ctx)
 			if err != nil {
 				promServiceUpdateErrorCounter.WithLabelValues(s.ServiceURL).Inc()
 				promServiceUpdateErrorGauge.WithLabelValues(s.ServiceURL).Set(1)
@@ -116,6 +132,7 @@ func (s *ExecutableSchema) UpdateSchema(forceRebuild bool) error {
 
 			services = append(services, s)
 			schemas = append(schemas, s.Schema)
+
 			return nil
 		})
 	}
@@ -155,6 +172,26 @@ func (s *ExecutableSchema) ExecuteQuery(ctx context.Context) *graphql.Response {
 	operation := operationCtx.Operation
 	variables := operationCtx.Variables
 
+	ctx, span := s.tracer.Start(ctx, "Federated GraphQL Query",
+		trace.WithSpanKind(trace.SpanKindInternal),
+		trace.WithAttributes(
+			semconv.GraphqlOperationTypeKey.String(string(operation.Operation)),
+			semconv.GraphqlOperationName(operationCtx.OperationName),
+			semconv.GraphqlDocument(operationCtx.RawQuery),
+		),
+	)
+
+	defer span.End()
+
+	traceErr := func(err error) {
+		if err == nil {
+			return
+		}
+
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+	}
+
 	for _, plugin := range s.plugins {
 		plugin.InterceptRequest(ctx, operation.Name, operationCtx.RawQuery, variables)
 	}
@@ -185,6 +222,7 @@ func (s *ExecutableSchema) ExecuteQuery(ctx context.Context) *graphql.Response {
 		Services:   s.Services,
 	})
 	if err != nil {
+		traceErr(err)
 		return s.interceptResponse(ctx, operation.Name, operationCtx.RawQuery, variables, graphql.ErrorResponse(ctx, err.Error()))
 	}
 
@@ -212,8 +250,10 @@ func (s *ExecutableSchema) ExecuteQuery(ctx context.Context) *graphql.Response {
 	executionStart := time.Now()
 
 	qe := newQueryExecution(ctx, operationCtx.OperationName, s.GraphqlClient, filteredSchema, s.BoundaryQueries, int32(s.MaxRequestsPerQuery))
+
 	results, executeErrs := qe.Execute(plan)
 	if len(executeErrs) > 0 {
+		traceErr(executeErrs)
 		return s.interceptResponse(ctx, operation.Name, operationCtx.RawQuery, variables, &graphql.Response{
 			Errors: executeErrs,
 		})
@@ -241,7 +281,10 @@ func (s *ExecutableSchema) ExecuteQuery(ctx context.Context) *graphql.Response {
 	mergedResult, err := mergeExecutionResults(results)
 	if err != nil {
 		errs = append(errs, &gqlerror.Error{Message: err.Error()})
+
+		traceErr(errs)
 		AddField(ctx, "errors", errs)
+
 		return s.interceptResponse(ctx, operation.Name, operationCtx.RawQuery, variables, &graphql.Response{
 			Errors: errs,
 		})
@@ -252,7 +295,10 @@ func (s *ExecutableSchema) ExecuteQuery(ctx context.Context) *graphql.Response {
 		mergedResult = nil
 	} else if err != nil {
 		errs = append(errs, &gqlerror.Error{Message: err.Error()})
+
+		traceErr(errs)
 		AddField(ctx, "errors", errs)
+
 		return s.interceptResponse(ctx, operation.Name, operationCtx.RawQuery, variables, &graphql.Response{
 			Errors: errs,
 		})
@@ -266,6 +312,7 @@ func (s *ExecutableSchema) ExecuteQuery(ctx context.Context) *graphql.Response {
 	timings["format"] = time.Since(formattingStart).String()
 
 	if len(errs) > 0 {
+		traceErr(errs)
 		AddField(ctx, "errors", errs)
 	}
 

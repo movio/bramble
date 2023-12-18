@@ -6,6 +6,10 @@ import (
 
 	"github.com/vektah/gqlparser/v2"
 	"github.com/vektah/gqlparser/v2/ast"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // Service is a federated service.
@@ -17,6 +21,7 @@ type Service struct {
 	Schema       *ast.Schema
 	Status       string
 
+	tracer trace.Tracer
 	client *GraphQLClient
 }
 
@@ -25,15 +30,29 @@ func NewService(serviceURL string, opts ...ClientOpt) *Service {
 	opts = append(opts, WithUserAgent(GenerateUserAgent("update")))
 	s := &Service{
 		ServiceURL: serviceURL,
+		tracer:     otel.GetTracerProvider().Tracer(instrumentationName),
 		client:     NewClientWithoutKeepAlive(opts...),
 	}
 	return s
 }
 
 // Update queries the service's schema, name and version and updates its status.
-func (s *Service) Update() (bool, error) {
+func (s *Service) Update(ctx context.Context) (bool, error) {
 	req := NewRequest("query brambleServicePoll { service { name, version, schema} }").
 		WithOperationName("brambleServicePoll")
+
+	ctx, span := s.tracer.Start(ctx, "Federated Service Schema Update",
+		trace.WithSpanKind(trace.SpanKindInternal),
+		trace.WithAttributes(
+			semconv.GraphqlOperationTypeQuery,
+			semconv.GraphqlOperationName(req.OperationName),
+			semconv.GraphqlDocument(req.Query),
+			attribute.String("graphql.federation.service", s.Name),
+		),
+	)
+
+	defer span.End()
+
 	response := struct {
 		Service struct {
 			Name    string `json:"name"`
@@ -42,7 +61,7 @@ func (s *Service) Update() (bool, error) {
 		} `json:"service"`
 	}{}
 
-	if err := s.client.Request(context.Background(), s.ServiceURL, req, &response); err != nil {
+	if err := s.client.Request(ctx, s.ServiceURL, req, &response); err != nil {
 		s.SchemaSource = ""
 		s.Status = "Unreachable"
 		return false, err

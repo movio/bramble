@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -100,8 +101,14 @@ func (q *queryExecution) executeRootStep(step *QueryPlanStep) error {
 		return errors.New("expected mutation or query root step")
 	}
 
+	req := NewRequest(document).
+		WithVariables(variables).
+		WithHeaders(GetOutgoingRequestHeadersFromContext(q.ctx)).
+		WithOperationName(q.operationName).
+		WithOperationType(step.ParentType)
+
 	var data map[string]interface{}
-	err := q.executeDocument(document, variables, step.ServiceURL, &data)
+	err := q.graphqlClient.Request(q.ctx, step.ServiceURL, req, &data)
 	if err != nil {
 		q.writeExecutionResult(step, data, err)
 		return nil
@@ -124,14 +131,6 @@ func (q *queryExecution) executeRootStep(step *QueryPlanStep) error {
 		})
 	}
 	return nil
-}
-
-func (q *queryExecution) executeDocument(query string, variables map[string]interface{}, serviceURL string, response interface{}) error {
-	req := NewRequest(query).
-		WithVariables(variables).
-		WithHeaders(GetOutgoingRequestHeadersFromContext(q.ctx)).
-		WithOperationName(q.operationName)
-	return q.graphqlClient.Request(q.ctx, serviceURL, req, &response)
 }
 
 func (q *queryExecution) writeExecutionResult(step *QueryPlanStep, data interface{}, err error) {
@@ -212,8 +211,14 @@ func (q *queryExecution) executeBoundaryQuery(documents []string, serviceURL str
 	output := make([]interface{}, 0)
 	if !boundaryFieldGetter.Array {
 		for _, document := range documents {
+			req := NewRequest(document).
+				WithVariables(variables).
+				WithHeaders(GetOutgoingRequestHeadersFromContext(q.ctx)).
+				WithOperationName(q.operationName).
+				WithOperationType(queryObjectName)
+
 			partialData := make(map[string]interface{})
-			err := q.executeDocument(document, variables, serviceURL, &partialData)
+			err := q.graphqlClient.Request(q.ctx, serviceURL, req, &partialData)
 			if err != nil {
 				return nil, err
 			}
@@ -232,7 +237,13 @@ func (q *queryExecution) executeBoundaryQuery(documents []string, serviceURL str
 		Result []interface{} `json:"_result"`
 	}{}
 
-	err := q.executeDocument(documents[0], variables, serviceURL, &data)
+	req := NewRequest(documents[0]).
+		WithVariables(variables).
+		WithHeaders(GetOutgoingRequestHeadersFromContext(q.ctx)).
+		WithOperationName(q.operationName).
+		WithOperationType(queryObjectName)
+
+	err := q.graphqlClient.Request(q.ctx, serviceURL, req, &data)
 	return data.Result, err
 }
 
@@ -258,7 +269,9 @@ func (q *queryExecution) createGQLErrors(step *QueryPlanStep, err error) gqlerro
 
 	var gqlErr GraphqlErrors
 	var outputErrs gqlerror.List
-	if errors.As(err, &gqlErr) {
+
+	switch {
+	case errors.As(err, &gqlErr):
 		for _, ge := range gqlErr {
 			extensions := ge.Extensions
 			if extensions == nil {
@@ -270,21 +283,38 @@ func (q *queryExecution) createGQLErrors(step *QueryPlanStep, err error) gqlerro
 			extensions["serviceUrl"] = step.ServiceURL
 
 			outputErrs = append(outputErrs, &gqlerror.Error{
+				Err:        err,
 				Message:    ge.Message,
 				Path:       ge.Path,
 				Locations:  locs,
 				Extensions: extensions,
+				Rule:       "",
 			})
 		}
 		return outputErrs
-	} else {
+
+	case os.IsTimeout(err):
 		outputErrs = append(outputErrs, &gqlerror.Error{
+			Err:       err,
+			Message:   "downstream request timed out",
+			Path:      path,
+			Locations: locs,
+			Extensions: map[string]interface{}{
+				"selectionSet": formatSelectionSetSingleLine(q.ctx, q.schema, step.SelectionSet),
+			},
+			Rule: "",
+		})
+
+	default:
+		outputErrs = append(outputErrs, &gqlerror.Error{
+			Err:       err,
 			Message:   err.Error(),
 			Path:      path,
 			Locations: locs,
 			Extensions: map[string]interface{}{
 				"selectionSet": formatSelectionSetSingleLine(q.ctx, q.schema, step.SelectionSet),
 			},
+			Rule: "",
 		})
 	}
 

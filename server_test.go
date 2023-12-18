@@ -1,6 +1,7 @@
 package bramble
 
 import (
+	"context"
 	"testing"
 
 	"github.com/movio/bramble/testsrv"
@@ -14,7 +15,7 @@ func TestFederatedQuery(t *testing.T) {
 
 	executableSchema := NewExecutableSchema(nil, 10, nil, NewService(gizmoService.URL), NewService(gadgetService.URL))
 
-	require.NoError(t, executableSchema.UpdateSchema(true))
+	require.NoError(t, executableSchema.UpdateSchema(context.TODO(), true))
 
 	query := gqlparser.MustLoadQuery(executableSchema.MergedSchema, `{
 		gizmo(id: "GIZMO1") {
@@ -45,7 +46,7 @@ func TestFederatedQueryWithMultipleFragmentSpreads(t *testing.T) {
 
 	executableSchema := NewExecutableSchema(nil, 10, nil, NewService(gizmoService.URL), NewService(gadgetService.URL))
 
-	require.NoError(t, executableSchema.UpdateSchema(true))
+	require.NoError(t, executableSchema.UpdateSchema(context.TODO(), true))
 
 	t.Run("first fragment matches", func(t *testing.T) {
 		query := gqlparser.MustLoadQuery(executableSchema.MergedSchema, `{

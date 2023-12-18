@@ -8,7 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"regexp"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -20,6 +20,7 @@ import (
 	"github.com/vektah/gqlparser/v2/ast"
 	"github.com/vektah/gqlparser/v2/formatter"
 	"github.com/vektah/gqlparser/v2/gqlerror"
+	"go.opentelemetry.io/otel/trace/noop"
 )
 
 func TestHonorsPermissions(t *testing.T) {
@@ -37,6 +38,7 @@ func TestHonorsPermissions(t *testing.T) {
 	require.NoError(t, err)
 
 	es := ExecutableSchema{
+		tracer:       noop.NewTracerProvider().Tracer("test"),
 		MergedSchema: mergedSchema,
 	}
 
@@ -110,7 +112,8 @@ func TestQueryWithNamespace(t *testing.T) {
 		}`,
 	}
 
-	f.checkSuccess(t)
+	es := f.setup(t)
+	f.run(t, es, f.checkSuccess())
 }
 
 func TestQueryError(t *testing.T) {
@@ -169,7 +172,16 @@ func TestQueryError(t *testing.T) {
 	}
 
 	es := f.setup(t)
-	f.run(t, es)
+	f.run(t, es, func(t *testing.T, resp *graphql.Response) {
+		require.Equal(t, len(f.errors), len(resp.Errors))
+		for i := range f.errors {
+			assert.Error(t, resp.Errors[i])
+			assert.Equal(t, f.errors[i].Message, resp.Errors[i].Message, "error message did not match")
+			assert.Equal(t, f.errors[i].Path, resp.Errors[i].Path, "error path did not match")
+			assert.Equal(t, f.errors[i].Locations, resp.Errors[i].Locations, "error locations did not match")
+			assert.Equal(t, f.errors[i].Extensions, resp.Errors[i].Extensions, "error extensions did not match")
+		}
+	})
 }
 
 func TestFederatedQueryFragmentSpreads(t *testing.T) {
@@ -343,7 +355,8 @@ func TestFederatedQueryFragmentSpreads(t *testing.T) {
 			}`,
 		}
 
-		f.checkSuccess(t)
+		es := f.setup(t)
+		f.run(t, es, f.checkSuccess())
 	})
 
 	t.Run("with overlap in field and fragment selection", func(t *testing.T) {
@@ -374,7 +387,8 @@ func TestFederatedQueryFragmentSpreads(t *testing.T) {
 			}`,
 		}
 
-		f.checkSuccess(t)
+		es := f.setup(t)
+		f.run(t, es, f.checkSuccess())
 	})
 
 	t.Run("with non abstract fragment", func(t *testing.T) {
@@ -396,7 +410,8 @@ func TestFederatedQueryFragmentSpreads(t *testing.T) {
 			}`,
 		}
 
-		f.checkSuccess(t)
+		es := f.setup(t)
+		f.run(t, es, f.checkSuccess())
 	})
 
 	t.Run("with named fragment spread", func(t *testing.T) {
@@ -427,7 +442,8 @@ func TestFederatedQueryFragmentSpreads(t *testing.T) {
 			}`,
 		}
 
-		f.checkSuccess(t)
+		es := f.setup(t)
+		f.run(t, es, f.checkSuccess())
 	})
 
 	t.Run("with nested fragment spread", func(t *testing.T) {
@@ -460,7 +476,8 @@ func TestFederatedQueryFragmentSpreads(t *testing.T) {
 			}`,
 		}
 
-		f.checkSuccess(t)
+		es := f.setup(t)
+		f.run(t, es, f.checkSuccess())
 	})
 
 	t.Run("with multiple implementation fragment spreads (gizmo implementation)", func(t *testing.T) {
@@ -499,7 +516,8 @@ func TestFederatedQueryFragmentSpreads(t *testing.T) {
 			}`,
 		}
 
-		f.checkSuccess(t)
+		es := f.setup(t)
+		f.run(t, es, f.checkSuccess())
 	})
 
 	t.Run("with multiple implementation fragment spreads (gadget implementation)", func(t *testing.T) {
@@ -554,7 +572,8 @@ func TestFederatedQueryFragmentSpreads(t *testing.T) {
 			}`,
 		}
 
-		f.checkSuccess(t)
+		es := f.setup(t)
+		f.run(t, es, f.checkSuccess())
 	})
 
 	t.Run("with multiple top level fragment spreads (gadget implementation)", func(t *testing.T) {
@@ -607,7 +626,8 @@ func TestFederatedQueryFragmentSpreads(t *testing.T) {
 			}`,
 		}
 
-		f.checkSuccess(t)
+		es := f.setup(t)
+		f.run(t, es, f.checkSuccess())
 	})
 
 	t.Run("with nested abstract fragment spreads", func(t *testing.T) {
@@ -651,7 +671,8 @@ func TestFederatedQueryFragmentSpreads(t *testing.T) {
 			}`,
 		}
 
-		f.checkSuccess(t)
+		es := f.setup(t)
+		f.run(t, es, f.checkSuccess())
 	})
 }
 
@@ -724,7 +745,8 @@ func TestQueryExecutionMultipleServices(t *testing.T) {
 		}`,
 	}
 
-	f.checkSuccess(t)
+	es := f.setup(t)
+	f.run(t, es, f.checkSuccess())
 }
 
 func TestQueryExecutionServiceTimeout(t *testing.T) {
@@ -802,7 +824,7 @@ func TestQueryExecutionServiceTimeout(t *testing.T) {
 		}`,
 		errors: gqlerror.List{
 			&gqlerror.Error{
-				Message: `error during request: Post \"http://127.0.0.1:\d{5}\": context deadline exceeded`,
+				Message: "downstream request timed out",
 				Path:    ast.Path{ast.PathName("movie")},
 				Locations: []gqlerror.Location{
 					{Line: 5, Column: 5},
@@ -817,8 +839,26 @@ func TestQueryExecutionServiceTimeout(t *testing.T) {
 	es := f.setup(t)
 	es.GraphqlClient.HTTPClient.Timeout = 10 * time.Millisecond
 
-	f.run(t, es)
-	jsonEqWithOrder(t, f.expected, string(f.resp.Data))
+	f.run(t, es, func(t *testing.T, resp *graphql.Response) {
+		jsonEqWithOrder(t, f.expected, string(resp.Data))
+
+		assert.Equal(t, len(f.errors), len(resp.Errors))
+
+		for i := range f.errors {
+			// We want to unwrap the error to check the underlying error
+			// type of the error returned by the client. This way we are
+			// able to check if the error is a timeout error.
+			respErr := resp.Errors[i].Unwrap()
+
+			assert.Error(t, respErr, "expected error to be non-nil")
+			assert.True(t, os.IsTimeout(respErr), "expected timeout error, got %T", respErr)
+			assert.Equal(t, f.errors[i].Message, resp.Errors[i].Message, "error message did not match")
+			assert.Equal(t, f.errors[i].Path, resp.Errors[i].Path, "error path did not match")
+			assert.Equal(t, f.errors[i].Locations, resp.Errors[i].Locations, "error locations did not match")
+			assert.Equal(t, f.errors[i].Extensions, resp.Errors[i].Extensions, "error extensions did not match")
+		}
+
+	})
 }
 
 func TestQueryExecutionNamespaceAndFragmentSpread(t *testing.T) {
@@ -921,7 +961,9 @@ func TestQueryExecutionNamespaceAndFragmentSpread(t *testing.T) {
 	}
 
 	es := f.setup(t)
-	f.run(t, es)
+	f.run(t, es, func(t *testing.T, resp *graphql.Response) {
+		jsonEqWithOrder(t, f.expected, string(resp.Data))
+	})
 }
 
 func TestQueryExecutionWithNullResponse(t *testing.T) {
@@ -972,7 +1014,8 @@ func TestQueryExecutionWithNullResponse(t *testing.T) {
 		}`,
 	}
 
-	f.checkSuccess(t)
+	es := f.setup(t)
+	f.run(t, es, f.checkSuccess())
 }
 
 func TestQueryExecutionWithSingleService(t *testing.T) {
@@ -1014,7 +1057,8 @@ func TestQueryExecutionWithSingleService(t *testing.T) {
 		}`,
 	}
 
-	f.checkSuccess(t)
+	es := f.setup(t)
+	f.run(t, es, f.checkSuccess())
 }
 
 func TestQueryWithArrayBoundaryFieldsAndMultipleChildrenSteps(t *testing.T) {
@@ -1115,7 +1159,8 @@ func TestQueryWithArrayBoundaryFieldsAndMultipleChildrenSteps(t *testing.T) {
 		}`,
 	}
 
-	f.checkSuccess(t)
+	es := f.setup(t)
+	f.run(t, es, f.checkSuccess())
 }
 
 func TestQueryWithBoundaryFieldsAndNullsAboveInsertionPoint(t *testing.T) {
@@ -1229,7 +1274,8 @@ func TestQueryWithBoundaryFieldsAndNullsAboveInsertionPoint(t *testing.T) {
 		}`,
 	}
 
-	f.checkSuccess(t)
+	es := f.setup(t)
+	f.run(t, es, f.checkSuccess())
 }
 
 func TestNestingNullableBoundaryTypes(t *testing.T) {
@@ -1334,7 +1380,8 @@ func TestNestingNullableBoundaryTypes(t *testing.T) {
 			}`,
 		}
 
-		f.checkSuccess(t)
+		es := f.setup(t)
+		f.run(t, es, f.checkSuccess())
 	})
 
 	t.Run("nested boundary types sometimes null", func(t *testing.T) {
@@ -1470,7 +1517,8 @@ func TestNestingNullableBoundaryTypes(t *testing.T) {
 			}`,
 		}
 
-		f.checkSuccess(t)
+		es := f.setup(t)
+		f.run(t, es, f.checkSuccess())
 	})
 }
 
@@ -1516,7 +1564,8 @@ func TestQueryExecutionWithTypename(t *testing.T) {
 		}`,
 	}
 
-	f.checkSuccess(t)
+	es := f.setup(t)
+	f.run(t, es, f.checkSuccess())
 }
 
 func TestQueryExecutionWithTypenameAndNamespaces(t *testing.T) {
@@ -1588,7 +1637,8 @@ func TestQueryExecutionWithTypenameAndNamespaces(t *testing.T) {
 		}`,
 	}
 
-	f.checkSuccess(t)
+	es := f.setup(t)
+	f.run(t, es, f.checkSuccess())
 }
 
 func TestQueryExecutionWithMultipleBoundaryQueries(t *testing.T) {
@@ -1673,7 +1723,8 @@ func TestQueryExecutionWithMultipleBoundaryQueries(t *testing.T) {
 		}`,
 	}
 
-	f.checkSuccess(t)
+	es := f.setup(t)
+	f.run(t, es, f.checkSuccess())
 }
 
 func TestQueryExecutionMultipleServicesWithArray(t *testing.T) {
@@ -1827,7 +1878,8 @@ func TestQueryExecutionMultipleServicesWithArray(t *testing.T) {
 		}`,
 	}
 
-	f.checkSuccess(t)
+	es := f.setup(t)
+	f.run(t, es, f.checkSuccess())
 }
 
 func TestQueryExecutionMultipleServicesWithEmptyArray(t *testing.T) {
@@ -1878,7 +1930,8 @@ func TestQueryExecutionMultipleServicesWithEmptyArray(t *testing.T) {
 		}`,
 	}
 
-	f.checkSuccess(t)
+	es := f.setup(t)
+	f.run(t, es, f.checkSuccess())
 }
 
 func TestQueryExecutionMultipleServicesWithNestedArrays(t *testing.T) {
@@ -2000,7 +2053,8 @@ func TestQueryExecutionMultipleServicesWithNestedArrays(t *testing.T) {
 		}`,
 	}
 
-	f.checkSuccess(t)
+	es := f.setup(t)
+	f.run(t, es, f.checkSuccess())
 }
 
 func TestQueryExecutionEmptyBoundaryResponse(t *testing.T) {
@@ -2067,7 +2121,8 @@ func TestQueryExecutionEmptyBoundaryResponse(t *testing.T) {
 		}`,
 	}
 
-	f.checkSuccess(t)
+	es := f.setup(t)
+	f.run(t, es, f.checkSuccess())
 }
 
 func TestQueryExecutionWithNullResponseAndSubBoundaryType(t *testing.T) {
@@ -2123,7 +2178,8 @@ func TestQueryExecutionWithNullResponseAndSubBoundaryType(t *testing.T) {
 		}`,
 	}
 
-	f.checkSuccess(t)
+	es := f.setup(t)
+	f.run(t, es, f.checkSuccess())
 }
 
 func TestQueryExecutionWithInputObject(t *testing.T) {
@@ -2228,7 +2284,8 @@ func TestQueryExecutionWithInputObject(t *testing.T) {
 		}`,
 	}
 
-	f.checkSuccess(t)
+	es := f.setup(t)
+	f.run(t, es, f.checkSuccess())
 }
 
 func TestQueryExecutionMultipleObjects(t *testing.T) {
@@ -2323,7 +2380,8 @@ func TestQueryExecutionMultipleObjects(t *testing.T) {
 		}`,
 	}
 
-	f.checkSuccess(t)
+	es := f.setup(t)
+	f.run(t, es, f.checkSuccess())
 }
 
 func TestQueryExecutionMultipleServicesWithSkipTrueDirectives(t *testing.T) {
@@ -2388,7 +2446,8 @@ func TestQueryExecutionMultipleServicesWithSkipTrueDirectives(t *testing.T) {
 		}`,
 	}
 
-	f.checkSuccess(t)
+	es := f.setup(t)
+	f.run(t, es, f.checkSuccess())
 }
 
 func TestQueryExecutionMultipleServicesWithSkipFalseDirectives(t *testing.T) {
@@ -2474,7 +2533,8 @@ func TestQueryExecutionMultipleServicesWithSkipFalseDirectives(t *testing.T) {
 		}`,
 	}
 
-	f.checkSuccess(t)
+	es := f.setup(t)
+	f.run(t, es, f.checkSuccess())
 }
 
 func TestQueryExecutionMultipleServicesWithIncludeFalseDirectives(t *testing.T) {
@@ -2539,7 +2599,8 @@ func TestQueryExecutionMultipleServicesWithIncludeFalseDirectives(t *testing.T) 
 		}`,
 	}
 
-	f.checkSuccess(t)
+	es := f.setup(t)
+	f.run(t, es, f.checkSuccess())
 }
 
 func TestQueryExecutionMultipleServicesWithIncludeTrueDirectives(t *testing.T) {
@@ -2625,7 +2686,8 @@ func TestQueryExecutionMultipleServicesWithIncludeTrueDirectives(t *testing.T) {
 		}`,
 	}
 
-	f.checkSuccess(t)
+	es := f.setup(t)
+	f.run(t, es, f.checkSuccess())
 }
 
 func TestMutationExecution(t *testing.T) {
@@ -2700,7 +2762,8 @@ func TestMutationExecution(t *testing.T) {
 		}`,
 	}
 
-	f.checkSuccess(t)
+	es := f.setup(t)
+	f.run(t, es, f.checkSuccess())
 }
 
 func TestQueryExecutionWithUnions(t *testing.T) {
@@ -2813,7 +2876,8 @@ func TestQueryExecutionWithUnions(t *testing.T) {
 		}`,
 	}
 
-	f.checkSuccess(t)
+	es := f.setup(t)
+	f.run(t, es, f.checkSuccess())
 }
 
 func TestQueryExecutionWithNamespaces(t *testing.T) {
@@ -2937,7 +3001,8 @@ func TestQueryExecutionWithNamespaces(t *testing.T) {
 		}`,
 	}
 
-	f.checkSuccess(t)
+	es := f.setup(t)
+	f.run(t, es, f.checkSuccess())
 }
 
 func TestDebugExtensions(t *testing.T) {
@@ -2973,9 +3038,13 @@ func TestDebugExtensions(t *testing.T) {
 		}`,
 	}
 
-	f.checkSuccess(t)
-	assert.True(t, called)
-	assert.NotNil(t, f.resp.Extensions["variables"])
+	es := f.setup(t)
+	f.run(t, es, func(t *testing.T, resp *graphql.Response) {
+		assert.True(t, called)
+		assert.NotNil(t, resp.Extensions["variables"])
+		require.Empty(t, resp.Errors)
+		jsonEqWithOrder(t, f.expected, string(resp.Data))
+	})
 }
 
 func TestQueryWithBoundaryFields(t *testing.T) {
@@ -3049,7 +3118,8 @@ func TestQueryWithBoundaryFields(t *testing.T) {
 		}`,
 	}
 
-	f.checkSuccess(t)
+	es := f.setup(t)
+	f.run(t, es, f.checkSuccess())
 }
 
 func TestQuerySelectionSetFragmentMismatchesWithResponse(t *testing.T) {
@@ -3098,7 +3168,8 @@ func TestQuerySelectionSetFragmentMismatchesWithResponse(t *testing.T) {
 			}
     	}`,
 	}
-	f.checkSuccess(t)
+	es := f.setup(t)
+	f.run(t, es, f.checkSuccess())
 }
 
 func TestQueryWithArrayBoundaryFields(t *testing.T) {
@@ -3212,7 +3283,8 @@ func TestQueryWithArrayBoundaryFields(t *testing.T) {
 		}`,
 	}
 
-	f.checkSuccess(t)
+	es := f.setup(t)
+	f.run(t, es, f.checkSuccess())
 }
 
 func TestQueryWithAbstractType(t *testing.T) {
@@ -3308,7 +3380,8 @@ func TestQueryWithAbstractType(t *testing.T) {
 		}`,
 	}
 
-	f.checkSuccess(t)
+	es := f.setup(t)
+	f.run(t, es, f.checkSuccess())
 }
 
 func TestMergeWithNull(t *testing.T) {
@@ -3405,7 +3478,7 @@ func TestSchemaUpdate_serviceError(t *testing.T) {
 		t.Error("expected both Gadget and Gizmo in schema")
 	}
 
-	executableSchema.UpdateSchema(false)
+	executableSchema.UpdateSchema(context.TODO(), false)
 
 	for _, service := range executableSchema.Services {
 		if service.Name == "serviceA" {
@@ -3431,17 +3504,8 @@ type queryExecutionFixture struct {
 	mergedSchema *ast.Schema
 	query        string
 	expected     string
-	resp         *graphql.Response
 	debug        *DebugInfo
 	errors       gqlerror.List
-}
-
-func (f *queryExecutionFixture) checkSuccess(t *testing.T) {
-	es := f.setup(t)
-	f.run(t, es)
-
-	require.Empty(t, f.resp.Errors)
-	jsonEqWithOrder(t, f.expected, string(f.resp.Data))
 }
 
 func (f *queryExecutionFixture) setup(t *testing.T) *ExecutableSchema {
@@ -3462,7 +3526,7 @@ func (f *queryExecutionFixture) setup(t *testing.T) *ExecutableSchema {
 	}
 
 	merged, err := MergeSchemas(schemas...)
-	require.NoError(t, err)
+	require.NoError(t, err, "failed to merge schemas before testrun")
 
 	f.mergedSchema = merged
 
@@ -3475,7 +3539,9 @@ func (f *queryExecutionFixture) setup(t *testing.T) *ExecutableSchema {
 	return es
 }
 
-func (f *queryExecutionFixture) run(t *testing.T, es *ExecutableSchema) {
+type assertFunc func(t *testing.T, resp *graphql.Response)
+
+func (f *queryExecutionFixture) run(t *testing.T, es *ExecutableSchema, assertFunc assertFunc) {
 	query := gqlparser.MustLoadQuery(f.mergedSchema, f.query)
 	vars := f.variables
 	if vars == nil {
@@ -3485,22 +3551,21 @@ func (f *queryExecutionFixture) run(t *testing.T, es *ExecutableSchema) {
 	if f.debug != nil {
 		ctx = context.WithValue(ctx, DebugKey, *f.debug)
 	}
-	f.resp = es.ExecuteQuery(ctx)
-	f.resp.Extensions = graphql.GetExtensions(ctx)
+	resp := es.ExecuteQuery(ctx)
+	resp.Extensions = graphql.GetExtensions(ctx)
 
-	if len(f.errors) == 0 {
-		require.Empty(t, f.resp.Errors)
-		jsonEqWithOrder(t, f.expected, string(f.resp.Data))
-	} else {
-		require.Equal(t, len(f.errors), len(f.resp.Errors))
-		for i := range f.errors {
-			delete(f.resp.Errors[i].Extensions, "serviceUrl")
-			// Allow regular expressions in expected error messages
-			if r, err := regexp.Compile(f.errors[i].Message); err == nil && r.Match([]byte(f.resp.Errors.Error())) {
-				f.errors[i].Message = f.resp.Errors[i].Message
-			}
-			require.Equal(t, *f.errors[i], *f.resp.Errors[i])
-		}
+	// Remove serviceUrl from extensions to make tests deterministic
+	for i := range resp.Errors {
+		delete(resp.Errors[i].Extensions, "serviceUrl")
+	}
+
+	assertFunc(t, resp)
+}
+
+func (f *queryExecutionFixture) checkSuccess() assertFunc {
+	return func(t *testing.T, resp *graphql.Response) {
+		require.Empty(t, resp.Errors, "expected no errors, got %v", resp.Errors)
+		jsonEqWithOrder(t, f.expected, string(resp.Data))
 	}
 }
 

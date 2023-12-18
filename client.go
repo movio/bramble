@@ -15,6 +15,11 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/vektah/gqlparser/v2/ast"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/codes"
+	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // GraphQLClient is a GraphQL client.
@@ -22,6 +27,8 @@ type GraphQLClient struct {
 	HTTPClient      *http.Client
 	MaxResponseSize int64
 	UserAgent       string
+
+	tracer trace.Tracer
 }
 
 // ClientOpt is a function used to set a GraphQL client option
@@ -33,10 +40,15 @@ func NewClient(opts ...ClientOpt) *GraphQLClient {
 }
 
 func NewClientWithPlugins(plugins []Plugin, opts ...ClientOpt) *GraphQLClient {
+	var transport http.RoundTripper = http.DefaultTransport
+	transport = otelhttp.NewTransport(transport)
+
 	c := &GraphQLClient{
 		HTTPClient: &http.Client{
-			Timeout: 5 * time.Second,
+			Transport: transport,
+			Timeout:   5 * time.Second,
 		},
+		tracer:          otel.GetTracerProvider().Tracer(instrumentationName),
 		MaxResponseSize: 1024 * 1024,
 	}
 
@@ -51,13 +63,18 @@ func NewClientWithPlugins(plugins []Plugin, opts ...ClientOpt) *GraphQLClient {
 }
 
 func NewClientWithoutKeepAlive(opts ...ClientOpt) *GraphQLClient {
-	transport := http.DefaultTransport.(*http.Transport).Clone()
-	transport.DisableKeepAlives = true
+	var defaultTransport = http.DefaultTransport.(*http.Transport).Clone()
+	defaultTransport.DisableKeepAlives = true
+
+	var transport http.RoundTripper = defaultTransport
+	transport = otelhttp.NewTransport(transport)
+
 	c := &GraphQLClient{
 		HTTPClient: &http.Client{
 			Timeout:   5 * time.Second,
 			Transport: transport,
 		},
+		tracer:          otel.GetTracerProvider().Tracer(instrumentationName),
 		MaxResponseSize: 1024 * 1024,
 	}
 
@@ -93,15 +110,35 @@ func WithUserAgent(userAgent string) ClientOpt {
 
 // Request executes a GraphQL request.
 func (c *GraphQLClient) Request(ctx context.Context, url string, request *Request, out interface{}) error {
+	ctx, span := c.tracer.Start(ctx, "GraphQL Request",
+		trace.WithSpanKind(trace.SpanKindInternal),
+		trace.WithAttributes(
+			semconv.GraphqlOperationTypeKey.String(string(request.OperationType)),
+			semconv.GraphqlOperationName(request.OperationName),
+			semconv.GraphqlDocument(request.Query),
+		),
+	)
+
+	defer span.End()
+
+	traceErr := func(err error) error {
+		if err == nil {
+			return err
+		}
+
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return err
+	}
+
 	var buf bytes.Buffer
-	err := json.NewEncoder(&buf).Encode(request)
-	if err != nil {
-		return fmt.Errorf("unable to encode request body: %w", err)
+	if err := json.NewEncoder(&buf).Encode(request); err != nil {
+		return traceErr(fmt.Errorf("unable to encode request body: %w", err))
 	}
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, &buf)
 	if err != nil {
-		return fmt.Errorf("unable to create request: %w", err)
+		return traceErr(fmt.Errorf("unable to create request: %w", err))
 	}
 
 	if request.Headers != nil {
@@ -121,8 +158,13 @@ func (c *GraphQLClient) Request(ctx context.Context, url string, request *Reques
 			promServiceTimeoutErrorCounter.With(prometheus.Labels{
 				"service": url,
 			}).Inc()
+
+			// Return raw timeout error to allow caller to handle it since a
+			// downstream caller may want to retry, and they will have to jump
+			// through hoops to detect this error otherwise.
+			return traceErr(err)
 		}
-		return fmt.Errorf("error during request: %w", err)
+		return traceErr(fmt.Errorf("error during request: %w", err))
 	}
 	defer res.Body.Close()
 
@@ -140,18 +182,17 @@ func (c *GraphQLClient) Request(ctx context.Context, url string, request *Reques
 		Data: out,
 	}
 
-	err = json.NewDecoder(&limitReader).Decode(&graphqlResponse)
-	if err != nil {
+	if err = json.NewDecoder(&limitReader).Decode(&graphqlResponse); err != nil {
 		if errors.Is(err, io.ErrUnexpectedEOF) {
 			if limitReader.N == 0 {
-				return fmt.Errorf("response exceeded maximum size of %d bytes", maxResponseSize)
+				return traceErr(fmt.Errorf("response exceeded maximum size of %d bytes", maxResponseSize))
 			}
 		}
-		return fmt.Errorf("error decoding response: %w", err)
+		return traceErr(fmt.Errorf("error decoding response: %w", err))
 	}
 
 	if len(graphqlResponse.Errors) > 0 {
-		return graphqlResponse.Errors
+		return traceErr(graphqlResponse.Errors)
 	}
 
 	return nil
@@ -159,6 +200,7 @@ func (c *GraphQLClient) Request(ctx context.Context, url string, request *Reques
 
 // Request is a GraphQL request.
 type Request struct {
+	OperationType string                 `json:"operationType,omitempty"`
 	Query         string                 `json:"query"`
 	OperationName string                 `json:"operationName,omitempty"`
 	Variables     map[string]interface{} `json:"variables,omitempty"`
@@ -177,7 +219,20 @@ func (r *Request) WithHeaders(headers http.Header) *Request {
 	return r
 }
 
+func (r *Request) WithOperationType(operation string) *Request {
+	op := strings.ToLower(operation)
+	switch op {
+	case "query", "mutation", "subscription":
+		r.OperationType = op
+	default:
+		r.OperationType = "query"
+	}
+
+	return r
+}
+
 func (r *Request) WithOperationName(operationName string) *Request {
+
 	r.OperationName = operationName
 	return r
 }

@@ -1,6 +1,7 @@
 package bramble
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -11,6 +12,8 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	log "github.com/sirupsen/logrus"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/trace"
 )
 
 var Version = "dev"
@@ -47,8 +50,9 @@ type Config struct {
 	LogLevel               log.Level     `json:"loglevel"`
 	PollInterval           string        `json:"poll-interval"`
 	PollIntervalDuration   time.Duration
-	MaxRequestsPerQuery    int64 `json:"max-requests-per-query"`
-	MaxServiceResponseSize int64 `json:"max-service-response-size"`
+	MaxRequestsPerQuery    int64           `json:"max-requests-per-query"`
+	MaxServiceResponseSize int64           `json:"max-service-response-size"`
+	Telemetry              TelemetryConfig `json:"telemetry"`
 	Plugins                []PluginConfig
 	// Config extensions that can be shared among plugins
 	Extensions map[string]json.RawMessage
@@ -58,6 +62,7 @@ type Config struct {
 	plugins          []Plugin
 	executableSchema *ExecutableSchema
 	watcher          *fsnotify.Watcher
+	tracer           trace.Tracer
 	configFiles      []string
 	linkedFiles      []string
 }
@@ -250,18 +255,32 @@ func (c *Config) Watch() {
 				continue
 			}
 
-			err := c.Load()
-			if err != nil {
+			if err := c.reload(); err != nil {
 				log.WithError(err).Error("error reloading config")
 			}
-			log.WithField("services", c.Services).Info("config file updated")
-			err = c.executableSchema.UpdateServiceList(c.Services)
-			if err != nil {
-				log.WithError(err).Error("error updating services")
-			}
-			log.WithField("services", c.Services).Info("updated services")
 		}
 	}
+}
+
+func (c *Config) reload() error {
+	ctx := context.Background()
+
+	ctx, span := c.tracer.Start(ctx, "Config Reload")
+	defer span.End()
+
+	if err := c.Load(); err != nil {
+		log.WithError(err).Error("error reloading config")
+	}
+
+	log.WithField("services", c.Services).Info("config file updated")
+
+	if err := c.executableSchema.UpdateServiceList(ctx, c.Services); err != nil {
+		log.WithError(err).Error("error updating services")
+	}
+
+	log.WithField("services", c.Services).Info("updated services")
+
+	return nil
 }
 
 // GetConfig returns operational config for the gateway
@@ -296,6 +315,7 @@ func GetConfig(configFiles []string) (*Config, error) {
 		MaxServiceResponseSize: 1024 * 1024,
 
 		watcher:     watcher,
+		tracer:      otel.GetTracerProvider().Tracer(instrumentationName),
 		configFiles: configFiles,
 		linkedFiles: linkedFiles,
 	}
@@ -343,13 +363,17 @@ func (c *Config) Init() error {
 		services = append(services, NewService(s, serviceClientOptions...))
 	}
 
-	queryClientOptions := []ClientOpt{WithMaxResponseSize(c.MaxServiceResponseSize), WithUserAgent(GenerateUserAgent("query"))}
+	queryClientOptions := []ClientOpt{
+		WithMaxResponseSize(c.MaxServiceResponseSize),
+		WithUserAgent(GenerateUserAgent("query")),
+	}
+
 	if c.QueryHTTPClient != nil {
 		queryClientOptions = append(queryClientOptions, WithHTTPClient(c.QueryHTTPClient))
 	}
 	queryClient := NewClientWithPlugins(c.plugins, queryClientOptions...)
 	es := NewExecutableSchema(c.plugins, c.MaxRequestsPerQuery, queryClient, services...)
-	err = es.UpdateSchema(true)
+	err = es.UpdateSchema(context.Background(), true)
 	if err != nil {
 		return err
 	}
