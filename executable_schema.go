@@ -236,7 +236,7 @@ func (s *ExecutableSchema) ExecuteQuery(ctx context.Context) *graphql.Response {
 		}
 	}
 
-	timings["execution"] = time.Since(executionStart).Round(time.Millisecond).String()
+	timings["execution"] = time.Since(executionStart).String()
 
 	mergeStart := time.Now()
 	mergedResult, err := mergeExecutionResults(results)
@@ -260,11 +260,11 @@ func (s *ExecutableSchema) ExecuteQuery(ctx context.Context) *graphql.Response {
 	}
 
 	errs = append(errs, bubbleErrs...)
-	timings["merge"] = time.Since(mergeStart).Round(time.Millisecond).String()
+	timings["merge"] = time.Since(mergeStart).String()
 
 	formattingStart := time.Now()
 	formattedResponse := formatResponseData(filteredSchema, operation.SelectionSet, mergedResult)
-	timings["format"] = time.Since(formattingStart).Round(time.Millisecond).String()
+	timings["format"] = time.Since(formattingStart).String()
 
 	if len(errs) > 0 {
 		AddField(ctx, "errors", errs)
