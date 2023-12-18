@@ -425,7 +425,6 @@ func TestServiceQuery(t *testing.T) {
 		}
 		`).assertInvalid("the Query type is missing the 'service' field", ValidateSchema)
 	})
-
 }
 
 func TestRootObjectNaming(t *testing.T) {
@@ -515,7 +514,7 @@ func TestSchemaValidAfterMerge(t *testing.T) {
 
 		type Mutation {
 			service: Service!
-		}`).assertInvalid("schema will become invalid after merge operation: merged schema:3: Undefined type Service.", validateSchemaValidAfterMerge)
+		}`).assertInvalid("schema will become invalid after merge operation: merged schema:2: Undefined type Service.", validateSchemaValidAfterMerge)
 	})
 
 	t.Run("valid schema with empty Query type", func(t *testing.T) {
