@@ -50,10 +50,9 @@ func (e *event) addFields(fields EventFields) {
 
 func (e *event) finish() {
 	e.writeLock.Do(func() {
-		log.WithFields(log.Fields{
-			"timestamp": e.timestamp.Format(time.RFC3339Nano),
-			"duration":  time.Since(e.timestamp).String(),
-		}).WithFields(log.Fields(e.fields)).Info(e.name)
+		log.WithField("duration", time.Since(e.timestamp).String()).
+			WithFields(log.Fields(e.fields)).
+			Info(e.name)
 	})
 }
 

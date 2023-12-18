@@ -88,7 +88,7 @@ func TestEventMeasurement(t *testing.T) {
 		time.Sleep(time.Microsecond)
 	})
 
-	if ts, ok := output["timestamp"].(string); ok {
+	if ts, ok := output["time"].(string); ok {
 		timestamp, err := time.Parse(time.RFC3339Nano, ts)
 		assert.NoError(t, err)
 		assert.WithinDuration(t, start, timestamp, time.Second)
