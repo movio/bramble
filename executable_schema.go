@@ -88,8 +88,8 @@ func (s *ExecutableSchema) UpdateSchema(forceRebuild bool) error {
 	// as high concurrency can actually hurt performance
 	group.SetLimit(64)
 	for url_, s_ := range s.Services {
-		var url = url_
-		var s = s_
+		url := url_
+		s := s_
 		group.Go(func() error {
 			logger := log.WithField("url", url)
 			updated, err := s.Update()
@@ -184,7 +184,6 @@ func (s *ExecutableSchema) ExecuteQuery(ctx context.Context) *graphql.Response {
 		IsBoundary: s.IsBoundary,
 		Services:   s.Services,
 	})
-
 	if err != nil {
 		return s.interceptResponse(ctx, operation.Name, operationCtx.RawQuery, variables, graphql.ErrorResponse(ctx, err.Error()))
 	}
