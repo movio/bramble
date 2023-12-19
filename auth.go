@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/vektah/gqlparser/v2/ast"
 	"github.com/vektah/gqlparser/v2/gqlerror"
 )
@@ -33,7 +34,7 @@ func (a AllowedFields) IsAllowed(fieldName string) (bool, AllowedFields) {
 	return false, AllowedFields{}
 }
 
-// OperationPermissions represents the user permissions for all operation types
+// OperationPermissions represents the top level permissions for all operation types
 type OperationPermissions struct {
 	AllowedRootQueryFields        AllowedFields `json:"query"`
 	AllowedRootMutationFields     AllowedFields `json:"mutation"`
@@ -52,6 +53,14 @@ func (f fieldList) Less(i, j int) bool {
 
 func (f fieldList) Swap(i, j int) {
 	f[i], f[j] = f[j], f[i]
+}
+
+func (a AllowedFields) String() string {
+	bytes, err := json.Marshal(a)
+	if err != nil {
+		return err.Error()
+	}
+	return string(bytes)
 }
 
 // MarshalJSON marshals to a JSON representation.
@@ -270,7 +279,12 @@ func filterFields(path []string, ss ast.SelectionSet, allowedFields AllowedField
 				res = append(res, s)
 				errs = append(errs, ferrs...)
 			} else {
-				errs = append(errs, gqlerror.Errorf("user do not have permission to access field %s.%s", strings.Join(path, "."), s.Name))
+				fieldPath := strings.Join(append(path, s.Name), ".")
+				log.WithFields(log.Fields{
+					"field":       fieldPath,
+					"permissions": allowedFields,
+				}).Debug("field access disallowed")
+				errs = append(errs, gqlerror.Errorf("%s access disallowed", fieldPath))
 			}
 		case *ast.FragmentSpread:
 			var ferrs gqlerror.List
