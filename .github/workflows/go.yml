@@ -17,6 +17,14 @@ jobs:
       - name: Test
         run: go test -race -v -coverprofile=coverage.txt -covermode=atomic $(go list ./... | grep -v examples)
 
+      - name: Image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: false
+          build-args: |
+            VERSION=${{ github.ref_name }}
+
       - uses: codecov/codecov-action@v3
         name: Upload to codecov.io
         with:
