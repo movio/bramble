@@ -48,6 +48,7 @@ func TestSchemaIsValid(t *testing.T) {
 	}
 	type Query {
 		node(id: ID!): Node
+    nodes(ids: [ID!]!): [Node]!
 		service: Service!
 	}
 	`).assertValid(ValidateSchema)
@@ -273,6 +274,86 @@ func TestNodeQuery(t *testing.T) {
 		type Gizmo implements Node @boundary {
 			id: ID!
 		}`).assertInvalid("the 'node' field of Query must be of type 'Node'", validateBoundaryObjects)
+	})
+}
+
+func TestNodesQuery(t *testing.T) {
+	t.Run("query type missing", func(t *testing.T) {
+		withSchema(t, "").assertInvalid("the schema is missing a Query type", validateNodesQuery)
+	})
+	t.Run("nodes query missing", func(t *testing.T) {
+		withSchema(t, `
+		type Query {
+			other: String
+		}
+		`).assertInvalid("the Query type is missing the 'nodes' field", validateNodesQuery)
+	})
+	t.Run("query with no arguments", func(t *testing.T) {
+		withSchema(t, `
+		type Query {
+			nodes: ID!
+		}
+		`).assertInvalid("the 'nodes' field of Query must take a single argument", validateNodesQuery)
+	})
+	t.Run("query with wrong argument name", func(t *testing.T) {
+		withSchema(t, `
+		type Query {
+			nodes(incorrect: ID!): ID!
+		}
+		`).assertInvalid("the 'nodes' field of Query must take a single argument called 'ids'", validateNodesQuery)
+	})
+	t.Run("query with extra argument", func(t *testing.T) {
+		withSchema(t, `
+		type Query {
+			nodes(ids: [ID!]!, incorrect: String): ID!
+		}
+		`).assertInvalid("the 'nodes' field of Query must take a single argument", validateNodesQuery)
+	})
+
+	t.Run("query with wrong nullable array type", func(t *testing.T) {
+		withSchema(t, `
+		type Query {
+			nodes(ids: [ID!]): ID!
+		}
+		`).assertInvalid("the 'nodes' field of Query must take a single argument of type 'ID!'", validateNodesQuery)
+	})
+	t.Run("query with wrong nullable array type", func(t *testing.T) {
+		withSchema(t, `
+		type Query {
+			nodes(ids: [ID]!): ID!
+		}
+		`).assertInvalid("the 'nodes' field of Query must take a single argument of type 'ID!'", validateNodesQuery)
+	})
+	t.Run("query with wrong type", func(t *testing.T) {
+		withSchema(t, `
+		type Query {
+			nodes(ids: [ID!]!): ID!
+		}
+		`).assertInvalid("the 'nodes' field of Query must be of type '[Node]!'", validateNodesQuery)
+	})
+	t.Run("query is correct", func(t *testing.T) {
+		withSchema(t, `
+		interface Node {
+			id: ID!
+		}
+		type Query {
+			nodes(ids: [ID!]!): [Node]!
+		}
+		`).assertValid(validateNodesQuery)
+	})
+	t.Run("Query is checked if @boundary is used", func(t *testing.T) {
+		withSchema(t, `
+		directive @boundary on OBJECT
+		type Query {
+			nodes(ids: [ID!]!): ID!
+			node(id: ID!): ID!
+		}
+		interface Node {
+			id: ID!
+		}
+		type Gizmo implements Node @boundary {
+			id: ID!
+		}`).assertInvalid("the 'nodes' field of Query must be of type '[Node]!'", validateNodesQuery)
 	})
 }
 
