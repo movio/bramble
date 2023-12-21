@@ -15,7 +15,7 @@ jobs:
         run: go build -v ./cmd/bramble
 
       - name: Test
-        run: go test -race -v -coverprofile=coverage.txt -covermode=atomic $(go list ./... | grep -v examples)
+        run: go test -race -v -coverprofile=coverage.txt -covermode=atomic ./...
 
       - name: Image
         uses: docker/build-push-action@v4
