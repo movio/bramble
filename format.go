@@ -14,10 +14,12 @@ import (
 )
 
 func indentPrefix(sb *strings.Builder, level int, suffix ...string) (int, error) {
+	sb.WriteString("\n")
+
 	var err error
 	total, count := 0, 0
 	for i := 0; i <= level; i++ {
-		count, err = sb.WriteString("    ")
+		count, err = sb.WriteString("  ")
 		total += count
 		if err != nil {
 			return total, err
@@ -192,7 +194,7 @@ func formatSelectionSet(ctx context.Context, schema *ast.Schema, selection ast.S
 
 	sb.WriteString("{")
 	formatSelection(&sb, schema, vars, 0, selection)
-	sb.WriteString(" }")
+	sb.WriteString("\n}")
 
 	return sb.String()
 }

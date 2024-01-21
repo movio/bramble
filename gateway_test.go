@@ -1,6 +1,7 @@
 package bramble
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -50,7 +51,7 @@ func TestGatewayQuery(t *testing.T) {
 	}))
 	client := NewClient(WithUserAgent(GenerateUserAgent("query")))
 	executableSchema := NewExecutableSchema(nil, 50, client, NewService(server.URL))
-	err := executableSchema.UpdateSchema(true)
+	err := executableSchema.UpdateSchema(context.TODO(), true)
 	require.NoError(t, err)
 	gtw := NewGateway(executableSchema, []Plugin{})
 	rec := httptest.NewRecorder()

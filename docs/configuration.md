@@ -17,6 +17,12 @@ Sample configuration:
   "max-requests-per-query": 50,
   "max-client-response-size": 1048576,
   "id-field-name": "id",
+  "telemetry": {
+    "enabled": true,
+    "insecure": false,
+    "endpoint": "http://localhost:4317",
+    "serviceName": "bramble"
+  },
   "plugins": [
     {
       "name": "admin-ui"
@@ -83,6 +89,21 @@ Sample configuration:
 
   - Default: `id`
   - Supports hot-reload: No
+
+- `telemetry`: OpenTelemetry configuration.
+  - `enabled`: Enable OpenTelemetry.
+    - Default: `false`
+    - Supports hot-reload: No
+  - `insecure`: Whether to use insecure connection to OpenTelemetry collector.
+    - Default: `false`
+    - Supports hot-reload: No
+  - `endpoint`: OpenTelemetry collector endpoint.
+    - Default: If no endpoint is specified, telemetry is disabled.
+    - Supports hot-reload: No
+  - `serviceName`: Service name to use for OpenTelemetry.
+    - Default: `bramble`
+    - Supports hot-reload: No
+
 
 - `plugins`: Optional list of plugins to enable. See [plugins](plugins.md) for plugins-specific config.
 

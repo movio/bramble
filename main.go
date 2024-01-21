@@ -15,6 +15,8 @@ import (
 // Main runs the gateway. This function is exported so that it can be reused
 // when building Bramble with custom plugins.
 func Main() {
+	ctx := context.Background()
+
 	var configFiles arrayFlags
 	flag.Var(&configFiles, "config", "Config file (can appear multiple times)")
 	flag.Var(&configFiles, "conf", "deprecated, use -config instead")
@@ -28,6 +30,18 @@ func Main() {
 	}
 	go cfg.Watch()
 
+	shutdown, err := InitTelemetry(ctx, cfg.Telemetry)
+	if err != nil {
+		log.WithError(err).Error("error creating telemetry")
+	}
+
+	defer func() {
+		log.Info("flushing and shutting down telemetry")
+		if err := shutdown(context.Background()); err != nil {
+			log.WithError(err).Error("shutting down telemetry")
+		}
+	}()
+
 	err = cfg.Init()
 	if err != nil {
 		log.WithError(err).Fatal("failed to configure")
@@ -40,7 +54,7 @@ func Main() {
 
 	go gtw.UpdateSchemas(cfg.PollIntervalDuration)
 
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt)
 	defer cancel()
 
 	var wg sync.WaitGroup

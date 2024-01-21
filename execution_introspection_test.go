@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/vektah/gqlparser/v2"
 	"github.com/vektah/gqlparser/v2/ast"
+	"go.opentelemetry.io/otel/trace/noop"
 )
 
 func TestIntrospectionQuery(t *testing.T) {
@@ -55,6 +56,7 @@ func TestIntrospectionQuery(t *testing.T) {
 	require.NoError(t, err)
 
 	es := ExecutableSchema{
+		tracer:       noop.NewTracerProvider().Tracer("test"),
 		MergedSchema: mergedSchema,
 	}
 
