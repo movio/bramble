@@ -98,7 +98,7 @@ Sample configuration:
     - Default: `false`
     - Supports hot-reload: No
   - `endpoint`: OpenTelemetry collector endpoint.
-    - Default: If no endpoint is specified, telemetry is disabled.
+    - Default: If no endpoint is specified, telemetry is disabled. Bramble will check for `BRAMBLE_OTEL_ENDPOINT` environment variable and use it if set.
     - Supports hot-reload: No
   - `serviceName`: Service name to use for OpenTelemetry.
     - Default: `bramble`

@@ -3,6 +3,7 @@ package bramble
 import (
 	"context"
 	"errors"
+	"os"
 
 	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel"
@@ -41,6 +42,11 @@ func (e *TelemetryErrHandler) Handle(err error) {
 // returns a shutdown function that should be called when the application
 // terminates.
 func InitTelemetry(ctx context.Context, cfg TelemetryConfig) (func(context.Context) error, error) {
+	endpoint := os.Getenv("BRAMBLE_OTEL_ENDPOINT")
+	if endpoint != "" {
+		cfg.Endpoint = endpoint
+	}
+
 	// If telemetry is disabled, return a no-op shutdown function. The standard
 	// behaviour of the application will not be affected, since a
 	// `NoopTracerProvider` is used by default.
