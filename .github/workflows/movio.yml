@@ -1,0 +1,24 @@
+name: Notify Movio
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify Movio
+        uses: peter-evans/repository-dispatch@v2
+        with:
+          token: ${{ secrets.MOVIO_ACTIONS_ACCESS }}
+          repository: movio/bramble-movio
+          event-type: push
+          client-payload: |-
+            {
+              "repository": "${{ github.repository }}",
+              "ref": "${{ github.ref }}",
+              "ref_name": "${{ github.ref_name }}",
+              "sha": "${{ github.sha }}"
+            }
