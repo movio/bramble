@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - main
+  release:
+    types:
+      - published
 
 jobs:
   dispatch:
@@ -14,7 +17,7 @@ jobs:
         with:
           token: ${{ secrets.MOVIO_ACTIONS_ACCESS }}
           repository: movio/bramble-movio
-          event-type: push
+          event-type: ${{ github.event_name }}
           client-payload: |-
             {
               "repository": "${{ github.repository }}",
