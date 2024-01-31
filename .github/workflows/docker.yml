@@ -13,7 +13,7 @@ jobs:
 
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set BRAMBLE_VERSION env
         run: echo "BRAMBLE_VERSION=$(git describe --tags --abbrev=0)" >> $GITHUB_ENV
