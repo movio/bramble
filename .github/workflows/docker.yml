@@ -5,39 +5,31 @@ on:
       - 'v*.*.*'
 jobs:
   push-to-ghcr:
-    name: Push Docker image to Docker Hub
+    name: Push image to Github Container Registry
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
 
     steps:
-      - name: Check out the repo
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set BRAMBLE_VERSION env
-        run: echo "BRAMBLE_VERSION=$(git describe --tags --abbrev=0)" >> $GITHUB_ENV
-
-      - name: Login to ghcr.io
-        uses: docker/login-action@v2
+      - uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          username: ${{ secrets.REGISTRY_USERNAME }}
+          username: ${{ github.actor }}
           password: ${{ secrets.REGISTRY_ACCESS_TOKEN }}
 
-      - name: Extract metadata
+      - uses: docker/metadata-action@v5
         id: meta
-        uses: docker/metadata-action@v4
         with:
-          images: ghcr.io/movio/bramble
+          images: ghcr.io/${{ github.repository }}
 
-      - name: Push to ghcr.io
-        uses: docker/build-push-action@v4
+      - uses: docker/build-push-action@v5
         with:
           context: .
-          registry: ghcr.io
           push: true
           build-args: |
-            VERSION=${{ env.BRAMBLE_VERSION }}
+            VERSION=${{ github.ref_name }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
