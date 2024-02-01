@@ -1,6 +1,6 @@
 module github.com/movio/bramble/examples/graph-gophers-service
 
-go 1.19
+go 1.21
 
 require (
 	github.com/go-faker/faker/v4 v4.0.0-beta.3
