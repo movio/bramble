@@ -493,7 +493,7 @@ func TestIntrospectionQuery(t *testing.T) {
 				"inputFields": [
 					{
 						"name": "name",
-						"defaultValue": "SomeName"
+						"defaultValue": "\"SomeName\""
 					}
 				]
 			}

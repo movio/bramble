@@ -543,6 +543,12 @@ func resolveField(ctx context.Context, schema *ast.Schema, field *ast.FieldDefin
 			result[f.Alias] = deprecated
 		case "deprecationReason":
 			result[f.Alias] = deprecatedReason
+		case "defaultValue":
+			if field.DefaultValue != nil {
+				result[f.Alias] = field.DefaultValue.String()
+			} else {
+				result[f.Alias] = nil
+			}
 		}
 	}
 
