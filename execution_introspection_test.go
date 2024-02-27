@@ -53,6 +53,9 @@ func TestIntrospectionQuery(t *testing.T) {
 
 	input CinemaInput {
 		name: String! = "SomeName"
+		cinema: CinemaInput = {name: "SomeOtherName"}
+		mainGenre: MovieGenre = ACTION
+		description: String
 	}
 
 	type Mutation {
@@ -494,6 +497,18 @@ func TestIntrospectionQuery(t *testing.T) {
 					{
 						"name": "name",
 						"defaultValue": "\"SomeName\""
+					},
+					{
+						"name": "cinema",
+						"defaultValue": "{name:\"SomeOtherName\"}"
+					},
+					{
+						"name": "mainGenre",
+						"defaultValue": "ACTION"
+					},
+					{
+						"name": "description",
+						"defaultValue": null
 					}
 				]
 			}
