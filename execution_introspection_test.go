@@ -49,6 +49,17 @@ func TestIntrospectionQuery(t *testing.T) {
 		movies: [Movie!]!
 		somethingRandom: MovieOrCinema
 		somePerson: Person
+	}
+
+	input CinemaInput {
+		name: String! = "SomeName"
+		cinema: CinemaInput = {name: "SomeOtherName"}
+		mainGenre: MovieGenre = ACTION
+		description: String
+	}
+
+	type Mutation {
+		createCinema(input: CinemaInput!): Cinema
 	}`
 
 	// Make sure schema merging doesn't break introspection
@@ -454,10 +465,55 @@ func TestIntrospectionQuery(t *testing.T) {
 				"queryType": {
 					"name": "Query"
 				},
-				"mutationType": null,
+				"mutationType": {
+					"name": "Mutation"
+				},
 				"subscriptionType": null
 			}
 			}
 		`, string(resp.Data))
 	})
+
+	t.Run("input fields", func(t *testing.T) {
+		query := gqlparser.MustLoadQuery(es.MergedSchema, `{
+			__type(name: "CinemaInput") {
+				kind
+				name
+				inputFields {
+					name
+					defaultValue
+				}
+			}
+		}`)
+		ctx := testContextWithoutVariables(query.Operations[0])
+		resp := es.ExecuteQuery(ctx)
+
+		require.JSONEq(t, `
+		{
+			"__type": {
+				"kind": "INPUT_OBJECT",
+				"name": "CinemaInput",
+				"inputFields": [
+					{
+						"name": "name",
+						"defaultValue": "\"SomeName\""
+					},
+					{
+						"name": "cinema",
+						"defaultValue": "{name:\"SomeOtherName\"}"
+					},
+					{
+						"name": "mainGenre",
+						"defaultValue": "ACTION"
+					},
+					{
+						"name": "description",
+						"defaultValue": null
+					}
+				]
+			}
+		}
+		`, string(resp.Data))
+	})
+
 }
