@@ -22,7 +22,9 @@ type CorsPlugin struct {
 type CorsPluginConfig struct {
 	AllowedOrigins   []string `json:"allowed-origins"`
 	AllowedHeaders   []string `json:"allowed-headers"`
+	AllowedMethods   []string `json:"allowed-methods"`
 	AllowCredentials bool     `json:"allow-credentials"`
+	ExposedHeaders   []string `json:"exposed-headers"`
 	MaxAge           int      `json:"max-age"`
 	Debug            bool     `json:"debug"`
 }
@@ -43,7 +45,9 @@ func (p *CorsPlugin) middleware(h http.Handler) http.Handler {
 	c := cors.New(cors.Options{
 		AllowedOrigins:   p.config.AllowedOrigins,
 		AllowedHeaders:   p.config.AllowedHeaders,
+		AllowedMethods:   p.config.AllowedMethods,
 		AllowCredentials: p.config.AllowCredentials,
+		ExposedHeaders:   p.config.ExposedHeaders,
 		MaxAge:           p.config.MaxAge,
 		Debug:            p.config.Debug,
 	})
