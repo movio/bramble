@@ -168,6 +168,10 @@ func (c *GraphQLClient) Request(ctx context.Context, url string, request *Reques
 	}
 	defer res.Body.Close()
 
+	if res.StatusCode != http.StatusOK {
+		return traceErr(fmt.Errorf("unexpected response code: %s", res.Status))
+	}
+
 	maxResponseSize := c.MaxResponseSize
 	if maxResponseSize == 0 {
 		maxResponseSize = math.MaxInt64
