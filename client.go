@@ -146,7 +146,7 @@ func (c *GraphQLClient) Request(ctx context.Context, url string, request *Reques
 	}
 
 	httpReq.Header.Set("Content-Type", "application/json; charset=utf-8")
-	httpReq.Header.Set("Accept", "application/json; charset=utf-8")
+	httpReq.Header.Set("Accept", "application/json")
 
 	if c.UserAgent != "" {
 		httpReq.Header.Set("User-Agent", c.UserAgent)
@@ -167,6 +167,10 @@ func (c *GraphQLClient) Request(ctx context.Context, url string, request *Reques
 		return traceErr(fmt.Errorf("error during request: %w", err))
 	}
 	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusOK {
+		return traceErr(fmt.Errorf("unexpected response code: %s", res.Status))
+	}
 
 	maxResponseSize := c.MaxResponseSize
 	if maxResponseSize == 0 {
