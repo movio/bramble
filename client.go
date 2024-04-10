@@ -146,7 +146,7 @@ func (c *GraphQLClient) Request(ctx context.Context, url string, request *Reques
 	}
 
 	httpReq.Header.Set("Content-Type", "application/json; charset=utf-8")
-	httpReq.Header.Set("Accept", "application/json; charset=utf-8")
+	httpReq.Header.Set("Accept", "application/json")
 
 	if c.UserAgent != "" {
 		httpReq.Header.Set("User-Agent", c.UserAgent)
