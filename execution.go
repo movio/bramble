@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/vektah/gqlparser/v2/ast"
 	"github.com/vektah/gqlparser/v2/gqlerror"
@@ -56,9 +57,15 @@ func (q *queryExecution) Execute(queryPlan *QueryPlan) ([]executionResult, gqler
 
 	for _, step := range queryPlan.RootSteps {
 		if step.ServiceURL == internalServiceName {
+			reqStart := time.Now()
 			r, err := executeBrambleStep(step)
 			if err != nil {
 				return nil, q.createGQLErrors(step, err)
+			}
+			step.executionResult = &executionStepResult{
+				executed:  true,
+				error:     err,
+				timeTaken: time.Since(reqStart),
 			}
 			results = append(results, *r)
 			continue
@@ -92,6 +99,7 @@ func (q *queryExecution) Execute(queryPlan *QueryPlan) ([]executionResult, gqler
 
 func (q *queryExecution) executeRootStep(step *QueryPlanStep) error {
 	var document string
+	reqStart := time.Now()
 
 	var variables map[string]interface{}
 	switch step.ParentType {
@@ -109,12 +117,16 @@ func (q *queryExecution) executeRootStep(step *QueryPlanStep) error {
 
 	var data map[string]interface{}
 	err := q.graphqlClient.Request(q.ctx, step.ServiceURL, req, &data)
-	if err != nil {
-		q.writeExecutionResult(step, data, err)
-		return nil
+	q.writeExecutionResult(step, data, err)
+	step.executionResult = &executionStepResult{
+		executed:  true,
+		error:     err,
+		timeTaken: time.Since(reqStart),
 	}
 
-	q.writeExecutionResult(step, data, nil)
+	if err != nil {
+		return nil
+	}
 
 	for _, childStep := range step.Then {
 		boundaryIDs, err := extractAndDedupeBoundaryIDs(data, childStep.InsertionPoint, childStep.ParentType)
@@ -151,6 +163,7 @@ func (q *queryExecution) executeChildStep(step *QueryPlanStep, boundaryIDs []str
 	if newRequestCount > q.maxRequest {
 		return fmt.Errorf("exceeded max requests of %v", q.maxRequest)
 	}
+	reqStart := time.Now()
 
 	boundaryField, err := q.boundaryFields.Field(step.ServiceURL, step.ParentType)
 	if err != nil {
@@ -163,12 +176,16 @@ func (q *queryExecution) executeChildStep(step *QueryPlanStep, boundaryIDs []str
 	}
 
 	data, err := q.executeBoundaryQuery(documents, step.ServiceURL, variables, boundaryField)
-	if err != nil {
-		q.writeExecutionResult(step, data, err)
-		return nil
+	q.writeExecutionResult(step, data, err)
+	step.executionResult = &executionStepResult{
+		executed:  true,
+		error:     err,
+		timeTaken: time.Since(reqStart),
 	}
 
-	q.writeExecutionResult(step, data, nil)
+	if err != nil {
+		return nil
+	}
 
 	nonNilBoundaryResults := extractNonNilBoundaryResults(data)
 

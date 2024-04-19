@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/vektah/gqlparser/v2/ast"
@@ -19,6 +20,32 @@ type QueryPlanStep struct {
 	SelectionSet   ast.SelectionSet
 	InsertionPoint []string
 	Then           []*QueryPlanStep
+
+	executionResult *executionStepResult
+}
+
+type executionStepResult struct {
+	executed  bool
+	error     error
+	timeTaken time.Duration
+}
+
+func (e *executionStepResult) MarshalJSON() ([]byte, error) {
+	type toMarshal struct {
+		Executed  bool
+		Error     error `json:",omitempty"`
+		TimeTaken string
+	}
+	j := toMarshal{
+		Executed:  e.executed,
+		TimeTaken: e.timeTaken.String(),
+	}
+
+	if e.error != nil {
+		j.Error = e.error
+	}
+
+	return json.Marshal(&j)
 }
 
 // MarshalJSON marshals the step the JSON
@@ -26,19 +53,27 @@ func (s *QueryPlanStep) MarshalJSON() ([]byte, error) {
 	ctx := graphql.WithOperationContext(context.Background(), &graphql.OperationContext{
 		Variables: map[string]interface{}{},
 	})
-	return json.Marshal(&struct {
-		ServiceURL     string
-		ParentType     string
-		SelectionSet   string
-		InsertionPoint []string
-		Then           []*QueryPlanStep
-	}{
+	type toMarshal struct {
+		ServiceURL          string
+		ParentType          string
+		SelectionSet        string
+		InsertionPoint      []string
+		ExecutionStepResult *executionStepResult `json:",omitempty"`
+		Then                []*QueryPlanStep
+	}
+	j := toMarshal{
 		ServiceURL:     s.ServiceURL,
 		ParentType:     s.ParentType,
 		SelectionSet:   formatSelectionSetSingleLine(ctx, nil, s.SelectionSet),
 		InsertionPoint: s.InsertionPoint,
 		Then:           s.Then,
-	})
+	}
+
+	if s.executionResult != nil {
+		j.ExecutionStepResult = s.executionResult
+	}
+
+	return json.Marshal(&j)
 }
 
 // QueryPlan is a query execution plan
