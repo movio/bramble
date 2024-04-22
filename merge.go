@@ -285,22 +285,19 @@ func mergeNamespaceObjects(aTypes, bTypes map[string]*ast.Definition, a, b *ast.
 }
 
 func mergeBoundaryObjects(a, b *ast.Definition) (*ast.Definition, error) {
-	result := &ast.Definition{
-		Kind:        ast.Object,
-		Description: mergeDescriptions(a, b),
-		Name:        a.Name,
-		Directives:  a.Directives.ForNames(boundaryDirectiveName),
-		Interfaces:  append(a.Interfaces, b.Interfaces...),
-		Fields:      nil,
-	}
-
 	mergedFields, err := mergeBoundaryObjectFields(a, b)
 	if err != nil {
 		return nil, err
 	}
 
-	result.Fields = mergedFields
-	return result, nil
+	return &ast.Definition{
+		Kind:        ast.Object,
+		Description: mergeDescriptions(a, b),
+		Name:        a.Name,
+		Directives:  a.Directives.ForNames(boundaryDirectiveName),
+		Interfaces:  append(a.Interfaces, b.Interfaces...),
+		Fields:      mergedFields,
+	}, nil
 }
 
 func mergeBoundaryObjectFields(a, b *ast.Definition) (ast.FieldList, error) {
