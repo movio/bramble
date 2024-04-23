@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/vektah/gqlparser/v2/ast"
@@ -19,6 +20,26 @@ type QueryPlanStep struct {
 	SelectionSet   ast.SelectionSet
 	InsertionPoint []string
 	Then           []*QueryPlanStep
+
+	executionResult *executionStepResult
+}
+
+type executionStepResult struct {
+	executed  bool
+	error     error
+	timeTaken time.Duration
+}
+
+func (e *executionStepResult) MarshalJSON() ([]byte, error) {
+	return json.Marshal(&struct {
+		Executed  bool
+		Error     error `json:",omitempty"`
+		TimeTaken string
+	}{
+		Executed:  e.executed,
+		TimeTaken: e.timeTaken.String(),
+		Error:     e.error,
+	})
 }
 
 // MarshalJSON marshals the step the JSON
@@ -27,17 +48,19 @@ func (s *QueryPlanStep) MarshalJSON() ([]byte, error) {
 		Variables: map[string]interface{}{},
 	})
 	return json.Marshal(&struct {
-		ServiceURL     string
-		ParentType     string
-		SelectionSet   string
-		InsertionPoint []string
-		Then           []*QueryPlanStep
+		ServiceURL          string
+		ParentType          string
+		SelectionSet        string
+		InsertionPoint      []string
+		ExecutionStepResult *executionStepResult `json:",omitempty"`
+		Then                []*QueryPlanStep
 	}{
-		ServiceURL:     s.ServiceURL,
-		ParentType:     s.ParentType,
-		SelectionSet:   formatSelectionSetSingleLine(ctx, nil, s.SelectionSet),
-		InsertionPoint: s.InsertionPoint,
-		Then:           s.Then,
+		ServiceURL:          s.ServiceURL,
+		ParentType:          s.ParentType,
+		SelectionSet:        formatSelectionSetSingleLine(ctx, nil, s.SelectionSet),
+		InsertionPoint:      s.InsertionPoint,
+		Then:                s.Then,
+		ExecutionStepResult: s.executionResult,
 	})
 }
 
