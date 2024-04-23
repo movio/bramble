@@ -31,17 +31,15 @@ type executionStepResult struct {
 }
 
 func (e *executionStepResult) MarshalJSON() ([]byte, error) {
-	type toMarshal struct {
+	return json.Marshal(&struct {
 		Executed  bool
 		Error     error `json:",omitempty"`
 		TimeTaken string
-	}
-	j := toMarshal{
+	}{
 		Executed:  e.executed,
 		TimeTaken: e.timeTaken.String(),
 		Error:     e.error,
-	}
-	return json.Marshal(&j)
+	})
 }
 
 // MarshalJSON marshals the step the JSON
@@ -49,24 +47,21 @@ func (s *QueryPlanStep) MarshalJSON() ([]byte, error) {
 	ctx := graphql.WithOperationContext(context.Background(), &graphql.OperationContext{
 		Variables: map[string]interface{}{},
 	})
-	type toMarshal struct {
+	return json.Marshal(&struct {
 		ServiceURL          string
 		ParentType          string
 		SelectionSet        string
 		InsertionPoint      []string
 		ExecutionStepResult *executionStepResult `json:",omitempty"`
 		Then                []*QueryPlanStep
-	}
-	j := toMarshal{
+	}{
 		ServiceURL:          s.ServiceURL,
 		ParentType:          s.ParentType,
 		SelectionSet:        formatSelectionSetSingleLine(ctx, nil, s.SelectionSet),
 		InsertionPoint:      s.InsertionPoint,
 		Then:                s.Then,
 		ExecutionStepResult: s.executionResult,
-	}
-
-	return json.Marshal(&j)
+	})
 }
 
 // QueryPlan is a query execution plan
