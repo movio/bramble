@@ -185,7 +185,7 @@ func mergeTypes(a, b map[string]*ast.Definition) (map[string]*ast.Definition, er
 			continue
 		}
 
-		mergedBoundaryObject, err := mergeBoundaryObjects(a, b, &newVB, va)
+		mergedBoundaryObject, err := mergeBoundaryObjects(&newVB, va)
 		if err != nil {
 			return nil, err
 		}
@@ -284,26 +284,23 @@ func mergeNamespaceObjects(aTypes, bTypes map[string]*ast.Definition, a, b *ast.
 	}, nil
 }
 
-func mergeBoundaryObjects(aTypes, bTypes map[string]*ast.Definition, a, b *ast.Definition) (*ast.Definition, error) {
-	result := &ast.Definition{
+func mergeBoundaryObjects(a, b *ast.Definition) (*ast.Definition, error) {
+	mergedFields, err := mergeBoundaryObjectFields(a, b)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ast.Definition{
 		Kind:        ast.Object,
 		Description: mergeDescriptions(a, b),
 		Name:        a.Name,
 		Directives:  a.Directives.ForNames(boundaryDirectiveName),
 		Interfaces:  append(a.Interfaces, b.Interfaces...),
-		Fields:      nil,
-	}
-
-	mergedFields, err := mergeBoundaryObjectFields(aTypes, bTypes, a, b)
-	if err != nil {
-		return nil, err
-	}
-
-	result.Fields = mergedFields
-	return result, nil
+		Fields:      mergedFields,
+	}, nil
 }
 
-func mergeBoundaryObjectFields(aTypes, bTypes map[string]*ast.Definition, a, b *ast.Definition) (ast.FieldList, error) {
+func mergeBoundaryObjectFields(a, b *ast.Definition) (ast.FieldList, error) {
 	var result ast.FieldList
 	for _, f := range a.Fields {
 		if isQueryType(a) && (isNodeField(f) || isServiceField(f)) {
