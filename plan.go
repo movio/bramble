@@ -39,12 +39,8 @@ func (e *executionStepResult) MarshalJSON() ([]byte, error) {
 	j := toMarshal{
 		Executed:  e.executed,
 		TimeTaken: e.timeTaken.String(),
+		Error:     e.error,
 	}
-
-	if e.error != nil {
-		j.Error = e.error
-	}
-
 	return json.Marshal(&j)
 }
 
@@ -62,15 +58,12 @@ func (s *QueryPlanStep) MarshalJSON() ([]byte, error) {
 		Then                []*QueryPlanStep
 	}
 	j := toMarshal{
-		ServiceURL:     s.ServiceURL,
-		ParentType:     s.ParentType,
-		SelectionSet:   formatSelectionSetSingleLine(ctx, nil, s.SelectionSet),
-		InsertionPoint: s.InsertionPoint,
-		Then:           s.Then,
-	}
-
-	if s.executionResult != nil {
-		j.ExecutionStepResult = s.executionResult
+		ServiceURL:          s.ServiceURL,
+		ParentType:          s.ParentType,
+		SelectionSet:        formatSelectionSetSingleLine(ctx, nil, s.SelectionSet),
+		InsertionPoint:      s.InsertionPoint,
+		Then:                s.Then,
+		ExecutionStepResult: s.executionResult,
 	}
 
 	return json.Marshal(&j)
