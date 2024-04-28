@@ -53,6 +53,10 @@ func (g *Gateway) Router(cfg *Config) http.Handler {
 		gatewayHandler.Use(extension.Introspection{})
 	}
 
+	for _, plugin := range g.plugins {
+		plugin.SetupGatewayHandler(gatewayHandler)
+	}
+
 	mux.Handle("/query", applyMiddleware(otelhttp.NewHandler(gatewayHandler, "/query"), debugMiddleware))
 
 	for _, plugin := range g.plugins {
