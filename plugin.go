@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/99designs/gqlgen/graphql"
+	"github.com/99designs/gqlgen/graphql/handler"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -20,6 +21,7 @@ type Plugin interface {
 	// Init is called once on initialization
 	Init(schema *ExecutableSchema)
 	SetupPublicMux(mux *http.ServeMux)
+	SetupGatewayHandler(handler *handler.Server)
 	SetupPrivateMux(mux *http.ServeMux)
 	// Should return true and the query path if the plugin is a service that
 	// should be federated by Bramble
@@ -43,6 +45,8 @@ func (p *BasePlugin) Configure(*Config, json.RawMessage) error {
 
 // Init ...
 func (p *BasePlugin) Init(s *ExecutableSchema) {}
+
+func (p *BasePlugin) SetupGatewayHandler(handler *handler.Server) {}
 
 // SetupPublicMux ...
 func (p *BasePlugin) SetupPublicMux(mux *http.ServeMux) {}
