@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/99designs/gqlgen/graphql"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -100,5 +101,38 @@ func TestGraphqlClient(t *testing.T) {
 		err := c.Request(context.Background(), srv.URL, &Request{}, &res)
 		require.Error(t, err)
 		assert.Equal(t, "response exceeded maximum size of 1 bytes", err.Error())
+	})
+}
+func TestParseMultipartVariables(t *testing.T) {
+	nestedMap := map[string]any{
+		"node1": map[string]any{
+			"node11": map[string]any{
+				"leaf111": graphql.Upload{},
+				"leaf112": "someThing",
+				"node113": map[string]any{"leaf1131": graphql.Upload{}},
+			},
+			"leaf12": 42,
+			"leaf13": graphql.Upload{},
+		},
+		"node2": map[string]any{
+			"leaf21": false,
+			"node21": map[string]any{
+				"leaf211": &graphql.Upload{},
+			},
+		},
+	}
+
+	t.Run("parseMultipartVariables", func(t *testing.T) {
+		res := parseMultipartVariables(nestedMap)
+		assert.Equal(
+			t,
+			map[string][]string{
+				"file3": {"variables.node1.node11.node113.leaf1131"},
+				"file2": {"variables.node1.node11.leaf111"},
+				"file1": {"variables.node1.leaf13"},
+				"file0": {"variables.node2.node21.leaf211"},
+			},
+			res.fileMap,
+		)
 	})
 }

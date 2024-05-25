@@ -8,11 +8,13 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"mime/multipart"
 	"net/http"
 	"os"
 	"strings"
 	"time"
 
+	"github.com/99designs/gqlgen/graphql"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/vektah/gqlparser/v2/ast"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
@@ -132,8 +134,19 @@ func (c *GraphQLClient) Request(ctx context.Context, url string, request *Reques
 	}
 
 	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(request); err != nil {
-		return traceErr(fmt.Errorf("unable to encode request body: %w", err))
+	contentType := "application/json; charset=utf-8"
+	if ct := request.Headers.Get("Content-Type"); !strings.Contains(ct, "multipart") {
+		err := json.NewEncoder(&buf).Encode(request)
+		if err != nil {
+			return fmt.Errorf("unable to encode request body: %w", err)
+		}
+	} else {
+		mpt, err := prepareMultipartData(request)
+		if err != nil {
+			return fmt.Errorf("unable to encode request body: %w", err)
+		}
+		buf = mpt.buf
+		contentType = mpt.contentType
 	}
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, &buf)
@@ -145,7 +158,7 @@ func (c *GraphQLClient) Request(ctx context.Context, url string, request *Reques
 		httpReq.Header = request.Headers.Clone()
 	}
 
-	httpReq.Header.Set("Content-Type", "application/json; charset=utf-8")
+	httpReq.Header.Set("Content-Type", contentType)
 	httpReq.Header.Set("Accept", "application/json")
 
 	if c.UserAgent != "" {
@@ -274,4 +287,105 @@ func (e GraphqlErrors) Error() string {
 
 func GenerateUserAgent(operation string) string {
 	return fmt.Sprintf("Bramble/%s (%s)", Version, operation)
+}
+
+type parseMultipartVariablesResult struct {
+	fileMap map[string][]string
+	files   map[string]graphql.Upload
+	m       map[string]any
+}
+
+type parseMultipartVariablesStackItem struct {
+	key  string
+	path string
+	data map[string]interface{}
+}
+
+func parseMultipartVariables(variables map[string]any) parseMultipartVariablesResult {
+	stack := []parseMultipartVariablesStackItem{{key: "", data: variables}}
+
+	index := 0
+	fileMap := map[string][]string{}
+	files := map[string]graphql.Upload{}
+	for len(stack) > 0 {
+		currentItem := stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
+
+		for key, value := range currentItem.data {
+			var currentPath string
+			if currentItem.path == "" {
+				currentPath = key
+			} else {
+				currentPath = currentItem.path + "." + key
+			}
+
+			switch v := value.(type) {
+			case graphql.Upload:
+				currentItem.data[key] = nil
+				fileIndex := fmt.Sprintf("file%d", index)
+				fileMap[fileIndex] = []string{fmt.Sprintf("variables.%s", currentPath)}
+				index += 1
+				files[fileIndex] = v
+			case *graphql.Upload:
+				currentItem.data[key] = nil
+				fileIndex := fmt.Sprintf("file%d", index)
+				fileMap[fileIndex] = []string{fmt.Sprintf("variables.%s", currentPath)}
+				index += 1
+				files[fileIndex] = *v
+			case map[string]any:
+				stack = append(stack, parseMultipartVariablesStackItem{key: key, data: v, path: currentPath})
+			default:
+			}
+		}
+	}
+	return parseMultipartVariablesResult{
+		fileMap: fileMap,
+		files:   files,
+		m:       variables,
+	}
+}
+
+type prepareMultipartDataResult struct {
+	buf         bytes.Buffer
+	contentType string
+}
+
+func prepareMultipartData(request *Request) (*prepareMultipartDataResult, error) {
+	res := parseMultipartVariables(request.Variables)
+
+	var fw io.Writer
+	var buf bytes.Buffer
+	mpw := multipart.NewWriter(&buf)
+	fw, err := mpw.CreateFormField("operations")
+	if err != nil {
+		return nil, err
+	}
+	input, err := json.Marshal(request)
+	if err != nil {
+		return nil, err
+	}
+	fw.Write(input)
+	fw, err = mpw.CreateFormField("map")
+	if err != nil {
+		return nil, err
+	}
+	for fileIndex, path := range res.fileMap {
+		fw.Write([]byte(fmt.Sprintf(
+			"{\"%s\": [\"%s\"]}", fileIndex, path[0],
+		)))
+		fw, fileErr := mpw.CreateFormFile(fileIndex, res.files[fileIndex].Filename)
+		if fileErr != nil {
+			return nil, fileErr
+		}
+		io.Copy(fw, res.files[fileIndex].File)
+	}
+	err = mpw.Close()
+	if err != nil {
+		return nil, err
+	}
+	contentType := mpw.FormDataContentType()
+	return &prepareMultipartDataResult{
+		buf:         buf,
+		contentType: contentType,
+	}, nil
 }
