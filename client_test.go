@@ -103,7 +103,7 @@ func TestGraphqlClient(t *testing.T) {
 		assert.Equal(t, "response exceeded maximum size of 1 bytes", err.Error())
 	})
 }
-func TestParseMultipartVariables(t *testing.T) {
+func TestMultipartClient(t *testing.T) {
 	nestedMap := map[string]any{
 		"node1": map[string]any{
 			"node11": map[string]any{
@@ -155,5 +155,27 @@ func TestParseMultipartVariables(t *testing.T) {
 			},
 			res.m,
 		)
+	})
+
+	t.Run("multipart request", func(t *testing.T) {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Write([]byte(`{ "data": {"root": "multipart response"} }`))
+		}))
+
+		c := NewClient()
+		req := &Request{Headers: make(http.Header)}
+		req.Headers.Set("Content-Type", "multipart/form-data")
+
+		var res struct {
+			Root string
+		}
+		err := c.Request(
+			context.Background(),
+			srv.URL,
+			req,
+			&res,
+		)
+		require.NoError(t, err)
+		assert.Equal(t, "multipart response", res.Root)
 	})
 }
