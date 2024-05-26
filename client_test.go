@@ -134,5 +134,26 @@ func TestParseMultipartVariables(t *testing.T) {
 			},
 			res.fileMap,
 		)
+		assert.Equal(
+			t,
+			map[string]any{
+				"node1": map[string]any{
+					"node11": map[string]any{
+						"leaf111": nil,
+						"leaf112": "someThing",
+						"node113": map[string]any{"leaf1131": nil},
+					},
+					"leaf12": 42,
+					"leaf13": nil,
+				},
+				"node2": map[string]any{
+					"leaf21": false,
+					"node21": map[string]any{
+						"leaf211": nil,
+					},
+				},
+			},
+			res.m,
+		)
 	})
 }

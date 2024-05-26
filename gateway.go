@@ -48,7 +48,7 @@ func (g *Gateway) Router(cfg *Config) http.Handler {
 	gatewayHandler.AddTransport(transport.Options{})
 	gatewayHandler.AddTransport(transport.GET{})
 	gatewayHandler.AddTransport(transport.POST{})
-    gatewayHandler.AddTransport(transport.MultipartForm{
+	gatewayHandler.AddTransport(transport.MultipartForm{
 		MaxUploadSize: cfg.MaxFileUploadSize,
 	})
 	if !cfg.DisableIntrospection {
