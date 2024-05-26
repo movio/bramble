@@ -50,12 +50,9 @@ func (e *event) addFields(fields EventFields) {
 
 func (e *event) finish() {
 	e.writeLock.Do(func() {
-		log.WithFields(log.Fields{
-			"timestamp": e.timestamp.Format(time.RFC3339Nano),
-			"duration":  time.Since(e.timestamp).String(),
-		}).Info(e.name)
-		// log fields with "debug" by default, because we do not want to log the whole body in case of file upload
-		log.WithFields(log.Fields(e.fields)).Debug(e.name)
+		log.WithField("duration", time.Since(e.timestamp).String()).
+			WithFields(log.Fields(e.fields)).
+			Info(e.name)
 	})
 }
 
