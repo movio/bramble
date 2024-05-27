@@ -1,6 +1,14 @@
 {
   "plugins": [
     {
+      "name": "headers",
+      "config": {
+        "allowed-headers": [
+          "Content-Type"
+        ]
+      }
+    },
+    {
       "name": "limits",
       "config": {
         "max-request-bytes": 1048576,
