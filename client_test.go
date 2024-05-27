@@ -120,20 +120,25 @@ func TestMultipartClient(t *testing.T) {
 				"leaf211": &graphql.Upload{},
 			},
 		},
+		"node3": graphql.Upload{},
 	}
 
 	t.Run("parseMultipartVariables", func(t *testing.T) {
 		res := parseMultipartVariables(nestedMap)
-		assert.Equal(
-			t,
-			map[string][]string{
-				"file3": {"variables.node1.node11.node113.leaf1131"},
-				"file2": {"variables.node1.node11.leaf111"},
-				"file1": {"variables.node1.leaf13"},
-				"file0": {"variables.node2.node21.leaf211"},
-			},
-			res.fileMap,
-		)
+		fileMapKeys := []string{}
+		fileMapValues := []string{}
+		for k, v := range res.fileMap {
+			fileMapKeys = append(fileMapKeys, k)
+			fileMapValues = append(fileMapValues, v...)
+		}
+		assert.ElementsMatch(t, fileMapKeys, []string{"file0", "file1", "file2", "file3", "file4"})
+		assert.ElementsMatch(t, fileMapValues, []string{
+			"variables.node1.node11.node113.leaf1131",
+			"variables.node1.node11.leaf111",
+			"variables.node1.leaf13",
+			"variables.node2.node21.leaf211",
+			"variables.node3",
+		})
 		assert.Equal(
 			t,
 			map[string]any{
@@ -152,6 +157,7 @@ func TestMultipartClient(t *testing.T) {
 						"leaf211": nil,
 					},
 				},
+				"node3": nil,
 			},
 			res.m,
 		)

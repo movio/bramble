@@ -135,7 +135,11 @@ func (c *GraphQLClient) Request(ctx context.Context, url string, request *Reques
 
 	var buf bytes.Buffer
 	contentType := "application/json; charset=utf-8"
-	if ct := request.Headers.Get("Content-Type"); !strings.Contains(ct, "multipart") {
+	requestContentType := ""
+	if request.Headers != nil {
+		requestContentType = request.Headers.Get("Content-Type")
+	}
+	if !strings.Contains(requestContentType, "multipart") {
 		err := json.NewEncoder(&buf).Encode(request)
 		if err != nil {
 			return fmt.Errorf("unable to encode request body: %w", err)
