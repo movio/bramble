@@ -139,18 +139,18 @@ func (c *GraphQLClient) Request(ctx context.Context, url string, request *Reques
 	if request.Headers != nil {
 		requestContentType = request.Headers.Get("Content-Type")
 	}
-	if !strings.Contains(requestContentType, "multipart") {
-		err := json.NewEncoder(&buf).Encode(request)
-		if err != nil {
-			return fmt.Errorf("unable to encode request body: %w", err)
-		}
-	} else {
+	if strings.HasPrefix(requestContentType, "multipart/form-data") {
 		mpt, err := prepareMultipartData(request)
 		if err != nil {
 			return fmt.Errorf("unable to encode request body: %w", err)
 		}
 		buf = mpt.buf
 		contentType = mpt.contentType
+	} else {
+		err := json.NewEncoder(&buf).Encode(request)
+		if err != nil {
+			return fmt.Errorf("unable to encode request body: %w", err)
+		}
 	}
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, &buf)
