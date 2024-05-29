@@ -364,31 +364,15 @@ func prepareMultipartData(request *Request) (*prepareMultipartDataResult, error)
 	if err != nil {
 		return nil, err
 	}
-	input, err := json.Marshal(request)
-	if err != nil {
-		return nil, err
-	}
-	_, err = fw.Write(input)
-	if err != nil {
+
+	if err = json.NewEncoder(fw).Encode(request); err != nil {
 		return nil, err
 	}
 	fw, err = mpw.CreateFormField("map")
 	if err != nil {
 		return nil, err
 	}
-	fileMapEntries := []string{}
-	for fileIndex, path := range res.fileMap {
-		fileMapEntries = append(fileMapEntries,
-			fmt.Sprintf(
-				"\"%s\": [\"%s\"]", fileIndex, strings.Join(path, "\",\""),
-			),
-		)
-	}
-	_, err = fw.Write([]byte(fmt.Sprintf(
-		"{%s}",
-		strings.Join(fileMapEntries, ","),
-	)))
-	if err != nil {
+	if err = json.NewEncoder(fw).Encode(res.fileMap); err != nil {
 		return nil, err
 	}
 	for fileIndex := range res.fileMap {
