@@ -368,20 +368,43 @@ func prepareMultipartData(request *Request) (*prepareMultipartDataResult, error)
 	if err != nil {
 		return nil, err
 	}
-	fw.Write(input)
+	_, err = fw.Write(input)
+	if err != nil {
+		return nil, err
+	}
 	fw, err = mpw.CreateFormField("map")
 	if err != nil {
 		return nil, err
 	}
+	_, err = fw.Write([]byte("{"))
+	if err != nil {
+		return nil, err
+	}
+	fileMapEntries := []string{}
 	for fileIndex, path := range res.fileMap {
-		fw.Write([]byte(fmt.Sprintf(
-			"{\"%s\": [\"%s\"]}", fileIndex, path[0],
-		)))
-		fw, fileErr := mpw.CreateFormFile(fileIndex, res.files[fileIndex].Filename)
+		fileMapEntries = append(fileMapEntries,
+			fmt.Sprintf(
+				"\"%s\": [\"%s\"]", fileIndex, path[0],
+			),
+		)
+	}
+	_, err = fw.Write([]byte(strings.Join(fileMapEntries, ",")))
+	if err != nil {
+		return nil, err
+	}
+	_, err = fw.Write([]byte("}"))
+	if err != nil {
+		return nil, err
+	}
+	for fileIndex := range res.fileMap {
+		innerFw, fileErr := mpw.CreateFormFile(fileIndex, res.files[fileIndex].Filename)
 		if fileErr != nil {
 			return nil, fileErr
 		}
-		io.Copy(fw, res.files[fileIndex].File)
+		_, ioErr := io.Copy(innerFw, res.files[fileIndex].File)
+		if ioErr != nil {
+			return nil, ioErr
+		}
 	}
 	err = mpw.Close()
 	if err != nil {
