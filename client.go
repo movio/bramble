@@ -376,23 +376,18 @@ func prepareMultipartData(request *Request) (*prepareMultipartDataResult, error)
 	if err != nil {
 		return nil, err
 	}
-	_, err = fw.Write([]byte("{"))
-	if err != nil {
-		return nil, err
-	}
 	fileMapEntries := []string{}
 	for fileIndex, path := range res.fileMap {
 		fileMapEntries = append(fileMapEntries,
 			fmt.Sprintf(
-				"\"%s\": [\"%s\"]", fileIndex, path[0],
+				"\"%s\": [\"%s\"]", fileIndex, strings.Join(path, "\",\""),
 			),
 		)
 	}
-	_, err = fw.Write([]byte(strings.Join(fileMapEntries, ",")))
-	if err != nil {
-		return nil, err
-	}
-	_, err = fw.Write([]byte("}"))
+	_, err = fw.Write([]byte(fmt.Sprintf(
+		"{%s}",
+		strings.Join(fileMapEntries, ","),
+	)))
 	if err != nil {
 		return nil, err
 	}
