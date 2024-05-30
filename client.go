@@ -370,18 +370,17 @@ func prepareUploadsFromVariables(variables map[string]any) (map[string]graphql.U
 			currentPath := currentItem.path + "." + key
 
 			switch v := value.(type) {
-			case graphql.Upload:
+			case graphql.Upload, *graphql.Upload:
 				currentItem.data[key] = nil
 				fileIndex := fmt.Sprintf("file%d", index)
 				fileMap[fileIndex] = []string{currentPath}
 				index += 1
-				files[fileIndex] = v
-			case *graphql.Upload:
-				currentItem.data[key] = nil
-				fileIndex := fmt.Sprintf("file%d", index)
-				fileMap[fileIndex] = []string{currentPath}
-				index += 1
-				files[fileIndex] = *v
+				switch v := v.(type) {
+				case graphql.Upload:
+					files[fileIndex] = v
+				case *graphql.Upload:
+					files[fileIndex] = *v
+				}
 			case map[string]any:
 				stack = append(stack, stackItem{data: v, path: currentPath})
 			default:
