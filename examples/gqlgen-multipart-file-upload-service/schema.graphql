@@ -40,6 +40,6 @@ type Mutation {
   Mutation to upload file using multipart request spec:
   https://github.com/jaydenseric/graphql-multipart-request-spec.
   """
-  uploadGizmoFile(upload: Upload!): String
-  uploadGadgetFile(upload: GadgetInput!): String
+  uploadGizmoFile(upload: Upload!): String!
+  uploadGadgetFile(upload: GadgetInput!): String!
 }
