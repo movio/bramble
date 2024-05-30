@@ -134,18 +134,17 @@ func (c *GraphQLClient) Request(ctx context.Context, url string, request *Reques
 	}
 
 	var buf bytes.Buffer
+	var err error
 	contentType := "application/json; charset=utf-8"
 	requestContentType := ""
 	if request.Headers != nil {
 		requestContentType = request.Headers.Get("Content-Type")
 	}
 	if strings.HasPrefix(requestContentType, "multipart/form-data") {
-		mpt, err := prepareMultipartData(request)
+		buf, contentType, err = prepareMultipartData(request)
 		if err != nil {
 			return fmt.Errorf("unable to encode request body: %w", err)
 		}
-		buf = mpt.buf
-		contentType = mpt.contentType
 	} else {
 		err := json.NewEncoder(&buf).Encode(request)
 		if err != nil {
@@ -349,12 +348,7 @@ func parseMultipartVariables(variables map[string]any) parseMultipartVariablesRe
 	}
 }
 
-type prepareMultipartDataResult struct {
-	buf         bytes.Buffer
-	contentType string
-}
-
-func prepareMultipartData(request *Request) (*prepareMultipartDataResult, error) {
+func prepareMultipartData(request *Request) (bytes.Buffer, string, error) {
 	res := parseMultipartVariables(request.Variables)
 
 	var fw io.Writer
@@ -362,36 +356,33 @@ func prepareMultipartData(request *Request) (*prepareMultipartDataResult, error)
 	mpw := multipart.NewWriter(&buf)
 	fw, err := mpw.CreateFormField("operations")
 	if err != nil {
-		return nil, err
+		return buf, "", err
 	}
 
 	if err = json.NewEncoder(fw).Encode(request); err != nil {
-		return nil, err
+		return buf, "", err
 	}
 	fw, err = mpw.CreateFormField("map")
 	if err != nil {
-		return nil, err
+		return buf, "", err
 	}
 	if err = json.NewEncoder(fw).Encode(res.fileMap); err != nil {
-		return nil, err
+		return buf, "", err
 	}
 	for fileIndex := range res.fileMap {
 		innerFw, fileErr := mpw.CreateFormFile(fileIndex, res.files[fileIndex].Filename)
 		if fileErr != nil {
-			return nil, fileErr
+			return buf, "", fileErr
 		}
 		_, ioErr := io.Copy(innerFw, res.files[fileIndex].File)
 		if ioErr != nil {
-			return nil, ioErr
+			return buf, "", ioErr
 		}
 	}
 	err = mpw.Close()
 	if err != nil {
-		return nil, err
+		return buf, "", err
 	}
 	contentType := mpw.FormDataContentType()
-	return &prepareMultipartDataResult{
-		buf:         buf,
-		contentType: contentType,
-	}, nil
+	return buf, contentType, nil
 }
