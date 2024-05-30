@@ -292,14 +292,13 @@ func GenerateUserAgent(operation string) string {
 	return fmt.Sprintf("Bramble/%s (%s)", Version, operation)
 }
 
-type parseMultipartVariablesStackItem struct {
-	key  string
-	path string
-	data map[string]interface{}
-}
-
 func prepareUploadsFromVariables(variables map[string]any) (map[string]graphql.Upload, map[string][]string) {
-	stack := []parseMultipartVariablesStackItem{{key: "", data: variables}}
+	type stackItem struct {
+		path string
+		data map[string]interface{}
+	}
+
+	stack := []stackItem{{path: "variables", data: variables}}
 
 	index := 0
 	fileMap := map[string][]string{}
@@ -309,28 +308,23 @@ func prepareUploadsFromVariables(variables map[string]any) (map[string]graphql.U
 		stack = stack[:len(stack)-1]
 
 		for key, value := range currentItem.data {
-			var currentPath string
-			if currentItem.path == "" {
-				currentPath = key
-			} else {
-				currentPath = currentItem.path + "." + key
-			}
+			currentPath := currentItem.path + "." + key
 
 			switch v := value.(type) {
 			case graphql.Upload:
 				currentItem.data[key] = nil
 				fileIndex := fmt.Sprintf("file%d", index)
-				fileMap[fileIndex] = []string{fmt.Sprintf("variables.%s", currentPath)}
+				fileMap[fileIndex] = []string{currentPath}
 				index += 1
 				files[fileIndex] = v
 			case *graphql.Upload:
 				currentItem.data[key] = nil
 				fileIndex := fmt.Sprintf("file%d", index)
-				fileMap[fileIndex] = []string{fmt.Sprintf("variables.%s", currentPath)}
+				fileMap[fileIndex] = []string{currentPath}
 				index += 1
 				files[fileIndex] = *v
 			case map[string]any:
-				stack = append(stack, parseMultipartVariablesStackItem{key: key, data: v, path: currentPath})
+				stack = append(stack, stackItem{data: v, path: currentPath})
 			default:
 			}
 		}
