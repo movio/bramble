@@ -124,10 +124,10 @@ func TestMultipartClient(t *testing.T) {
 	}
 
 	t.Run("parseMultipartVariables", func(t *testing.T) {
-		res := parseMultipartVariables(nestedMap)
+		_, fileMap := prepareUploadsFromVariables(nestedMap)
 		fileMapKeys := []string{}
 		fileMapValues := []string{}
-		for k, v := range res.fileMap {
+		for k, v := range fileMap {
 			fileMapKeys = append(fileMapKeys, k)
 			fileMapValues = append(fileMapValues, v...)
 		}
@@ -159,7 +159,7 @@ func TestMultipartClient(t *testing.T) {
 				},
 				"node3": nil,
 			},
-			res.m,
+			nestedMap,
 		)
 	})
 

@@ -141,7 +141,7 @@ func (c *GraphQLClient) Request(ctx context.Context, url string, request *Reques
 		requestContentType = request.Headers.Get("Content-Type")
 	}
 	if strings.HasPrefix(requestContentType, "multipart/form-data") {
-		buf, contentType, err = prepareMultipartData(request)
+		buf, contentType, err = prepareMultipartBody(request)
 		if err != nil {
 			return fmt.Errorf("unable to encode request body: %w", err)
 		}
@@ -292,19 +292,13 @@ func GenerateUserAgent(operation string) string {
 	return fmt.Sprintf("Bramble/%s (%s)", Version, operation)
 }
 
-type parseMultipartVariablesResult struct {
-	fileMap map[string][]string
-	files   map[string]graphql.Upload
-	m       map[string]any
-}
-
 type parseMultipartVariablesStackItem struct {
 	key  string
 	path string
 	data map[string]interface{}
 }
 
-func parseMultipartVariables(variables map[string]any) parseMultipartVariablesResult {
+func prepareUploadsFromVariables(variables map[string]any) (map[string]graphql.Upload, map[string][]string) {
 	stack := []parseMultipartVariablesStackItem{{key: "", data: variables}}
 
 	index := 0
@@ -341,15 +335,11 @@ func parseMultipartVariables(variables map[string]any) parseMultipartVariablesRe
 			}
 		}
 	}
-	return parseMultipartVariablesResult{
-		fileMap: fileMap,
-		files:   files,
-		m:       variables,
-	}
+	return files, fileMap
 }
 
-func prepareMultipartData(request *Request) (bytes.Buffer, string, error) {
-	res := parseMultipartVariables(request.Variables)
+func prepareMultipartBody(request *Request) (bytes.Buffer, string, error) {
+	files, fileMap := prepareUploadsFromVariables(request.Variables)
 
 	var fw io.Writer
 	var buf bytes.Buffer
@@ -366,15 +356,15 @@ func prepareMultipartData(request *Request) (bytes.Buffer, string, error) {
 	if err != nil {
 		return buf, "", err
 	}
-	if err = json.NewEncoder(fw).Encode(res.fileMap); err != nil {
+	if err = json.NewEncoder(fw).Encode(fileMap); err != nil {
 		return buf, "", err
 	}
-	for fileIndex := range res.fileMap {
-		innerFw, fileErr := mpw.CreateFormFile(fileIndex, res.files[fileIndex].Filename)
+	for fileIndex := range fileMap {
+		innerFw, fileErr := mpw.CreateFormFile(fileIndex, files[fileIndex].Filename)
 		if fileErr != nil {
 			return buf, "", fileErr
 		}
-		_, ioErr := io.Copy(innerFw, res.files[fileIndex].File)
+		_, ioErr := io.Copy(innerFw, files[fileIndex].File)
 		if ioErr != nil {
 			return buf, "", ioErr
 		}
