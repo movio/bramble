@@ -8,8 +8,10 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"mime"
 	"mime/multipart"
 	"net/http"
+	"net/textproto"
 	"os"
 	"strings"
 	"time"
@@ -287,7 +289,6 @@ func (r *Request) requestBody() (bytes.Buffer, string, error) {
 func multipartBody(r *Request) (bytes.Buffer, string, error) {
 	files, fileMap := prepareUploadsFromVariables(r.Variables)
 
-	var fw io.Writer
 	var buf bytes.Buffer
 	mpw := multipart.NewWriter(&buf)
 	fw, err := mpw.CreateFormField("operations")
@@ -305,7 +306,17 @@ func multipartBody(r *Request) (bytes.Buffer, string, error) {
 		return buf, "", err
 	}
 	for fileIndex := range fileMap {
-		innerFw, fileErr := mpw.CreateFormFile(fileIndex, files[fileIndex].Filename)
+		h := make(textproto.MIMEHeader)
+		h.Set("Content-Disposition", mime.FormatMediaType("form-data", map[string]string{
+			"name":     fileIndex,
+			"filename": files[fileIndex].Filename,
+		}))
+		if ct := files[fileIndex].ContentType; ct != "" {
+			h.Set("Content-Type", files[fileIndex].ContentType)
+		} else {
+			h.Set("Content-Type", "application/octet-stream")
+		}
+		innerFw, fileErr := mpw.CreatePart(h)
 		if fileErr != nil {
 			return buf, "", fileErr
 		}

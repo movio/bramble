@@ -52,8 +52,9 @@ func (r *Resolver) Service(ctx context.Context) (*Service, error) {
 }
 
 func (r *Resolver) UploadGizmoFile(ctx context.Context, upload graphql.Upload) (string, error) {
-	return fmt.Sprintf("%s: %d bytes", upload.Filename, upload.Size), nil
+	return fmt.Sprintf("%s: %d bytes %s", upload.Filename, upload.Size, upload.ContentType), nil
 }
-func (r *Resolver) UploadGadgetFile(ctx context.Context, upload GadgetInput) (string, error) {
-	return fmt.Sprintf("%s: %d bytes", upload.Upload.Filename, upload.Upload.Size), nil
+func (r *Resolver) UploadGadgetFile(ctx context.Context, input GadgetInput) (string, error) {
+	upload := input.Upload
+	return fmt.Sprintf("%s: %d bytes %s", upload.Filename, upload.Size, upload.ContentType), nil
 }
