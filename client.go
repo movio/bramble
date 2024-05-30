@@ -133,25 +133,11 @@ func (c *GraphQLClient) Request(ctx context.Context, url string, request *Reques
 		return err
 	}
 
-	var buf bytes.Buffer
-	var err error
-	contentType := "application/json; charset=utf-8"
-	requestContentType := ""
-	if request.Headers != nil {
-		requestContentType = request.Headers.Get("Content-Type")
-	}
-	if strings.HasPrefix(requestContentType, "multipart/form-data") {
-		buf, contentType, err = prepareMultipartBody(request)
-		if err != nil {
-			return fmt.Errorf("unable to encode request body: %w", err)
-		}
-	} else {
-		err := json.NewEncoder(&buf).Encode(request)
-		if err != nil {
-			return fmt.Errorf("unable to encode request body: %w", err)
-		}
-	}
+	buf, contentType, err := request.requestBody()
+	if err != nil {
+		return traceErr(fmt.Errorf("unable to encode request body: %w", err))
 
+	}
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, &buf)
 	if err != nil {
 		return traceErr(fmt.Errorf("unable to create request: %w", err))
@@ -262,6 +248,79 @@ func (r *Request) WithVariables(variables map[string]interface{}) *Request {
 	return r
 }
 
+// isMultipart returns true if the request contains a graphql.Upload object
+// implying that the downstream request needs to be a multipart/form-data request
+func (r *Request) isMultipart() bool {
+	stack := []map[string]any{r.Variables}
+	for len(stack) > 0 {
+		currentItem := stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
+		for _, v := range currentItem {
+			switch v := v.(type) {
+			case graphql.Upload, *graphql.Upload:
+				return true
+			case map[string]any:
+				stack = append(stack, v)
+			}
+		}
+	}
+	return false
+}
+
+func (r *Request) requestBody() (bytes.Buffer, string, error) {
+	var buf bytes.Buffer
+	var err error
+	contentType := "application/json; charset=utf-8"
+	if r.isMultipart() {
+		buf, contentType, err = multipartBody(r)
+		if err != nil {
+			return buf, "", fmt.Errorf("unable to encode multipart request body: %w", err)
+		}
+		return buf, contentType, nil
+	}
+	if err = json.NewEncoder(&buf).Encode(r); err != nil {
+		return buf, "", fmt.Errorf("unable to encode request body: %w", err)
+	}
+	return buf, contentType, nil
+}
+
+func multipartBody(r *Request) (bytes.Buffer, string, error) {
+	files, fileMap := prepareUploadsFromVariables(r.Variables)
+
+	var fw io.Writer
+	var buf bytes.Buffer
+	mpw := multipart.NewWriter(&buf)
+	fw, err := mpw.CreateFormField("operations")
+	if err != nil {
+		return buf, "", err
+	}
+	if err = json.NewEncoder(fw).Encode(r); err != nil {
+		return buf, "", err
+	}
+	fw, err = mpw.CreateFormField("map")
+	if err != nil {
+		return buf, "", err
+	}
+	if err = json.NewEncoder(fw).Encode(fileMap); err != nil {
+		return buf, "", err
+	}
+	for fileIndex := range fileMap {
+		innerFw, fileErr := mpw.CreateFormFile(fileIndex, files[fileIndex].Filename)
+		if fileErr != nil {
+			return buf, "", fileErr
+		}
+		_, ioErr := io.Copy(innerFw, files[fileIndex].File)
+		if ioErr != nil {
+			return buf, "", ioErr
+		}
+	}
+	err = mpw.Close()
+	if err != nil {
+		return buf, "", err
+	}
+	return buf, mpw.FormDataContentType(), nil
+}
+
 // Response is a GraphQL response
 type Response struct {
 	Errors GraphqlErrors `json:"errors"`
@@ -330,43 +389,4 @@ func prepareUploadsFromVariables(variables map[string]any) (map[string]graphql.U
 		}
 	}
 	return files, fileMap
-}
-
-func prepareMultipartBody(request *Request) (bytes.Buffer, string, error) {
-	files, fileMap := prepareUploadsFromVariables(request.Variables)
-
-	var fw io.Writer
-	var buf bytes.Buffer
-	mpw := multipart.NewWriter(&buf)
-	fw, err := mpw.CreateFormField("operations")
-	if err != nil {
-		return buf, "", err
-	}
-
-	if err = json.NewEncoder(fw).Encode(request); err != nil {
-		return buf, "", err
-	}
-	fw, err = mpw.CreateFormField("map")
-	if err != nil {
-		return buf, "", err
-	}
-	if err = json.NewEncoder(fw).Encode(fileMap); err != nil {
-		return buf, "", err
-	}
-	for fileIndex := range fileMap {
-		innerFw, fileErr := mpw.CreateFormFile(fileIndex, files[fileIndex].Filename)
-		if fileErr != nil {
-			return buf, "", fileErr
-		}
-		_, ioErr := io.Copy(innerFw, files[fileIndex].File)
-		if ioErr != nil {
-			return buf, "", ioErr
-		}
-	}
-	err = mpw.Close()
-	if err != nil {
-		return buf, "", err
-	}
-	contentType := mpw.FormDataContentType()
-	return buf, contentType, nil
 }
