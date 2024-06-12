@@ -17,7 +17,7 @@ require (
 	github.com/rs/cors v1.7.0
 	github.com/sirupsen/logrus v1.8.1
 	github.com/stretchr/testify v1.9.0
-	github.com/vektah/gqlparser/v2 v2.5.10
+	github.com/vektah/gqlparser/v2 v2.5.14
 	golang.org/x/crypto v0.23.0 // indirect
 	golang.org/x/sync v0.6.0
 	golang.org/x/sys v0.20.0 // indirect
