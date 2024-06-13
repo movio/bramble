@@ -259,7 +259,7 @@ func (r *Request) isMultipart() bool {
 		stack = stack[:len(stack)-1]
 		for _, v := range currentItem {
 			switch v := v.(type) {
-			case graphql.Upload, *graphql.Upload:
+			case graphql.Upload, *graphql.Upload, []graphql.Upload, []*graphql.Upload:
 				return true
 			case map[string]any:
 				stack = append(stack, v)
@@ -391,6 +391,24 @@ func prepareUploadsFromVariables(variables map[string]any) (map[string]graphql.U
 					files[fileIndex] = v
 				case *graphql.Upload:
 					files[fileIndex] = *v
+				}
+			case []graphql.Upload:
+				currentItem.data[key] = make([]*struct{}, len(v))
+				for i, file := range v {
+					elemPath := fmt.Sprintf("%s.%d", currentPath, i)
+					fileIndex := fmt.Sprintf("file%d", index)
+					fileMap[fileIndex] = []string{elemPath}
+					index += 1
+					files[fileIndex] = file
+				}
+			case []*graphql.Upload:
+				currentItem.data[key] = make([]*struct{}, len(v))
+				for i, file := range v {
+					elemPath := fmt.Sprintf("%s.%d", currentPath, i)
+					fileIndex := fmt.Sprintf("file%d", index)
+					fileMap[fileIndex] = []string{elemPath}
+					index += 1
+					files[fileIndex] = *file
 				}
 			case map[string]any:
 				stack = append(stack, stackItem{data: v, path: currentPath})
