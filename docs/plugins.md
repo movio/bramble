@@ -29,6 +29,19 @@ Add `CORS` headers to queries.
 }
 ```
 
+## Headers
+
+Allow headers to passthrough to downstream services.
+
+```json
+{
+  "name": "headers",
+  "config": {
+    "allowed-headers": ["X-Custom-Header"]
+  }
+}
+```
+
 ## JWT Auth
 
 The JWT auth plugin validates that the request contains a valid JWT and

@@ -10,6 +10,16 @@ services:
       retries: 5
     expose:
       - 8080
+  gqlgen-multipart-file-upload-service:
+    build:
+      context: examples/gqlgen-multipart-file-upload-service
+    healthcheck: &healthcheck
+      test: wget -qO - http://localhost:8080/health
+      interval: 5s
+      timeout: 1s
+      retries: 5
+    expose:
+      - 8080
   graph-gophers-service:
     healthcheck: *healthcheck
     build:
@@ -34,7 +44,7 @@ services:
     configs: [gateway]
     command: ["-config", "gateway"]
     environment:
-      - BRAMBLE_SERVICE_LIST=http://gqlgen-service:8080/query http://graph-gophers-service:8080/query http://slow-service:8080/query http://nodejs-service:8080/query
+      - BRAMBLE_SERVICE_LIST=http://gqlgen-service:8080/query http://gqlgen-multipart-file-upload-service:8080/query http://graph-gophers-service:8080/query http://slow-service:8080/query http://nodejs-service:8080/query
     ports:
       - 8082:8082
       - 8083:8083
