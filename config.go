@@ -52,6 +52,7 @@ type Config struct {
 	PollIntervalDuration   time.Duration
 	MaxRequestsPerQuery    int64           `json:"max-requests-per-query"`
 	MaxServiceResponseSize int64           `json:"max-service-response-size"`
+	MaxFileUploadSize      int64           `json:"max-file-upload-size"`
 	Telemetry              TelemetryConfig `json:"telemetry"`
 	Plugins                []PluginConfig
 	// Config extensions that can be shared among plugins

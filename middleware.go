@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"strings"
 
@@ -101,18 +102,23 @@ func monitoringMiddleware(h http.Handler) http.Handler {
 }
 
 func addRequestBody(e *event, r *http.Request, buf bytes.Buffer) {
-	contentType := r.Header.Get("Content-Type")
+	contentType, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type"))
 	e.addField("request.content-type", contentType)
 
-	if r.Method != http.MethodHead &&
-		r.Method != http.MethodGet &&
-		contentType == "application/json" {
-		var payload interface{}
-		if err := json.Unmarshal(buf.Bytes(), &payload); err == nil {
-			e.addField("request.body", &payload)
-		} else {
+	if r.Method != http.MethodHead && r.Method != http.MethodGet {
+		switch {
+		case contentType == "application/json":
+			var payload interface{}
+			if err := json.Unmarshal(buf.Bytes(), &payload); err == nil {
+				e.addField("request.body", &payload)
+			} else {
+				e.addField("request.body", buf.String())
+				e.addField("request.error", err)
+			}
+		case contentType == "multipart/form-data":
+			e.addField("request.body", fmt.Sprintf("%d bytes", len(buf.Bytes())))
+		default:
 			e.addField("request.body", buf.String())
-			e.addField("request.error", err)
 		}
 	} else {
 		e.addField("request.body", buf.String())

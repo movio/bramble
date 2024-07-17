@@ -8,11 +8,15 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"mime"
+	"mime/multipart"
 	"net/http"
+	"net/textproto"
 	"os"
 	"strings"
 	"time"
 
+	"github.com/99designs/gqlgen/graphql"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/vektah/gqlparser/v2/ast"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
@@ -131,11 +135,11 @@ func (c *GraphQLClient) Request(ctx context.Context, url string, request *Reques
 		return err
 	}
 
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(request); err != nil {
+	buf, contentType, err := request.requestBody()
+	if err != nil {
 		return traceErr(fmt.Errorf("unable to encode request body: %w", err))
-	}
 
+	}
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, &buf)
 	if err != nil {
 		return traceErr(fmt.Errorf("unable to create request: %w", err))
@@ -145,7 +149,7 @@ func (c *GraphQLClient) Request(ctx context.Context, url string, request *Reques
 		httpReq.Header = request.Headers.Clone()
 	}
 
-	httpReq.Header.Set("Content-Type", "application/json; charset=utf-8")
+	httpReq.Header.Set("Content-Type", contentType)
 	httpReq.Header.Set("Accept", "application/json")
 
 	if c.UserAgent != "" {
@@ -246,6 +250,88 @@ func (r *Request) WithVariables(variables map[string]interface{}) *Request {
 	return r
 }
 
+// isMultipart returns true if the request contains a graphql.Upload object
+// implying that the downstream request needs to be a multipart/form-data request
+func (r *Request) isMultipart() bool {
+	stack := []map[string]any{r.Variables}
+	for len(stack) > 0 {
+		currentItem := stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
+		for _, v := range currentItem {
+			switch v := v.(type) {
+			case graphql.Upload, *graphql.Upload, []graphql.Upload, []*graphql.Upload:
+				return true
+			case map[string]any:
+				stack = append(stack, v)
+			}
+		}
+	}
+	return false
+}
+
+func (r *Request) requestBody() (bytes.Buffer, string, error) {
+	var buf bytes.Buffer
+	var err error
+	contentType := "application/json; charset=utf-8"
+	if r.isMultipart() {
+		buf, contentType, err = multipartBody(r)
+		if err != nil {
+			return buf, "", fmt.Errorf("unable to encode multipart request body: %w", err)
+		}
+		return buf, contentType, nil
+	}
+	if err = json.NewEncoder(&buf).Encode(r); err != nil {
+		return buf, "", fmt.Errorf("unable to encode request body: %w", err)
+	}
+	return buf, contentType, nil
+}
+
+func multipartBody(r *Request) (bytes.Buffer, string, error) {
+	files, fileMap := prepareUploadsFromVariables(r.Variables)
+
+	var buf bytes.Buffer
+	mpw := multipart.NewWriter(&buf)
+	fw, err := mpw.CreateFormField("operations")
+	if err != nil {
+		return buf, "", err
+	}
+	if err = json.NewEncoder(fw).Encode(r); err != nil {
+		return buf, "", err
+	}
+	fw, err = mpw.CreateFormField("map")
+	if err != nil {
+		return buf, "", err
+	}
+	if err = json.NewEncoder(fw).Encode(fileMap); err != nil {
+		return buf, "", err
+	}
+	for fileIndex := range fileMap {
+		h := make(textproto.MIMEHeader)
+		h.Set("Content-Disposition", mime.FormatMediaType("form-data", map[string]string{
+			"name":     fileIndex,
+			"filename": files[fileIndex].Filename,
+		}))
+		if ct := files[fileIndex].ContentType; ct != "" {
+			h.Set("Content-Type", files[fileIndex].ContentType)
+		} else {
+			h.Set("Content-Type", "application/octet-stream")
+		}
+		innerFw, fileErr := mpw.CreatePart(h)
+		if fileErr != nil {
+			return buf, "", fileErr
+		}
+		_, ioErr := io.Copy(innerFw, files[fileIndex].File)
+		if ioErr != nil {
+			return buf, "", ioErr
+		}
+	}
+	err = mpw.Close()
+	if err != nil {
+		return buf, "", err
+	}
+	return buf, mpw.FormDataContentType(), nil
+}
+
 // Response is a GraphQL response
 type Response struct {
 	Errors GraphqlErrors `json:"errors"`
@@ -274,4 +360,61 @@ func (e GraphqlErrors) Error() string {
 
 func GenerateUserAgent(operation string) string {
 	return fmt.Sprintf("Bramble/%s (%s)", Version, operation)
+}
+
+func prepareUploadsFromVariables(variables map[string]any) (map[string]graphql.Upload, map[string][]string) {
+	type stackItem struct {
+		path string
+		data map[string]interface{}
+	}
+
+	stack := []stackItem{{path: "variables", data: variables}}
+
+	index := 0
+	fileMap := map[string][]string{}
+	files := map[string]graphql.Upload{}
+	for len(stack) > 0 {
+		currentItem := stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
+
+		for key, value := range currentItem.data {
+			currentPath := currentItem.path + "." + key
+
+			switch v := value.(type) {
+			case graphql.Upload, *graphql.Upload:
+				currentItem.data[key] = nil
+				fileIndex := fmt.Sprintf("file%d", index)
+				fileMap[fileIndex] = []string{currentPath}
+				index += 1
+				switch v := v.(type) {
+				case graphql.Upload:
+					files[fileIndex] = v
+				case *graphql.Upload:
+					files[fileIndex] = *v
+				}
+			case []graphql.Upload:
+				currentItem.data[key] = make([]*struct{}, len(v))
+				for i, file := range v {
+					elemPath := fmt.Sprintf("%s.%d", currentPath, i)
+					fileIndex := fmt.Sprintf("file%d", index)
+					fileMap[fileIndex] = []string{elemPath}
+					index += 1
+					files[fileIndex] = file
+				}
+			case []*graphql.Upload:
+				currentItem.data[key] = make([]*struct{}, len(v))
+				for i, file := range v {
+					elemPath := fmt.Sprintf("%s.%d", currentPath, i)
+					fileIndex := fmt.Sprintf("file%d", index)
+					fileMap[fileIndex] = []string{elemPath}
+					index += 1
+					files[fileIndex] = *file
+				}
+			case map[string]any:
+				stack = append(stack, stackItem{data: v, path: currentPath})
+			default:
+			}
+		}
+	}
+	return files, fileMap
 }
