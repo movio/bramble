@@ -8,4 +8,4 @@ COPY . .
 
 RUN go generate .
 RUN go get
-CMD go run .
+CMD ["go", "run", "."]
