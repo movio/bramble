@@ -78,11 +78,7 @@ func InitTelemetry(ctx context.Context, cfg TelemetryConfig) (func(context.Conte
 	}
 
 	// Set up resource.
-	res, err := resource.Merge(resource.Default(),
-		resource.NewWithAttributes(semconv.SchemaURL,
-			semconv.ServiceName(cfg.ServiceName),
-			semconv.ServiceVersion(Version),
-		))
+	res, err := resources(cfg)
 	if err != nil {
 		return nil, handleErr(err)
 	}
@@ -226,4 +222,12 @@ func newMeterProvider(exp sdkmetric.Exporter, res *resource.Resource) (*sdkmetri
 	)
 
 	return meterProvider, nil
+}
+
+func resources(cfg TelemetryConfig) (*resource.Resource, error) {
+	return resource.Merge(resource.Default(),
+		resource.NewWithAttributes(semconv.SchemaURL,
+			semconv.ServiceName(cfg.ServiceName),
+			semconv.ServiceVersion(Version),
+		))
 }
