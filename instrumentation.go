@@ -11,7 +11,7 @@ import (
 const eventKey contextKey = "instrumentation"
 
 type event struct {
-	name      string
+	nameFunc  EventNameFunc
 	timestamp time.Time
 	fields    EventFields
 	fieldLock sync.Mutex
@@ -21,15 +21,18 @@ type event struct {
 // EventFields contains fields to be logged for the event
 type EventFields map[string]interface{}
 
-func newEvent(name string) *event {
+// EventNameFunc constructs a name for the event from the provided fields
+type EventNameFunc func(EventFields) string
+
+func newEvent(name EventNameFunc) *event {
 	return &event{
-		name:      name,
+		nameFunc:  name,
 		timestamp: time.Now(),
 		fields:    EventFields{},
 	}
 }
 
-func startEvent(ctx context.Context, name string) (context.Context, *event) {
+func startEvent(ctx context.Context, name EventNameFunc) (context.Context, *event) {
 	ev := newEvent(name)
 	return context.WithValue(ctx, eventKey, ev), ev
 }
@@ -52,7 +55,7 @@ func (e *event) finish() {
 	e.writeLock.Do(func() {
 		log.WithField("duration", time.Since(e.timestamp).String()).
 			WithFields(log.Fields(e.fields)).
-			Info(e.name)
+			Info(e.nameFunc(e.fields))
 	})
 }
 
