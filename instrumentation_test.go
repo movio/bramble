@@ -54,13 +54,17 @@ func collectEventFromContext(ctx context.Context, t *testing.T, f func(*event)) 
 	})
 }
 
+func testEventName(EventFields) string {
+	return "test"
+}
+
 func TestDropsField(t *testing.T) {
 	AddField(context.TODO(), "val", "test")
 	assert.True(t, true)
 }
 
 func TestEventLogOnFinish(t *testing.T) {
-	ctx, _ := startEvent(context.TODO(), "test")
+	ctx, _ := startEvent(context.TODO(), testEventName)
 	output := collectEventFromContext(ctx, t, func(*event) {
 		AddField(ctx, "val", "test")
 	})
@@ -69,7 +73,7 @@ func TestEventLogOnFinish(t *testing.T) {
 }
 
 func TestAddMultipleToEventOnContext(t *testing.T) {
-	ctx, _ := startEvent(context.TODO(), "test")
+	ctx, _ := startEvent(context.TODO(), testEventName)
 	output := collectEventFromContext(ctx, t, func(*event) {
 		AddFields(ctx, EventFields{
 			"gizmo":   "foo",
@@ -83,7 +87,7 @@ func TestAddMultipleToEventOnContext(t *testing.T) {
 
 func TestEventMeasurement(t *testing.T) {
 	start := time.Now()
-	ctx, _ := startEvent(context.TODO(), "test")
+	ctx, _ := startEvent(context.TODO(), testEventName)
 	output := collectEventFromContext(ctx, t, func(*event) {
 		time.Sleep(time.Microsecond)
 	})

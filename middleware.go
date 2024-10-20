@@ -63,7 +63,7 @@ func debugMiddleware(h http.Handler) http.Handler {
 
 func monitoringMiddleware(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx, event := startEvent(r.Context(), "request")
+		ctx, event := startEvent(r.Context(), nameMonitoringEvent)
 		if !strings.HasPrefix(r.Header.Get("user-agent"), "Bramble") {
 			defer event.finish()
 		}
@@ -99,6 +99,16 @@ func monitoringMiddleware(h http.Handler) http.Handler {
 		promHTTPResponseSizes.With(prometheus.Labels{}).Observe(float64(m.Written))
 		promHTTPResponseDurations.With(prometheus.Labels{}).Observe(m.Duration.Seconds())
 	})
+}
+
+func nameMonitoringEvent(fields EventFields) string {
+	if t := fields["operation.type"]; t != nil {
+		if n := fields["operation.name"]; n != "" {
+			return fmt.Sprintf("%s:%s", t, n)
+		}
+		return fmt.Sprintf("%s", t)
+	}
+	return "request"
 }
 
 func addRequestBody(e *event, r *http.Request, buf bytes.Buffer) {
