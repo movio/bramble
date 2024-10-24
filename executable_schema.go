@@ -221,7 +221,7 @@ func (s *ExecutableSchema) ExecuteQuery(ctx context.Context) *graphql.Response {
 	})
 	if err != nil {
 		traceErr(err)
-		return s.interceptResponse(ctx, operation.Name, operationCtx.RawQuery, variables, graphql.ErrorResponse(ctx, err.Error()))
+		return s.interceptResponse(ctx, operation.Name, operationCtx.RawQuery, variables, graphql.ErrorResponse(ctx, "%s", err.Error()))
 	}
 
 	extensions := make(map[string]interface{})
