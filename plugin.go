@@ -3,11 +3,12 @@ package bramble
 import (
 	"context"
 	"encoding/json"
+	log "log/slog"
 	"net/http"
+	"os"
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/99designs/gqlgen/graphql/handler"
-	log "github.com/sirupsen/logrus"
 )
 
 // Plugin is a Bramble plugin. Plugins can be used to extend base Bramble functionalities.
@@ -90,7 +91,8 @@ var registeredPlugins = map[string]Plugin{}
 // RegisterPlugin register a plugin so that it can be enabled via the configuration.
 func RegisterPlugin(p Plugin) {
 	if _, found := registeredPlugins[p.ID()]; found {
-		log.Fatalf("plugin %q already registered", p.ID())
+		log.With("plugin", p.ID()).Error("plugin already registered")
+		os.Exit(1)
 	}
 	registeredPlugins[p.ID()] = p
 }
