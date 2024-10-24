@@ -57,7 +57,7 @@ func TestGatewayQuery(t *testing.T) {
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/query", strings.NewReader(`
 	{
-		"query": "query { test }"
+		"query": "query gatewaytest { test }"
 	}`))
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	req.Header.Set("Accept", "application/json; charset=utf-8")
