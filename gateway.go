@@ -2,13 +2,13 @@ package bramble
 
 import (
 	"context"
+	log "log/slog"
 	"net/http"
 	"time"
 
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/handler/extension"
 	"github.com/99designs/gqlgen/graphql/handler/transport"
-	log "github.com/sirupsen/logrus"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
@@ -33,7 +33,7 @@ func (g *Gateway) UpdateSchemas(interval time.Duration) {
 	for range time.Tick(interval) {
 		err := g.ExecutableSchema.UpdateSchema(context.Background(), false)
 		if err != nil {
-			log.WithError(err).Error("error updating schemas")
+			log.With("error", err).Error("failed updating schemas")
 		}
 	}
 }

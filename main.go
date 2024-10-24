@@ -3,13 +3,13 @@ package bramble
 import (
 	"context"
 	"flag"
+	"fmt"
+	log "log/slog"
 	"net/http"
 	"os"
 	"os/signal"
 	"sync"
 	"time"
-
-	log "github.com/sirupsen/logrus"
 )
 
 // Main runs the gateway. This function is exported so that it can be reused
@@ -22,32 +22,37 @@ func Main() {
 	flag.Var(&configFiles, "conf", "deprecated, use -config instead")
 	flag.Parse()
 
-	log.SetFormatter(&log.JSONFormatter{TimestampFormat: time.RFC3339Nano})
+	loglevel := new(log.LevelVar)
+	logger := log.New(log.NewJSONHandler(os.Stderr, &log.HandlerOptions{Level: loglevel}))
+	log.SetDefault(logger)
 
 	cfg, err := GetConfig(configFiles)
 	if err != nil {
-		log.WithError(err).Fatal("failed to get config")
+		log.With("error", err).Error("failed to load config")
+		os.Exit(1)
 	}
+	loglevel.Set(cfg.LogLevel)
 	go cfg.Watch()
 
 	shutdown, err := InitTelemetry(ctx, cfg.Telemetry)
 	if err != nil {
-		log.WithError(err).Error("error creating telemetry")
+		log.With("error", err).Error("failed initializing telemetry")
 	}
 
 	defer func() {
 		log.Info("flushing and shutting down telemetry")
 		if err := shutdown(context.Background()); err != nil {
-			log.WithError(err).Error("shutting down telemetry")
+			log.With("error", err).Error("shutting down telemetry")
 		}
 	}()
 
 	err = cfg.Init()
 	if err != nil {
-		log.WithError(err).Fatal("failed to configure")
+		log.With("error", err).Error("failed to configure")
+		os.Exit(1)
 	}
 
-	log.WithField("config", cfg).Debug("configuration")
+	log.With("config", cfg).Debug("configuration")
 
 	gtw := NewGateway(cfg.executableSchema, cfg.plugins)
 	RegisterMetrics()
@@ -77,9 +82,10 @@ func runHandler(ctx context.Context, wg *sync.WaitGroup, name, addr string, time
 	}
 
 	go func() {
-		log.WithField("addr", addr).Infof("serving %s handler", name)
+		log.With("addr", addr).Info(fmt.Sprintf("serving %s handler", name))
 		if err := srv.ListenAndServe(); err != http.ErrServerClosed {
-			log.WithError(err).Fatal("server terminated unexpectedly")
+			log.With("error", err).Error("server terminated unexpectedly")
+			os.Exit(1)
 		}
 	}()
 
@@ -88,11 +94,11 @@ func runHandler(ctx context.Context, wg *sync.WaitGroup, name, addr string, time
 	timeoutCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	log.Infof("shutting down %s handler", name)
+	log.Info(fmt.Sprintf("shutting down %s handler", name))
 	err := srv.Shutdown(timeoutCtx)
 	if err != nil {
-		log.WithError(err).Error("error shutting down server")
+		log.With("error", err).Error("failed shutting down server")
 	}
-	log.Infof("shut down %s handler", name)
+	log.Info(fmt.Sprintf("shut down %s handler", name))
 	wg.Done()
 }
