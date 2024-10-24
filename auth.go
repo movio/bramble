@@ -3,10 +3,10 @@ package bramble
 import (
 	"encoding/json"
 	"fmt"
+	log "log/slog"
 	"sort"
 	"strings"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/vektah/gqlparser/v2/ast"
 	"github.com/vektah/gqlparser/v2/gqlerror"
 )
@@ -280,10 +280,10 @@ func filterFields(path []string, ss ast.SelectionSet, allowedFields AllowedField
 				errs = append(errs, ferrs...)
 			} else {
 				fieldPath := strings.Join(append(path, s.Name), ".")
-				log.WithFields(log.Fields{
-					"field":       fieldPath,
-					"permissions": allowedFields,
-				}).Debug("field access disallowed")
+				log.With(
+					"field", fieldPath,
+					"permissions", allowedFields,
+				).Debug("field access disallowed")
 				errs = append(errs, gqlerror.Errorf("%s access disallowed", fieldPath))
 			}
 		case *ast.FragmentSpread:

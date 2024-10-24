@@ -6,13 +6,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	log "log/slog"
 	"net/http"
+	"os"
 
 	"github.com/go-jose/go-jose/v4"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/golang-jwt/jwt/v4/request"
 	"github.com/movio/bramble"
-	log "github.com/sirupsen/logrus"
 )
 
 func init() {
@@ -24,7 +25,11 @@ func NewJWTPlugin(keyProviders []SigningKeyProvider, roles map[string]bramble.Op
 	for _, p := range keyProviders {
 		keys, err := p.Keys()
 		if err != nil {
-			log.WithError(err).Fatalf("couldn't get signing keys for provider %q", p.Name())
+			log.With(
+				"error", err,
+				"provider", p.Name(),
+			).Warn("failed to get signing keys for provider")
+			os.Exit(1)
 		}
 		for id, k := range keys {
 			publicKeys[id] = k
@@ -133,7 +138,7 @@ func (p *JWTPlugin) ApplyMiddlewarePublicMux(h http.Handler) http.Handler {
 			return nil, fmt.Errorf("could not find key for kid %q", keyID)
 		})
 		if err != nil {
-			log.WithError(err).Info("invalid token")
+			log.With("error", err).Info("invalid token")
 			rw.WriteHeader(http.StatusUnauthorized)
 			writeGraphqlError(rw, "invalid token")
 			return
@@ -141,7 +146,7 @@ func (p *JWTPlugin) ApplyMiddlewarePublicMux(h http.Handler) http.Handler {
 
 		role, ok := p.config.Roles[claims.Role]
 		if !ok {
-			log.WithField("role", claims.Role).Info("invalid role")
+			log.With("role", claims.Role).Info("invalid role")
 			rw.WriteHeader(http.StatusUnauthorized)
 			writeGraphqlError(rw, "invalid role")
 			return
