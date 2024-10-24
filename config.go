@@ -271,13 +271,13 @@ func (c *Config) reload() error {
 	defer span.End()
 
 	if err := c.Load(); err != nil {
-		log.With("error", err).Error("failed reloading config")
+		return fmt.Errorf("failed loading config")
 	}
 
 	log.With("services", c.Services).Info("config file updated")
 
 	if err := c.executableSchema.UpdateServiceList(ctx, c.Services); err != nil {
-		log.With("error", err).Error("failed updating services")
+		return fmt.Errorf("failed updating services")
 	}
 
 	log.With("services", c.Services).Info("updated services")
