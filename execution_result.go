@@ -340,7 +340,7 @@ func formatResponseDataRec(schema *ast.Schema, selectionSet ast.SelectionSet, re
 				fieldData, ok := result[field.Alias]
 				if !ok {
 					innerBuf.WriteString("null")
-				} else if field.SelectionSet != nil && len(field.SelectionSet) > 0 {
+				} else if len(field.SelectionSet) > 0 {
 					val := formatResponseDataRec(schema, field.SelectionSet, fieldData, false)
 					innerBuf.Write(val)
 				} else {
