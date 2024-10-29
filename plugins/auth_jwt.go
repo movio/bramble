@@ -8,11 +8,11 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/go-jose/go-jose/v4"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/golang-jwt/jwt/v4/request"
 	"github.com/movio/bramble"
 	log "github.com/sirupsen/logrus"
-	"gopkg.in/square/go-jose.v2"
 )
 
 func init() {
