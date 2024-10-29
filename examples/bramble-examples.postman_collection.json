@@ -1,0 +1,90 @@
+{
+	"info": {
+		"_postman_id": "9f400ac1-c634-472b-9cfd-93fcf9d5f21a",
+		"name": "Bramble examples",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "2117581"
+	},
+	"item": [
+		{
+			"name": "Random Gizmo",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							""
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "graphql",
+					"graphql": {
+						"query": "query gizmo($duration: String! = \"10ms\") {\n    randomGizmo {\n        id\n        name\n        email\n        delay(duration: $duration)\n    }\n}",
+						"variables": "{\n    \"duration\": \"150ms\"\n}"
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8082/query",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8082",
+					"path": [
+						"query"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "File upload example",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "operations",
+							"value": "{\"query\":\"mutation uploadGizmoFile($upload: Upload!) {uploadGizmoFile(upload: $upload)}\",\"variables\":{\"upload\":null},\"operationName\":\"uploadGizmoFile\"}",
+							"description": "GraphQL query to upload file",
+							"type": "text"
+						},
+						{
+							"key": "map",
+							"value": "{\"file1\":[\"variables.upload\"]}",
+							"description": "file part to variable map",
+							"type": "text"
+						},
+						{
+							"key": "file1",
+							"description": "the contents of file1",
+							"type": "file",
+							"src": []
+						}
+					]
+				},
+				"url": {
+					"raw": "http://localhost:8082/query",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8082",
+					"path": [
+						"query"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}
