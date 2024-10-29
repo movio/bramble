@@ -103,9 +103,7 @@ func (s *ExecutableSchema) UpdateSchema(ctx context.Context, forceRebuild bool) 
 	// Avoid fetching more than 64 servides in parallel,
 	// as high concurrency can actually hurt performance
 	group.SetLimit(64)
-	for url_, s_ := range s.Services {
-		url := url_
-		s := s_
+	for url, s := range s.Services {
 		group.Go(func() error {
 			logger := log.WithField("url", url)
 			updated, err := s.Update(ctx)
@@ -223,7 +221,7 @@ func (s *ExecutableSchema) ExecuteQuery(ctx context.Context) *graphql.Response {
 	})
 	if err != nil {
 		traceErr(err)
-		return s.interceptResponse(ctx, operation.Name, operationCtx.RawQuery, variables, graphql.ErrorResponse(ctx, err.Error()))
+		return s.interceptResponse(ctx, operation.Name, operationCtx.RawQuery, variables, graphql.ErrorResponse(ctx, "%s", err.Error()))
 	}
 
 	extensions := make(map[string]interface{})

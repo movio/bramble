@@ -162,13 +162,8 @@ func (c *GraphQLClient) Request(ctx context.Context, url string, request *Reques
 			promServiceTimeoutErrorCounter.With(prometheus.Labels{
 				"service": url,
 			}).Inc()
-
-			// Return raw timeout error to allow caller to handle it since a
-			// downstream caller may want to retry, and they will have to jump
-			// through hoops to detect this error otherwise.
-			return traceErr(err)
 		}
-		return traceErr(fmt.Errorf("error during request: %w", err))
+		return traceErr(err)
 	}
 	defer res.Body.Close()
 
