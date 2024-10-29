@@ -121,7 +121,7 @@ e.g.
 ```json
 {
   "errors": {
-    "message": "error during request: Post \"http://localhost:8080/query\": context deadline exceeded",
+    "message": "Post \"http://localhost:8080/query\": context deadline exceeded",
      "extensions": {
         "selectionSet": "{ serviceB _bramble_id: id }"
       },
