@@ -8,6 +8,10 @@ on:
     types:
       - published
 
+concurrency:
+  group: movio
+  cancel-in-progress: true
+
 jobs:
   dispatch:
     runs-on: ubuntu-latest
