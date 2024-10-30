@@ -41,7 +41,7 @@ services:
     build:
       context: .
     configs: [gateway]
-    command: ["-config", "gateway"]
+    command: ["-config", "gateway", "-loglevel", "debug"]
     environment:
       - BRAMBLE_SERVICE_LIST=http://gqlgen-service:8080/query http://gqlgen-multipart-file-upload-service:8080/query http://graph-gophers-service:8080/query http://slow-service:8080/query http://nodejs-service:8080/query
     ports:
