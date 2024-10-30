@@ -18,12 +18,13 @@ func Main() {
 	ctx := context.Background()
 
 	var configFiles arrayFlags
+	var level levelflag
 	flag.Var(&configFiles, "config", "Config file (can appear multiple times)")
 	flag.Var(&configFiles, "conf", "deprecated, use -config instead")
+	flag.Var(&level, "loglevel", "log level: debug, info, warn, error")
 	flag.Parse()
 
-	loglevel := new(log.LevelVar)
-	logger := log.New(log.NewJSONHandler(os.Stderr, &log.HandlerOptions{Level: loglevel}))
+	logger := log.New(log.NewJSONHandler(os.Stderr, &log.HandlerOptions{Level: &level}))
 	log.SetDefault(logger)
 
 	cfg, err := GetConfig(configFiles)
@@ -31,7 +32,7 @@ func Main() {
 		log.With("error", err).Error("failed to load config")
 		os.Exit(1)
 	}
-	loglevel.Set(cfg.LogLevel)
+	level.LevelVar.Set(cfg.LogLevel)
 	go cfg.Watch()
 
 	shutdown, err := InitTelemetry(ctx, cfg.Telemetry)
