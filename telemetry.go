@@ -3,9 +3,9 @@ package bramble
 import (
 	"context"
 	"errors"
+	log "log/slog"
 	"os"
 
-	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
@@ -26,16 +26,6 @@ type TelemetryConfig struct {
 	Insecure    bool   `json:"insecure"`     // Insecure enables insecure communication with the OpenTelemetry collector.
 	Endpoint    string `json:"endpoint"`     // Endpoint is the OpenTelemetry collector endpoint.
 	ServiceName string `json:"service_name"` // ServiceName is the name of the service.
-}
-
-// TelemetryErrHandler is an error handler that logs errors.
-type TelemetryErrHandler struct {
-	log *logrus.Logger
-}
-
-// Handle implements otel.ErrorHandler.
-func (e *TelemetryErrHandler) Handle(err error) {
-	e.log.Error(err.Error())
 }
 
 // InitializesTelemetry initializes OpenTelemetry tracing and metrics. It
@@ -91,11 +81,9 @@ func InitTelemetry(ctx context.Context, cfg TelemetryConfig) (func(context.Conte
 
 	otel.SetTextMapPropagator(prop)
 
-	errHandler := &TelemetryErrHandler{
-		log: logrus.StandardLogger(),
-	}
-
-	otel.SetErrorHandler(errHandler)
+	otel.SetErrorHandler(otel.ErrorHandlerFunc(func(err error) {
+		log.Error(err.Error())
+	}))
 
 	traceShutdown, err := setupOTelTraceProvider(ctx, cfg, res)
 	if err != nil {

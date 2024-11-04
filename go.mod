@@ -15,7 +15,6 @@ require (
 	github.com/prometheus/common v0.31.1 // indirect
 	github.com/prometheus/procfs v0.7.3 // indirect
 	github.com/rs/cors v1.7.0
-	github.com/sirupsen/logrus v1.8.1
 	github.com/stretchr/testify v1.9.0
 	github.com/vektah/gqlparser/v2 v2.5.16
 	golang.org/x/crypto v0.25.0 // indirect

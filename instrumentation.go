@@ -2,10 +2,9 @@ package bramble
 
 import (
 	"context"
+	log "log/slog"
 	"sync"
 	"time"
-
-	log "github.com/sirupsen/logrus"
 )
 
 const eventKey contextKey = "instrumentation"
@@ -53,9 +52,13 @@ func (e *event) addFields(fields EventFields) {
 
 func (e *event) finish() {
 	e.writeLock.Do(func() {
-		log.WithField("duration", time.Since(e.timestamp).String()).
-			WithFields(log.Fields(e.fields)).
-			Info(e.nameFunc(e.fields))
+		attrs := make([]any, 0, len(e.fields))
+		for k, v := range e.fields {
+			attrs = append(attrs, log.Any(k, v))
+		}
+		log.With(
+			"duration", time.Since(e.timestamp).String(),
+		).Info(e.nameFunc(e.fields), attrs...)
 	})
 }
 

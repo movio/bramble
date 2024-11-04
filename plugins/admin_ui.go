@@ -3,11 +3,12 @@ package plugins
 import (
 	"bytes"
 	"errors"
+	log "log/slog"
 	"net/http"
+	"os"
 	"sort"
 	"text/template"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/vektah/gqlparser/v2"
 	"github.com/vektah/gqlparser/v2/ast"
 	"github.com/vektah/gqlparser/v2/formatter"
@@ -34,7 +35,8 @@ func (p *AdminUIPlugin) Init(s *bramble.ExecutableSchema) {
 	tmpl := template.New("admin")
 	_, err := tmpl.Parse(htmlTemplate)
 	if err != nil {
-		log.WithError(err).Fatal("unable to load admin UI page template")
+		log.With("error", err).Error("unable to load admin UI page template")
+		os.Exit(1)
 	}
 
 	p.template = tmpl

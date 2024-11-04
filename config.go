@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	log "log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -11,7 +12,6 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
-	log "github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -121,12 +121,9 @@ func (c *Config) Load() error {
 	}
 
 	logLevel := os.Getenv("BRAMBLE_LOG_LEVEL")
-	if level, err := log.ParseLevel(logLevel); err == nil {
-		c.LogLevel = level
-	} else if logLevel != "" {
-		log.WithField("loglevel", logLevel).Warn("invalid loglevel")
+	if err := c.LogLevel.UnmarshalText([]byte(logLevel)); logLevel != "" && err != nil {
+		log.With("loglevel", logLevel).Warn("invalid loglevel")
 	}
-	log.SetLevel(c.LogLevel)
 
 	var err error
 	c.PollIntervalDuration, err = time.ParseDuration(c.PollInterval)
@@ -226,9 +223,13 @@ func (c *Config) Watch() {
 	for {
 		select {
 		case err := <-c.watcher.Errors:
-			log.WithError(err).Error("config watch error")
+			log.With("error", err).Error("config watch error")
 		case e := <-c.watcher.Events:
-			log.WithFields(log.Fields{"event": e, "files": c.configFiles, "links": c.linkedFiles}).Debug("received config file event")
+			log.With(
+				"event", e,
+				"files", c.configFiles,
+				"links", c.linkedFiles,
+			).Debug("received config file event")
 			shouldUpdate := false
 			for i := range c.configFiles {
 				// we want to reload the config if:
@@ -257,7 +258,7 @@ func (c *Config) Watch() {
 			}
 
 			if err := c.reload(); err != nil {
-				log.WithError(err).Error("error reloading config")
+				log.With("error", err).Error("failed reloading config")
 			}
 		}
 	}
@@ -270,16 +271,16 @@ func (c *Config) reload() error {
 	defer span.End()
 
 	if err := c.Load(); err != nil {
-		log.WithError(err).Error("error reloading config")
+		return fmt.Errorf("failed loading config")
 	}
 
-	log.WithField("services", c.Services).Info("config file updated")
+	log.With("services", c.Services).Info("config file updated")
 
 	if err := c.executableSchema.UpdateServiceList(ctx, c.Services); err != nil {
-		log.WithError(err).Error("error updating services")
+		return fmt.Errorf("failed updating services")
 	}
 
-	log.WithField("services", c.Services).Info("updated services")
+	log.With("services", c.Services).Info("updated services")
 
 	return nil
 }
@@ -310,7 +311,7 @@ func GetConfig(configFiles []string) (*Config, error) {
 		GatewayPort:            8082,
 		PrivatePort:            8083,
 		MetricsPort:            9009,
-		LogLevel:               log.DebugLevel,
+		LogLevel:               log.LevelDebug,
 		PollInterval:           "10s",
 		MaxRequestsPerQuery:    50,
 		MaxServiceResponseSize: 1024 * 1024,
@@ -330,13 +331,15 @@ func (c *Config) ConfigurePlugins() []Plugin {
 	var enabledPlugins []Plugin
 	for _, pl := range c.Plugins {
 		p, ok := RegisteredPlugins()[pl.Name]
+		logger := log.With("plugin", pl.Name)
 		if !ok {
-			log.Warnf("plugin %q not found", pl.Name)
+			logger.Warn("plugin not found")
 			continue
 		}
 		err := p.Configure(c, pl.Config)
 		if err != nil {
-			log.WithError(err).Fatalf("error unmarshalling config for plugin %q: %s", pl.Name, err)
+			logger.With("error", err).Error("failed loading plugin config")
+			os.Exit(1)
 		}
 		enabledPlugins = append(enabledPlugins, p)
 	}
@@ -386,7 +389,7 @@ func (c *Config) Init() error {
 		plugin.Init(c.executableSchema)
 		pluginsNames = append(pluginsNames, plugin.ID())
 	}
-	log.Infof("enabled plugins: %v", pluginsNames)
+	log.With("plugins", pluginsNames).Info("plugins enabled")
 
 	return nil
 }
@@ -400,4 +403,12 @@ func (a *arrayFlags) String() string {
 func (a *arrayFlags) Set(value string) error {
 	*a = append(*a, value)
 	return nil
+}
+
+type levelflag struct {
+	log.LevelVar
+}
+
+func (l *levelflag) Set(s string) error {
+	return l.UnmarshalText([]byte(s))
 }

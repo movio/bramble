@@ -3,16 +3,16 @@ package bramble
 import (
 	"flag"
 	"io"
+	log "log/slog"
 	"os"
 	"testing"
-
-	log "github.com/sirupsen/logrus"
 )
 
 func TestMain(m *testing.M) {
 	flag.Parse()
 	if !testing.Verbose() {
-		log.SetOutput(io.Discard)
+		blackhole := log.New(log.NewTextHandler(io.Discard, nil))
+		log.SetDefault(blackhole)
 	}
 	os.Exit(m.Run())
 }
