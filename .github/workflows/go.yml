@@ -12,10 +12,10 @@ jobs:
           go-version-file: go.mod
 
       - name: Build
-        run: go build -v ./cmd/bramble
+        run: go build ./cmd/bramble
 
       - name: Test
-        run: go test -race -v -coverprofile=coverage.txt -covermode=atomic ./...
+        run: go test -race -coverprofile=coverage.txt -covermode=atomic ./...
 
       - name: Image
         uses: docker/build-push-action@v4
