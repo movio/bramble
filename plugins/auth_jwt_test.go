@@ -69,9 +69,9 @@ func TestJWTPlugin(t *testing.T) {
 
 		token, err := jwt.NewWithClaims(jwt.SigningMethodRS256, &Claims{
 			Role: "basic_role",
-			StandardClaims: jwt.StandardClaims{
-				Audience: "test-audience",
-				Id:       "test-id",
+			RegisteredClaims: jwt.RegisteredClaims{
+				Audience: jwt.ClaimStrings{"test-audience"},
+				ID:       "test-id",
 				Issuer:   "test-issuer",
 				Subject:  "test-subject",
 			},
@@ -104,8 +104,8 @@ func TestJWTPlugin(t *testing.T) {
 		require.NoError(t, err)
 
 		token, err := jwt.NewWithClaims(jwt.SigningMethodRS256, &Claims{
-			StandardClaims: jwt.StandardClaims{
-				ExpiresAt: time.Now().Add(-1 * time.Second).Unix(),
+			RegisteredClaims: jwt.RegisteredClaims{
+				ExpiresAt: jwt.NewNumericDate(time.Now().Add(-1 * time.Second)),
 			},
 			Role: "basic_role",
 		}).SignedString(privateKey)
@@ -182,9 +182,9 @@ func TestJWTPlugin(t *testing.T) {
 
 		token := jwt.NewWithClaims(jwt.SigningMethodRS256, &Claims{
 			Role: "basic_role",
-			StandardClaims: jwt.StandardClaims{
-				Audience: "test-audience",
-				Id:       "test-id",
+			RegisteredClaims: jwt.RegisteredClaims{
+				Audience: jwt.ClaimStrings{"test-audience"},
+				ID:       "test-id",
 				Issuer:   "test-issuer",
 				Subject:  "test-subject",
 			},
