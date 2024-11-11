@@ -9,6 +9,7 @@ import (
 	log "log/slog"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/go-jose/go-jose/v4"
 	"github.com/golang-jwt/jwt/v4"
@@ -109,7 +110,7 @@ func (p *JWTPlugin) Configure(cfg *bramble.Config, data json.RawMessage) error {
 }
 
 type Claims struct {
-	jwt.StandardClaims
+	jwt.RegisteredClaims
 	Role string
 }
 
@@ -159,18 +160,18 @@ func (p *JWTPlugin) ApplyMiddlewarePublicMux(h http.Handler) http.Handler {
 
 		ctx := r.Context()
 		ctx = bramble.AddPermissionsToContext(ctx, role)
-		ctx = addStandardJWTClaimsToOutgoingRequest(ctx, claims.StandardClaims)
+		ctx = addStandardJWTClaimsToOutgoingRequest(ctx, claims.RegisteredClaims)
 		ctx = bramble.AddOutgoingRequestsHeaderToContext(ctx, "JWT-Claim-Role", claims.Role)
 		h.ServeHTTP(rw, r.WithContext(ctx))
 	})
 }
 
-func addStandardJWTClaimsToOutgoingRequest(ctx context.Context, claims jwt.StandardClaims) context.Context {
-	if claims.Audience != "" {
-		ctx = bramble.AddOutgoingRequestsHeaderToContext(ctx, "JWT-Claim-Audience", claims.Audience)
+func addStandardJWTClaimsToOutgoingRequest(ctx context.Context, claims jwt.RegisteredClaims) context.Context {
+	if len(claims.Audience) > 0 {
+		ctx = bramble.AddOutgoingRequestsHeaderToContext(ctx, "JWT-Claim-Audience", strings.Join(claims.Audience, ","))
 	}
-	if claims.Id != "" {
-		ctx = bramble.AddOutgoingRequestsHeaderToContext(ctx, "JWT-Claim-ID", claims.Id)
+	if claims.ID != "" {
+		ctx = bramble.AddOutgoingRequestsHeaderToContext(ctx, "JWT-Claim-ID", claims.ID)
 	}
 	if claims.Issuer != "" {
 		ctx = bramble.AddOutgoingRequestsHeaderToContext(ctx, "JWT-Claim-Issuer", claims.Issuer)
