@@ -404,11 +404,3 @@ func (a *arrayFlags) Set(value string) error {
 	*a = append(*a, value)
 	return nil
 }
-
-type levelflag struct {
-	log.LevelVar
-}
-
-func (l *levelflag) Set(s string) error {
-	return l.UnmarshalText([]byte(s))
-}
