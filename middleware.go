@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"mime"
+	"net"
 	"net/http"
 	"strings"
 
@@ -91,6 +92,9 @@ func monitoringMiddleware(h http.Handler) http.Handler {
 			"request.path":    r.URL.Path,
 			"response.size":   m.Written,
 		})
+		if ip, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
+			event.addField("request.ip", ip)
+		}
 
 		promHTTPRequestCounter.With(prometheus.Labels{
 			"code": fmt.Sprintf("%dXX", m.Code/100),
