@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -67,6 +68,34 @@ func TestGatewayQuery(t *testing.T) {
 	assert.JSONEq(t, `{"data": { "test": "Hello" }}`, rec.Body.String())
 }
 
+func TestRequestNoBodyLoggingOnInfo(t *testing.T) {
+	server := NewGateway(NewExecutableSchema(nil, 50, nil), nil).Router(&Config{})
+
+	body := map[string]interface{}{
+		"foo": "bar",
+	}
+	jr, jw := io.Pipe()
+	go func() {
+		enc := json.NewEncoder(jw)
+		enc.Encode(body)
+		jw.Close()
+	}()
+	defer jr.Close()
+
+	req := httptest.NewRequest("POST", "/query", jr)
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	obj := collectLogEvent(t, &slog.HandlerOptions{Level: slog.LevelInfo}, func() {
+		server.ServeHTTP(w, req)
+	})
+	resp := w.Result()
+
+	assert.NotNil(t, obj)
+	assert.Equal(t, float64(resp.StatusCode), obj["response.status"])
+	assert.Empty(t, obj["request.content-type"])
+	assert.Empty(t, obj["request.body"])
+}
+
 func TestRequestJSONBodyLogging(t *testing.T) {
 	server := NewGateway(NewExecutableSchema(nil, 50, nil), nil).Router(&Config{})
 
@@ -84,7 +113,7 @@ func TestRequestJSONBodyLogging(t *testing.T) {
 	req := httptest.NewRequest("POST", "/query", jr)
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
-	obj := collectLogEvent(t, func() {
+	obj := collectLogEvent(t, &slog.HandlerOptions{Level: slog.LevelDebug}, func() {
 		server.ServeHTTP(w, req)
 	})
 	resp := w.Result()
@@ -110,7 +139,7 @@ func TestRequestInvalidJSONBodyLogging(t *testing.T) {
 	req := httptest.NewRequest("POST", "/query", jr)
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
-	obj := collectLogEvent(t, func() {
+	obj := collectLogEvent(t, &slog.HandlerOptions{Level: slog.LevelDebug}, func() {
 		server.ServeHTTP(w, req)
 	})
 	w.Result()
@@ -136,7 +165,7 @@ func TestRequestTextBodyLogging(t *testing.T) {
 	req := httptest.NewRequest("POST", "/query", jr)
 	req.Header.Set("Content-Type", "text/plain")
 	w := httptest.NewRecorder()
-	obj := collectLogEvent(t, func() {
+	obj := collectLogEvent(t, &slog.HandlerOptions{Level: slog.LevelDebug}, func() {
 		server.ServeHTTP(w, req)
 	})
 	w.Result()

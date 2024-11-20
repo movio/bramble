@@ -50,6 +50,10 @@ func (e *event) addFields(fields EventFields) {
 	e.fieldLock.Unlock()
 }
 
+func (e *event) debugEnabled() bool {
+	return log.Default().Enabled(context.Background(), log.LevelDebug)
+}
+
 func (e *event) finish() {
 	e.writeLock.Do(func() {
 		attrs := make([]any, 0, len(e.fields))

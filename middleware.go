@@ -83,7 +83,9 @@ func monitoringMiddleware(h http.Handler) http.Handler {
 
 		r = r.WithContext(ctx)
 
-		addRequestBody(event, r, buf)
+		if event.debugEnabled() {
+			addRequestBody(event, r, buf)
+		}
 
 		m := httpsnoop.CaptureMetrics(h, w, r)
 
