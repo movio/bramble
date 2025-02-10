@@ -38,7 +38,7 @@ the issue you're facing and the proposed solution.
 
 ### Building and testing
 
-Prerequisite: Go 1.17 or newer
+Prerequisite: Go 1.23
 
 To build the `bramble` command:
 

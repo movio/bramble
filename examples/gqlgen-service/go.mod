@@ -1,6 +1,6 @@
 module github.com/movio/bramble/examples/gqlgen-service
 
-go 1.22
+go 1.23.3
 
 require (
 	github.com/99designs/gqlgen v0.17.44

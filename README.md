@@ -49,13 +49,13 @@ the issue you're facing and the proposed solution.
 
 ### Building and testing
 
-Prerequisite: Go 1.17 or newer
+Prerequisite: Go 1.23 or newer
 
 To build the `bramble` command:
 
 ```bash
 go build -o bramble ./cmd/bramble
-./bramble -conf config.json
+./bramble -config config.json
 ```
 
 To run the tests:
