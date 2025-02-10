@@ -3,11 +3,11 @@ package plugins
 import (
 	"bytes"
 	"errors"
+	"html/template"
 	log "log/slog"
 	"net/http"
 	"os"
 	"sort"
-	"text/template"
 
 	"github.com/vektah/gqlparser/v2"
 	"github.com/vektah/gqlparser/v2/ast"
