@@ -15,11 +15,11 @@ require (
 	github.com/prometheus/common v0.31.1 // indirect
 	github.com/prometheus/procfs v0.7.3 // indirect
 	github.com/rs/cors v1.7.0
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.10.0
 	github.com/vektah/gqlparser/v2 v2.5.16
-	golang.org/x/crypto v0.31.0 // indirect
+	golang.org/x/crypto v0.32.0 // indirect
 	golang.org/x/sync v0.10.0
-	golang.org/x/sys v0.28.0 // indirect
+	golang.org/x/sys v0.29.0 // indirect
 	google.golang.org/protobuf v1.34.1 // indirect
 )
 
@@ -49,7 +49,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.27.0
 )
 
-require github.com/go-jose/go-jose/v4 v4.0.4
+require github.com/go-jose/go-jose/v4 v4.0.5
 
 require (
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
