@@ -332,7 +332,7 @@ func (s *ExecutableSchema) Schema() *ast.Schema {
 }
 
 // Complexity returns the query complexity (unimplemented)
-func (s *ExecutableSchema) Complexity(typeName, fieldName string, childComplexity int, args map[string]interface{}) (int, bool) {
+func (s *ExecutableSchema) Complexity(ctx context.Context, typeName, fieldName string, childComplexity int, args map[string]interface{}) (int, bool) {
 	// FIXME: TBD
 	return 0, false
 }
