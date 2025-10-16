@@ -105,6 +105,12 @@ func WithMaxResponseSize(maxResponseSize int64) ClientOpt {
 	}
 }
 
+func WithTimeout(timeout time.Duration) ClientOpt {
+	return func(s *GraphQLClient) {
+		s.HTTPClient.Timeout = timeout
+	}
+}
+
 // WithUserAgent set the user agent used by the client.
 func WithUserAgent(userAgent string) ClientOpt {
 	return func(s *GraphQLClient) {

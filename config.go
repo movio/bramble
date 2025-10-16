@@ -35,26 +35,28 @@ type TimeoutConfig struct {
 
 // Config contains the gateway configuration
 type Config struct {
-	IdFieldName            string        `json:"id-field-name"`
-	GatewayListenAddress   string        `json:"gateway-address"`
-	DisableIntrospection   bool          `json:"disable-introspection"`
-	MetricsListenAddress   string        `json:"metrics-address"`
-	PrivateListenAddress   string        `json:"private-address"`
-	GatewayPort            int           `json:"gateway-port"`
-	MetricsPort            int           `json:"metrics-port"`
-	PrivatePort            int           `json:"private-port"`
-	DefaultTimeouts        TimeoutConfig `json:"default-timeouts"`
-	GatewayTimeouts        TimeoutConfig `json:"gateway-timeouts"`
-	PrivateTimeouts        TimeoutConfig `json:"private-timeouts"`
-	Services               []string      `json:"services"`
-	LogLevel               log.Level     `json:"loglevel"`
-	PollInterval           string        `json:"poll-interval"`
-	PollIntervalDuration   time.Duration
-	MaxRequestsPerQuery    int64           `json:"max-requests-per-query"`
-	MaxServiceResponseSize int64           `json:"max-service-response-size"`
-	MaxFileUploadSize      int64           `json:"max-file-upload-size"`
-	Telemetry              TelemetryConfig `json:"telemetry"`
-	Plugins                []PluginConfig
+	IdFieldName               string        `json:"id-field-name"`
+	GatewayListenAddress      string        `json:"gateway-address"`
+	DisableIntrospection      bool          `json:"disable-introspection"`
+	MetricsListenAddress      string        `json:"metrics-address"`
+	PrivateListenAddress      string        `json:"private-address"`
+	GatewayPort               int           `json:"gateway-port"`
+	MetricsPort               int           `json:"metrics-port"`
+	PrivatePort               int           `json:"private-port"`
+	DefaultTimeouts           TimeoutConfig `json:"default-timeouts"`
+	GatewayTimeouts           TimeoutConfig `json:"gateway-timeouts"`
+	PrivateTimeouts           TimeoutConfig `json:"private-timeouts"`
+	Services                  []string      `json:"services"`
+	LogLevel                  log.Level     `json:"loglevel"`
+	PollInterval              string        `json:"poll-interval"`
+	PollIntervalDuration      time.Duration
+	MaxRequestsPerQuery       int64           `json:"max-requests-per-query"`
+	MaxServiceResponseSize    int64           `json:"max-service-response-size"`
+	HTTPClientTimeout         string          `json:"http-client-timeout"`
+	HTTPClientTimeoutDuration time.Duration   `json:"-"`
+	MaxFileUploadSize         int64           `json:"max-file-upload-size"`
+	Telemetry                 TelemetryConfig `json:"telemetry"`
+	Plugins                   []PluginConfig
 	// Config extensions that can be shared among plugins
 	Extensions map[string]json.RawMessage
 	// HTTP client to customize for downstream services query
@@ -129,6 +131,11 @@ func (c *Config) Load() error {
 	c.PollIntervalDuration, err = time.ParseDuration(c.PollInterval)
 	if err != nil {
 		return fmt.Errorf("invalid poll interval: %w", err)
+	}
+
+	c.HTTPClientTimeoutDuration, err = time.ParseDuration(c.HTTPClientTimeout)
+	if err != nil {
+		return fmt.Errorf("invalid http client timeout: %w", err)
 	}
 
 	c.DefaultTimeouts.ReadTimeoutDuration, err = time.ParseDuration(c.DefaultTimeouts.ReadTimeout)
@@ -315,6 +322,7 @@ func GetConfig(configFiles []string) (*Config, error) {
 		PollInterval:           "10s",
 		MaxRequestsPerQuery:    50,
 		MaxServiceResponseSize: 1024 * 1024,
+		HTTPClientTimeout:      "5s",
 
 		watcher:     watcher,
 		tracer:      otel.GetTracerProvider().Tracer(instrumentationName),
@@ -370,6 +378,7 @@ func (c *Config) Init() error {
 	queryClientOptions := []ClientOpt{
 		WithMaxResponseSize(c.MaxServiceResponseSize),
 		WithUserAgent(GenerateUserAgent("query")),
+		WithTimeout(c.HTTPClientTimeoutDuration),
 	}
 
 	if c.QueryHTTPClient != nil {
