@@ -1,4 +1,4 @@
-package testsrv2
+package testsrv1
 
 import (
 	"errors"

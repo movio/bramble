@@ -236,7 +236,7 @@ func extractSelectionSet(ctx *PlanningContext, insertionPoint []string, parentTy
 		mergedSteps := []*QueryPlanStep{}
 		mergedStepsMap := map[string]*QueryPlanStep{}
 		for _, step := range childrenStepsResult {
-			key := strings.Join(append([]string{step.ServiceURL}, step.InsertionPoint...), "/")
+			key := strings.Join(append([]string{step.ServiceURL, step.ParentType}, step.InsertionPoint...), "/")
 			if existingStep, ok := mergedStepsMap[key]; ok {
 				existingStep.SelectionSet = append(existingStep.SelectionSet, step.SelectionSet...)
 				existingStep.Then = append(existingStep.Then, step.Then...)

@@ -165,18 +165,20 @@ func TestFederatedQueryWithMultipleFragmentSpreads(t *testing.T) {
 func TestFederatedQueryWithBoundary(t *testing.T) {
 	gizmoService := testsrv1.NewGizmoService()
 	gadgetService := testsrv2.NewGadgetService()
+	defer gizmoService.Close()
+	defer gadgetService.Close()
 
 	executableSchema := NewExecutableSchema(nil, 10, nil, NewService(gizmoService.URL), NewService(gadgetService.URL))
 
 	require.NoError(t, executableSchema.UpdateSchema(context.TODO(), true))
 
-	t.Run("It should resolve boundary fields on fragments correctly", func(t *testing.T) {
+	t.Run("It should resolve boundary fields on the Jetpack fragments correctly", func(t *testing.T) {
 		query := gqlparser.MustLoadQuery(executableSchema.MergedSchema, `{
 			gizmo(id: "GIZMO1") {
 				id
 				gadget {
 					... on Jetpack {
-						name	
+						name
 						range
 						description
 						__typename
@@ -212,7 +214,92 @@ func TestFederatedQueryWithBoundary(t *testing.T) {
 		jsonEqWithOrder(t, expectedResponse, string(response.Data))
 	})
 
-	gizmoService.Close()
-	gadgetService.Close()
+	t.Run("It should resolve boundary fields on the InvisibleCar fragments correctly", func(t *testing.T) {
+		query := gqlparser.MustLoadQuery(executableSchema.MergedSchema, `{
+			gizmo(id: "GIZMO2") {
+				id
+				gadget {
+					... on Jetpack {
+						name
+						range
+						description
+						__typename
+					}
+					... on InvisibleCar {
+						name
+						cloaked
+						performance
+						__typename
+					}
+				}
+			}
+		}`)
+
+		ctx := testContextWithoutVariables(query.Operations[0])
+
+		response := executableSchema.ExecuteQuery(ctx)
+		expectedResponse := `
+		{
+			"gizmo": {
+				"id": "GIZMO2",
+				"gadget": {
+					"name": "Vanquish",
+					"cloaked": true,
+					"performance": 100,
+					"__typename": "InvisibleCar"
+				}
+			}
+		}`
+
+		// Assert that response.Errors is empty
+		require.Empty(t, response.Errors)
+		jsonEqWithOrder(t, expectedResponse, string(response.Data))
+	})
+
+	t.Run("It should resolve boundary fields on fragments correctly", func(t *testing.T) {
+		query := gqlparser.MustLoadQuery(executableSchema.MergedSchema, `{
+			gadgets {
+				... on Jetpack {
+					name
+					range
+					description
+					__typename
+				}
+				... on InvisibleCar {
+					name
+					cloaked
+					performance
+					__typename
+				}
+			}
+		}`)
+
+		ctx := testContextWithoutVariables(query.Operations[0])
+
+		response := executableSchema.ExecuteQuery(ctx)
+		expectedResponse := `
+		{
+			"gadgets": [
+				{
+					"name": "Jetpack #1",
+					"range": "500km",
+					"description":"Jetpack #1 Description",
+					"__typename": "Jetpack"
+				},
+				{
+					"name": "Vanquish",
+					"cloaked": true,
+					"performance": 100,
+					"__typename": "InvisibleCar"
+				}
+			]
+		}`
+
+		// Assert that response.Errors is empty
+		require.Empty(t, response.Errors)
+		jsonEqWithOrder(t, expectedResponse, string(response.Data))
+	})
+
+
 
 }

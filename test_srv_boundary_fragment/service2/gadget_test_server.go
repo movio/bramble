@@ -1,4 +1,4 @@
-package testsrv1
+package testsrv2
 
 import (
 	"errors"
@@ -51,6 +51,14 @@ func (g *gadgetServiceResolver) Gizmo(args struct{ ID string }) (*gizmoWithGadge
 		IDField: args.ID,
 		Gadget:  &gadgetResolver{gadget},
 	}, nil
+}
+
+func (g *gadgetServiceResolver) Gadgets() ([]*gadgetResolver, error) {
+	return []*gadgetResolver{{
+		gadget: jetpackMap["JETPACK1"],
+	}, {
+		gadget: invisibleCarMap["AM1"],
+	}}, nil
 }
 
 func (g *gadgetServiceResolver) BoundaryJetpack(args struct{ ID string }) (*jetpack, error) {
@@ -137,8 +145,8 @@ type invisibleCar struct {
 }
 
 func (r *gadgetResolver) ToInvisibleCar() (*invisibleCar, bool) {
-	invisableCar, ok := r.gadget.(*invisibleCar)
-	return invisableCar, ok
+	invisibleCar, ok := r.gadget.(*invisibleCar)
+	return invisibleCar, ok
 }
 
 func (j invisibleCar) ID() graphql.ID {
@@ -160,6 +168,7 @@ func NewGadgetService() *httptest.Server {
 	type Query {
 		service: Service!
 		gizmo(id: ID!): Gizmo
+		gadgets: [Gadget!]!
 		boundaryGizmo(id: ID!): Gizmo @boundary
 		boundaryJetpack(id: ID!): Jetpack @boundary
 		boundaryInvisibleCar(id: ID!): InvisibleCar @boundary
