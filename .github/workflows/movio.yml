@@ -16,10 +16,18 @@ jobs:
   dispatch:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/create-github-app-token@v2
+        id: app-token
+        with:
+          app-id: ${{ vars.MOVIO_APP_ID }}
+          private-key: ${{ secrets.MOVIO_APP_PRIVATE_KEY }}
+          owner: movio
+          repositories: bramble-movio
+
       - name: Notify Movio
         uses: peter-evans/repository-dispatch@v3
         with:
-          token: ${{ secrets.MOVIO_ACTIONS_ACCESS }}
+          token: ${{ steps.app-token.outputs.token }}
           repository: movio/bramble-movio
           event-type: ${{ github.event_name }}
           client-payload: |-
