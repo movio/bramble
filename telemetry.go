@@ -214,7 +214,7 @@ func newMeterProvider(exp sdkmetric.Exporter, res *resource.Resource) (*sdkmetri
 
 func resources(cfg TelemetryConfig) (*resource.Resource, error) {
 	return resource.Merge(resource.Default(),
-		resource.NewWithAttributes(semconv.SchemaURL,
+		resource.NewWithAttributes("",
 			semconv.ServiceName(cfg.ServiceName),
 			semconv.ServiceVersion(Version),
 		))
