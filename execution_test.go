@@ -857,7 +857,6 @@ func TestQueryExecutionServiceTimeout(t *testing.T) {
 			assert.Equal(t, f.errors[i].Locations, resp.Errors[i].Locations, "error locations did not match")
 			assert.Equal(t, f.errors[i].Extensions, resp.Errors[i].Extensions, "error extensions did not match")
 		}
-
 	})
 }
 
@@ -1766,9 +1765,9 @@ func TestQueryExecutionMultipleServicesWithArray(t *testing.T) {
 									"title": "title %s"
 								}`, i, id, id, id)
 						}
-						w.Write([]byte(fmt.Sprintf(`{ "data": { %s } }`, res)))
+						_, _ = fmt.Fprintf(w, `{ "data": { %s } }`, res)
 					} else {
-						w.Write([]byte(fmt.Sprintf(`{
+						_, _ = fmt.Fprintf(w, `{
 							"data": {
 								"movie": {
 									"_bramble_id": "%s",
@@ -1777,7 +1776,7 @@ func TestQueryExecutionMultipleServicesWithArray(t *testing.T) {
 									"title": "title %s"
 								}
 							}
-						}`, ids[0], ids[0], ids[0])))
+						}`, ids[0], ids[0], ids[0])
 					}
 				}),
 			},
@@ -1971,9 +1970,9 @@ func TestQueryExecutionMultipleServicesWithNestedArrays(t *testing.T) {
 									"title": "title %s"
 								}`, i, id, id, id)
 					}
-					w.Write([]byte(fmt.Sprintf(`{ "data": { %s } }`, res)))
+					_, _ = fmt.Fprintf(w, `{ "data": { %s } }`, res)
 				} else {
-					w.Write([]byte(fmt.Sprintf(`{
+					_, _ = fmt.Fprintf(w, `{
 							"data": {
 								"movie": {
 									"_bramble_id": "%s",
@@ -1982,7 +1981,7 @@ func TestQueryExecutionMultipleServicesWithNestedArrays(t *testing.T) {
 									"title": "title %s"
 								}
 							}
-						}`, ids[0], ids[0], ids[0])))
+						}`, ids[0], ids[0], ids[0])
 				}
 			}),
 		},
@@ -3446,7 +3445,7 @@ func TestSchemaUpdate_serviceError(t *testing.T) {
 			{
 				schema: schemaB,
 				handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					w.Write([]byte(fmt.Sprintf(`{
+					fmt.Fprintf(w, `{
 						"data": {
 							"service": {
 								"name": "serviceB",
@@ -3455,7 +3454,7 @@ func TestSchemaUpdate_serviceError(t *testing.T) {
 							}
 						}
 					}
-					`, schemaB)))
+					`, schemaB)
 				}),
 			},
 		},
