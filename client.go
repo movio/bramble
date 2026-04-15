@@ -44,7 +44,7 @@ func NewClient(opts ...ClientOpt) *GraphQLClient {
 }
 
 func NewClientWithPlugins(plugins []Plugin, opts ...ClientOpt) *GraphQLClient {
-	var transport http.RoundTripper = http.DefaultTransport
+	transport := http.DefaultTransport
 	transport = otelhttp.NewTransport(transport)
 
 	c := &GraphQLClient{
@@ -67,7 +67,7 @@ func NewClientWithPlugins(plugins []Plugin, opts ...ClientOpt) *GraphQLClient {
 }
 
 func NewClientWithoutKeepAlive(opts ...ClientOpt) *GraphQLClient {
-	var defaultTransport = http.DefaultTransport.(*http.Transport).Clone()
+	defaultTransport := http.DefaultTransport.(*http.Transport).Clone()
 	defaultTransport.DisableKeepAlives = true
 
 	var transport http.RoundTripper = defaultTransport
@@ -144,7 +144,6 @@ func (c *GraphQLClient) Request(ctx context.Context, url string, request *Reques
 	buf, contentType, err := request.requestBody()
 	if err != nil {
 		return traceErr(fmt.Errorf("unable to encode request body: %w", err))
-
 	}
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, &buf)
 	if err != nil {
@@ -241,7 +240,6 @@ func (r *Request) WithOperationType(operation string) *Request {
 }
 
 func (r *Request) WithOperationName(operationName string) *Request {
-
 	r.OperationName = operationName
 	return r
 }

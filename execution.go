@@ -561,9 +561,9 @@ func eliminateUnwantedFragments(responseObjectTypeName string, schema *ast.Schem
 }
 
 func includeFragment(responseObjectTypeName string, schema *ast.Schema, objectDefinition *ast.Definition, typeCondition string) bool {
-	return !(objectDefinition.IsAbstractType() &&
-		fragmentImplementsAbstractType(schema, objectDefinition.Name, typeCondition) &&
-		objectTypenameMatchesDifferentFragment(responseObjectTypeName, typeCondition))
+	return !objectDefinition.IsAbstractType() ||
+		!fragmentImplementsAbstractType(schema, objectDefinition.Name, typeCondition) ||
+		!objectTypenameMatchesDifferentFragment(responseObjectTypeName, typeCondition)
 }
 
 func fragmentImplementsAbstractType(schema *ast.Schema, abstractObjectTypename, fragmentTypeDefinition string) bool {

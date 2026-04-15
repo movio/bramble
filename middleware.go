@@ -122,8 +122,8 @@ func addRequestBody(e *event, r *http.Request, buf bytes.Buffer) {
 	e.addField("request.content-type", contentType)
 
 	if r.Method != http.MethodHead && r.Method != http.MethodGet {
-		switch {
-		case contentType == "application/json":
+		switch contentType {
+		case "application/json":
 			var payload interface{}
 			if err := json.Unmarshal(buf.Bytes(), &payload); err == nil {
 				e.addField("request.body", &payload)
@@ -131,7 +131,7 @@ func addRequestBody(e *event, r *http.Request, buf bytes.Buffer) {
 				e.addField("request.body", buf.String())
 				e.addField("request.error", err)
 			}
-		case contentType == "multipart/form-data":
+		case "multipart/form-data":
 			e.addField("request.body", fmt.Sprintf("%d bytes", len(buf.Bytes())))
 		default:
 			e.addField("request.body", buf.String())
