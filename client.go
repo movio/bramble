@@ -121,7 +121,7 @@ func WithUserAgent(userAgent string) ClientOpt {
 // Request executes a GraphQL request.
 func (c *GraphQLClient) Request(ctx context.Context, url string, request *Request, out interface{}) error {
 	ctx, span := c.tracer.Start(ctx, "GraphQL Request",
-		trace.WithSpanKind(trace.SpanKindInternal),
+		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
 			semconv.GraphqlOperationTypeKey.String(string(request.OperationType)),
 			semconv.GraphqlOperationName(request.OperationName),
