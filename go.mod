@@ -8,7 +8,7 @@ require (
 	github.com/fsnotify/fsnotify v1.5.1
 	github.com/golang-jwt/jwt/v4 v4.5.2
 	github.com/golang/protobuf v1.5.4 // indirect
-	github.com/gorilla/websocket v1.5.0 // indirect
+	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/graph-gophers/graphql-go v1.5.0
 	github.com/prometheus/client_golang v1.11.1
 	github.com/prometheus/common v0.31.1 // indirect
