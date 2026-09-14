@@ -2,11 +2,11 @@
 
 This is an example service that exposes a very simple schema:
 
-    type Foo {
+    type Gizmo {
         id: ID!
-        gqlgen: Boolean!
+        name: String!
     }
 
-Other example services will add other fields to the `Foo` object.
+Other example services will add other fields to the `Gizmo` object.
 
 _Note: we have not added `gqlgen` related generated files to git; must `go generate .` before use_
