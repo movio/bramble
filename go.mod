@@ -44,7 +44,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.46.0
 )
 
-require github.com/go-jose/go-jose/v4 v4.1.4
+require github.com/go-jose/go-jose/v4 v4.1.6
 
 require (
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
