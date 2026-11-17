@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	log "log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -57,24 +58,46 @@ func Main() {
 	gtw := NewGateway(cfg.executableSchema, cfg.plugins)
 	RegisterMetrics()
 
-	go gtw.UpdateSchemas(cfg.PollIntervalDuration)
-
 	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt)
 	defer cancel()
 
 	var wg sync.WaitGroup
 	wg.Add(3)
 
-	go runHandler(ctx, &wg, "metrics", cfg.MetricAddress(), cfg.DefaultTimeouts, NewMetricsHandler())
-	go runHandler(ctx, &wg, "private", cfg.PrivateAddress(), cfg.PrivateTimeouts, gtw.PrivateRouter())
-	go runHandler(ctx, &wg, "public", cfg.GatewayAddress(), cfg.GatewayTimeouts, gtw.Router(cfg))
+	privateListener, err := net.Listen("tcp", cfg.PrivateAddress())
+	if err != nil {
+		log.With("error", err).Error("failed to bind private listener")
+		os.Exit(1)
+	}
+	go runHandler(ctx, &wg, "private", privateListener, cfg.PrivateTimeouts, gtw.PrivateRouter())
+
+	err = gtw.ExecutableSchema.UpdateSchema(ctx, true)
+	if err != nil {
+		log.With("error", err).Error("failed run first schema update")
+		os.Exit(1)
+	}
+
+	go gtw.UpdateSchemas(cfg.PollIntervalDuration)
+
+	metricsListener, err := net.Listen("tcp", cfg.MetricAddress())
+	if err != nil {
+		log.With("error", err).Error("failed to bind metrics listener")
+		os.Exit(1)
+	}
+	publicListener, err := net.Listen("tcp", cfg.GatewayAddress())
+	if err != nil {
+		log.With("error", err).Error("failed to bind public listener")
+		os.Exit(1)
+	}
+
+	go runHandler(ctx, &wg, "metrics", metricsListener, cfg.DefaultTimeouts, NewMetricsHandler())
+	go runHandler(ctx, &wg, "public", publicListener, cfg.GatewayTimeouts, gtw.Router(cfg))
 
 	wg.Wait()
 }
 
-func runHandler(ctx context.Context, wg *sync.WaitGroup, name, addr string, timeouts TimeoutConfig, handler http.Handler) {
+func runHandler(ctx context.Context, wg *sync.WaitGroup, name string, ln net.Listener, timeouts TimeoutConfig, handler http.Handler) {
 	srv := &http.Server{
-		Addr:         addr,
 		Handler:      handler,
 		ReadTimeout:  timeouts.ReadTimeoutDuration,
 		WriteTimeout: timeouts.WriteTimeoutDuration,
@@ -82,8 +105,8 @@ func runHandler(ctx context.Context, wg *sync.WaitGroup, name, addr string, time
 	}
 
 	go func() {
-		log.With("addr", addr).Info(fmt.Sprintf("serving %s handler", name))
-		if err := srv.ListenAndServe(); err != http.ErrServerClosed {
+		log.With("addr", ln.Addr().String()).Info(fmt.Sprintf("serving %s handler", name))
+		if err := srv.Serve(ln); err != http.ErrServerClosed {
 			log.With("error", err).Error("server terminated unexpectedly")
 			os.Exit(1)
 		}
