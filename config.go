@@ -355,7 +355,6 @@ func (c *Config) ConfigurePlugins() []Plugin {
 	return enabledPlugins
 }
 
-// Init initializes the config and does an initial fetch of the services.
 func (c *Config) Init() error {
 	var err error
 	c.Services, err = c.buildServiceList()
@@ -386,10 +385,6 @@ func (c *Config) Init() error {
 	}
 	queryClient := NewClientWithPlugins(c.plugins, queryClientOptions...)
 	es := NewExecutableSchema(c.plugins, c.MaxRequestsPerQuery, queryClient, services...)
-	err = es.UpdateSchema(context.Background(), true)
-	if err != nil {
-		return err
-	}
 
 	c.executableSchema = es
 
